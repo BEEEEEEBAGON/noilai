@@ -112,7 +112,8 @@ def test_run_cells_are_tagged_and_headed_so_they_can_be_adjusted():
         assert run_cells, name
         for c in run_cells:
             assert c.source.startswith("# RUN CELL"), name
-            assert "kaggle_run_plan" in c.source and "--resume" not in c.source, "flags live in the driver, not the cell"
+            # the cell calls the driver; it never assembles a run_eval.py command itself
+            assert "kaggle_run_plan" in c.source and "run_eval.py" not in c.source, "flags live in the driver, not the cell"
         headers = [c for c in nb.cells if c.cell_type == "markdown" and "RUN CELL" in c.source]
         assert len(headers) == len(run_cells), name
     nb = nbformat.read(str(NOTEBOOKS["colab_probe_gemma3"]), as_version=4)
@@ -512,6 +513,7 @@ def test_colab_setup_command_construction_and_token_handling(tmp_path, monkeypat
     ask = CS.write_askpass("GITHUB_TOKEN", tmp_path / "ask.sh")
     assert ask.read_text() == '#!/bin/sh\necho "$GITHUB_TOKEN"\n' and (ask.stat().st_mode & 0o777) == 0o700
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.delenv("GIT_ASKPASS", raising=False)          # some hosts export their own helper
     env = CS.git_env("GITHUB_TOKEN", askpass=ask)
     assert env["GIT_TERMINAL_PROMPT"] == "0" and "GIT_ASKPASS" not in env
     monkeypatch.setenv("GITHUB_TOKEN", "not-a-real-token-value")
