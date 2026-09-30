@@ -153,6 +153,17 @@ def test_inventory_round_trip_is_exact():
         assert s.glide and s.coda == "" and s.nucleus in ("a", "e", "i") and s.onset != "c"
 
 
+def test_inventory_extension_adds_common_missing_syllables():
+    base = L.load_inventory(extended=False)
+    ext = L.load_inventory()
+    assert "gẫy" not in base.syllables and "gẫy" in ext.syllables
+    assert 100 < ext.n_extended < 800 and ext.rimes == base.rimes          # no new rime types
+    assert "ii" not in ext.syllables and "hoc" not in ext.syllables
+    assert "gip" in base.rejected and "gip" not in base.syllables          # ngang tone on a stop coda
+    # no new rime type without attestation in at least two word-list entries
+    assert ext.is_legal(S("cược"), "attested")
+
+
 def test_inventory_legality_levels():
     inv = L.load_inventory()
     assert inv.is_legal(S("mài"), "attested")

@@ -111,13 +111,16 @@ class Generator:
         self.exclude_qu = exclude_qu
         self.rng = random.Random(seed)
         self.inv = inventory or L.load_inventory()
-        self.words = words if words is not None else L.load_words()
-        self.freqs = L.syllable_frequencies(self.words)
-        self.lex_pairs: set[tuple[str, str]] = set()
-        for a, b in L.two_syllable_words(self.words):
-            ca, cb = try_parse(a, strict=False), try_parse(b, strict=False)
-            if ca and cb:
-                self.lex_pairs.add((spell(ca.syllable), spell(cb.syllable)))
+        if words is None:
+            self.freqs = L.syllable_frequencies()          # cached word-list index
+            self.lex_pairs: set[tuple[str, str]] = L.lexical_pairs()
+        else:
+            self.freqs = L.syllable_frequencies(words)
+            self.lex_pairs = set()
+            for a, b in L.two_syllable_words(words):
+                ca, cb = try_parse(a, strict=False), try_parse(b, strict=False)
+                if ca and cb:
+                    self.lex_pairs.add((spell(ca.syllable), spell(cb.syllable)))
         # attested syllables usable for pseudo pairs and twins (standard spellings, real tones)
         self.attested = sorted({s for s in self.inv.structures if self.inv.is_legal(s, "attested")},
                                key=lambda s: (s.onset, s.glide, s.nucleus, s.coda, s.tone))

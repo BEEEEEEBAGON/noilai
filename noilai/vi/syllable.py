@@ -484,12 +484,16 @@ class Inventory:
         self.rimes: set[str] = set()           # canonical rime keys
         self.rime_tones: dict[str, set[int]] = {}
         self.unparsed: list[str] = []
+        self.rejected: list[str] = []          # parseable but phonotactically impossible (gip, têt, hoc)
         for w in syllables:
             p = try_parse(w, strict=False)
             if p is None:
                 self.unparsed.append(w)
                 continue
             s = p.syllable
+            if s.coda in STOP_CODAS and s.tone not in (2, 5):
+                self.rejected.append(w)
+                continue
             self.syllables.add(U.nfc(w.lower()))
             self.structures.add(s)
             self.toneless.add((s.onset, s.glide, s.nucleus, s.coda))

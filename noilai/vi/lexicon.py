@@ -16,7 +16,7 @@ import re
 from collections import Counter
 from functools import lru_cache
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Optional
 
 from . import unicode as U
 from .syllable import Inventory, try_parse
@@ -47,10 +47,89 @@ def load_hunspell_syllables(style: str = "new") -> list[str]:
     return out
 
 
+WORDLIST_MIN_COUNT = 2
+CACHE = ROOT / "data" / "cache"
+
+
+def _file_sha256(path: Path) -> str:
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 @lru_cache(maxsize=None)
-def load_inventory() -> Inventory:
-    """The attested syllable inventory (both placement styles merged, canonical spelling)."""
-    return Inventory(load_hunspell_syllables("new") + load_hunspell_syllables("old"))
+def wordlist_index(name: str = "Viet74K.txt") -> dict:
+    """Parsed view of the word list, cached on disk under data/cache keyed by the file hash:
+      canonical_counts        canonical spelling -> number of entries containing the syllable
+      strict_standard_counts  standard-spelled syllables (strict parse) -> count
+      two_syllable_pairs      [[a, b], ...] canonical spellings of two-syllable entries
+    Parsing the 74k entries takes about 15 s; the cache makes every later load instant."""
+    import json
+    path = EXTERNAL / name
+    key = _file_sha256(path)[:16]
+    CACHE.mkdir(parents=True, exist_ok=True)
+    cpath = CACHE / f"wordlist_{name}_{key}.json"
+    if cpath.exists():
+        with open(cpath, encoding="utf-8") as f:
+            return json.load(f)
+    from .syllable import spell
+    canonical: Counter = Counter()
+    strict: Counter = Counter()
+    pairs: list[list[str]] = []
+    for w in load_words(name):
+        parts = w.split()
+        parsed = [try_parse(p, strict=False) for p in parts]
+        for part, pr in zip(parts, parsed):
+            if pr is None:
+                continue
+            canonical[spell(pr.syllable)] += 1
+            if pr.i_y_variant is None and try_parse(part, strict=True) is not None:
+                strict[part] += 1
+        if len(parts) == 2 and all(parsed):
+            pairs.append([spell(parsed[0].syllable), spell(parsed[1].syllable)])
+    data = {"source": name, "sha256_prefix": key, "canonical_counts": dict(canonical),
+            "strict_standard_counts": dict(strict), "two_syllable_pairs": pairs}
+    tmp = cpath.with_suffix(".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+    tmp.replace(cpath)
+    return data
+
+
+@lru_cache(maxsize=None)
+def load_inventory(extended: bool = True) -> Inventory:
+    """The attested syllable inventory.
+
+    Base: the Hunspell list in both placement styles (6,611 lowercase entries). The
+    Hunspell list misses a number of common syllables (gẫy, nhếch, cược, thới, ...), so
+    `extended=True` (the default) adds every syllable of the Viet74K word list that
+    parses in strict mode with a standard spelling and occurs in at least
+    WORDLIST_MIN_COUNT entries (singletons are likely typos or proper-noun fragments).
+    The extension adds a few hundred syllables and no new rime types are accepted
+    unless they are attested this way.
+    """
+    base = load_hunspell_syllables("new") + load_hunspell_syllables("old")
+    if not extended:
+        return Inventory(base)
+    counts = wordlist_index()["strict_standard_counts"]
+    base_inv = Inventory(base)
+    hun = set(base)
+    extra = []
+    for syl, n in counts.items():
+        if n < WORDLIST_MIN_COUNT or syl in hun:
+            continue
+        pr = try_parse(syl, strict=True)
+        # no new RIME types from the word list: a rime unattested in the Hunspell base is
+        # more likely a foreign word or a typo (ii, quới) than a gap in the base
+        if pr is None or pr.syllable.rime not in base_inv.rimes:
+            continue
+        extra.append(syl)
+    inv = Inventory(base + sorted(extra))
+    inv.n_extended = len(extra)
+    return inv
 
 
 def load_words(name: str = "Viet74K.txt") -> list[str]:
@@ -75,8 +154,11 @@ def two_syllable_words(words: Iterable[str]) -> list[tuple[str, str]]:
     return pairs
 
 
-def syllable_frequencies(words: Iterable[str]) -> Counter:
-    """How often each canonical syllable appears across the word list (a frequency proxy)."""
+def syllable_frequencies(words: Optional[Iterable[str]] = None) -> Counter:
+    """How often each canonical syllable appears across the word list (a frequency proxy).
+    With no argument the cached index of Viet74K is used."""
+    if words is None:
+        return Counter(wordlist_index()["canonical_counts"])
     c: Counter = Counter()
     for w in words:
         for p in w.split():
@@ -84,3 +166,8 @@ def syllable_frequencies(words: Iterable[str]) -> Counter:
             if pr:
                 c[pr.syllable.spelled()] += 1
     return c
+
+
+def lexical_pairs() -> set[tuple[str, str]]:
+    """Canonical two-syllable entries of the word list (cached)."""
+    return {tuple(p) for p in wordlist_index()["two_syllable_pairs"]}
