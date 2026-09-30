@@ -107,3 +107,17 @@ def test_audit_script_on_gemma3_if_present(tmp_path):
 def test_fetch_resources_keeps_existing_and_verifies_hashes():
     r = run("scripts/fetch_resources.py")
     assert "HASH MISMATCH" not in r.stdout and "[FAIL]" not in r.stdout
+
+
+def test_audit_items_script(release, tmp_path):
+    spm = ROOT / "data" / "external" / "gemma3_tokenizer.model"
+    if not spm.exists():
+        pytest.skip("no Gemma 3 tokenizer downloaded")
+    out = tmp_path / "items.jsonl"
+    run("scripts/audit_items.py", "--items", str(release / "noilai_core.jsonl"), "--spm", f"{spm}:g3", "--out", str(out))
+    rows = [json.loads(l) for l in open(out, encoding="utf-8")]
+    core = [json.loads(l) for l in open(release / "noilai_core.jsonl", encoding="utf-8")]
+    assert len(rows) == 2 * len(core)
+    nfd = [r for r in rows if r["encoding"] == "nfd"]
+    assert all(r["delta_tokens_vs_nfc"] >= 0 for r in nfd) and any(r["delta_tokens_vs_nfc"] > 0 for r in nfd)
+    assert all(len(r["input"]["tokens_per_syllable"]) == 2 for r in rows)
