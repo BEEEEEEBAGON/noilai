@@ -21,7 +21,6 @@ model fitted elsewhere (bambi/PyMC or lme4), see docs/DESIGN_DECISIONS.md 8.4.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -162,9 +161,9 @@ def bootstrap_mean_slopes(df: pd.DataFrame, n_boot: int = 200, seed: int = 0, bp
         boot = pd.concat(parts, ignore_index=True)
         try:
             fe = fit_fixed_effects_clustered(boot, formula=formula, bp_col=bp_col, model_col=model_col)
-        except Exception:  # noqa: BLE001 - a singular replicate is skipped and counted
+        except Exception:
             continue
         tps.append(fe.mean_slope_tps)
         al.append(fe.mean_slope_align)
-    q = lambda a: [float(np.quantile(a, 0.025)), float(np.quantile(a, 0.975))] if a else [np.nan, np.nan]  # noqa: E731
+    q = lambda a: [float(np.quantile(a, 0.025)), float(np.quantile(a, 0.975))] if a else [np.nan, np.nan]
     return {"n_ok": len(tps), "ci_mean_slope_tps": q(tps), "ci_mean_slope_align": q(al)}

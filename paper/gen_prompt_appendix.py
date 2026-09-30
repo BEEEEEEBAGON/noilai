@@ -24,10 +24,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from noilai.eval import prompts as P  # noqa: E402
-from noilai.gen import variants as V  # noqa: E402
-from noilai.gen.generate import syl_dict  # noqa: E402
-from noilai.vi.syllable import spell, try_parse  # noqa: E402
+from noilai.eval import prompts as P
+from noilai.gen import variants as V
+from noilai.gen.generate import syl_dict
+from noilai.vi.syllable import spell, try_parse
 
 _ESC = {"\\": r"\textbackslash{}", "{": r"\{", "}": r"\}", "$": r"\$", "&": r"\&", "#": r"\#", "%": r"\%",
         "_": r"\_", "^": r"\textasciicircum{}", "~": r"\textasciitilde{}", "<": r"\textless{}",

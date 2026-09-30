@@ -449,7 +449,7 @@ def git_info() -> dict:
     def _run(*args):
         try:
             return subprocess.check_output(["git", *args], cwd=ROOT, text=True, stderr=subprocess.DEVNULL).strip()
-        except Exception:  # noqa: BLE001
+        except Exception:
             return None
     commit = _run("rev-parse", "HEAD")
     dirty = _run("status", "--porcelain", "--", str(ROOT))
@@ -502,7 +502,7 @@ def pip_freeze() -> tuple[str, str]:
         from importlib import metadata
         lines = sorted({f"{d.metadata['Name']}=={d.version}" for d in metadata.distributions() if d.metadata["Name"]},
                        key=str.lower)
-    except Exception:  # noqa: BLE001
+    except Exception:
         lines = []
     text = "\n".join(lines) + ("\n" if lines else "")
     return text, hashlib.sha256(text.encode("utf-8")).hexdigest()

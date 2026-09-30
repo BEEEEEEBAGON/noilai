@@ -737,7 +737,7 @@ def execute(run_id: str, models: Sequence[str] | None = None, platform: str = "k
         if after_each is not None:
             try:
                 after_each(res)
-            except Exception as e:  # noqa: BLE001 - a failed push must not stop the loop
+            except Exception as e:
                 res["after_each_error"] = repr(e)
                 print(f"[warn ] after_each hook failed for {name}: {e!r}")
         results.append(res)

@@ -52,7 +52,7 @@ def get_secret(name: str) -> str | None:
 
         try:
             val = userdata.get(name)
-        except Exception:  # noqa: BLE001 - SecretNotFoundError / NotebookAccessError
+        except Exception:
             val = None
         if val:
             return val
@@ -63,7 +63,7 @@ def get_secret(name: str) -> str | None:
 
         try:
             val = UserSecretsClient().get_secret(name)
-        except Exception:  # noqa: BLE001
+        except Exception:
             val = None
         if val:
             return val
@@ -254,13 +254,13 @@ def record_environment(out_dir: Path, python: str = sys.executable) -> Path:
                                 "capability": ".".join(map(str, torch.cuda.get_device_capability(i))),
                                 "memory_gb": round(torch.cuda.get_device_properties(i).total_memory / 2**30, 1)}
                                for i in range(torch.cuda.device_count())]
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         info["torch"] = f"unavailable: {e}"
     for mod in ("transformers", "vllm", "sentencepiece"):
         try:
             m = __import__(mod)
             info[mod] = getattr(m, "__version__", "?")
-        except Exception:  # noqa: BLE001
+        except Exception:
             info[mod] = None
     p = out_dir / f"env_{stamp}.json"
     p.write_text(json.dumps(info, indent=2), encoding="utf-8")

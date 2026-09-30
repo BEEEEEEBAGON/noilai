@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Annotate an item file with per-syllable tokenization covariates for one tokenizer.
 
-    python scripts/audit_items.py --items data/release/v0.1/noilai_test.jsonl \
+    python scripts/audit_items.py --items data/release/v0.2/noilai_test.jsonl \
         --spm data/external/gemma3_tokenizer.model:gemma3 --out data/audit/items_gemma3.jsonl
     python scripts/audit_items.py --items ... --hf Qwen/Qwen2.5-7B-Instruct --out ...
 

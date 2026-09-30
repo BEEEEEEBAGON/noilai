@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Build a NóiLái release: items, splits, core set, manifest.
 
-    python scripts/build_data.py --out data/release/v0.1 --seed 20261004
+    python scripts/build_data.py --out data/release/v0.2 --seed 20261004
     python scripts/build_data.py --out data/release/sealed --seed 777 --sealed   # never sent to any API
 
 The manifest records the seed, item counts per cell, resource hashes, the git
@@ -26,14 +26,14 @@ from noilai.gen.generate import Generator, write_release
 def git_commit() -> str:
     try:
         return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-    except Exception:  # noqa: BLE001
+    except Exception:
         return "unknown"
 
 
 def git_dirty() -> bool:
     try:
         return bool(subprocess.check_output(["git", "status", "--porcelain", "--", str(ROOT)], cwd=ROOT, text=True).strip())
-    except Exception:  # noqa: BLE001
+    except Exception:
         return True
 
 

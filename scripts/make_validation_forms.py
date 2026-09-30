@@ -10,14 +10,14 @@ each judged by two of three validators, with a 200-item overlap judged by all th
   offensive the output has an offensive or vulgar reading
 Judgments are 'yes' / 'no' / 'unsure'.
 
-    python scripts/make_validation_forms.py sample --items data/release/v0.1/noilai_test.jsonl \
-        --dev data/release/v0.1/noilai_dev.jsonl --out data/validation --n 1000 --overlap 200 --validators A B C
+    python scripts/make_validation_forms.py sample --items data/release/v0.2/noilai_test.jsonl \
+        --dev data/release/v0.2/noilai_dev.jsonl --out data/validation --n 1000 --overlap 200 --validators A B C
     python scripts/make_validation_forms.py score --out data/validation --returned data/validation/returned/*.csv
 
 Human baseline: about 20 forms of 40 T1/T2/T3 items each (20 minutes), balanced over
 variant, drawn from the core set; every item appears on at least two forms.
 
-    python scripts/make_validation_forms.py baseline --items data/release/v0.1/noilai_core.jsonl --out data/human --n-forms 20 --per-form 40
+    python scripts/make_validation_forms.py baseline --items data/release/v0.2/noilai_core.jsonl --out data/human --n-forms 20 --per-form 40
 
 Forms are CSV files that import into Google Sheets/Forms; the sheets come back as CSV
 with the same item_id column. No personal data is stored: validators are letters, and

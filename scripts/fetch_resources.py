@@ -106,7 +106,7 @@ def main(argv=None) -> int:
             try:
                 with urllib.request.urlopen(meta["url"], timeout=120) as r, open(dest, "wb") as f:
                     f.write(r.read())
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 print(f"[FAIL] {name}: {e}")
                 rc = 1
                 continue

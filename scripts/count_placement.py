@@ -24,8 +24,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from noilai.vi import unicode as U  # noqa: E402
-from noilai.vi.syllable import try_parse  # noqa: E402
+from noilai.vi import unicode as U
+from noilai.vi.syllable import try_parse
 
 WORD = re.compile(r"[A-Za-zĐđÀ-ɏḀ-ỿ]+")
 

@@ -29,9 +29,9 @@ import json
 import secrets
 import uuid
 from collections import Counter, defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Optional
 
 from ..vi import lexicon as L
 from ..vi import unicode as U
@@ -109,7 +109,7 @@ class VulgarLexicon:
     """Syllable and pair blocklist (data/vulgar_lexicon.tsv). Matching is on canonical
     spellings; pairs match in either order."""
 
-    def __init__(self, path: Optional[Path] = None):
+    def __init__(self, path: Path | None = None):
         self.syllables: dict[str, str] = {}
         self.pairs: dict[frozenset, str] = {}
         path = path or ROOT / "data" / "vulgar_lexicon.tsv"
@@ -122,7 +122,7 @@ class VulgarLexicon:
                     else:
                         self.syllables[entry] = r.get("severity") or ""
 
-    def reason(self, text: str) -> Optional[str]:
+    def reason(self, text: str) -> str | None:
         words = canonical_text(text).split()
         for w in words:
             if w in self.syllables:
@@ -143,7 +143,7 @@ class Reserved:
         return sa in self.syllables or sb in self.syllables or frozenset((sa, sb)) in self.pairs
 
 
-def load_reserved(attested_path: Optional[Path] = None, demos_path: Optional[Path] = None) -> Reserved:
+def load_reserved(attested_path: Path | None = None, demos_path: Path | None = None) -> Reserved:
     """Attested inputs and outputs are reserved as unordered pairs (two-syllable windows);
     demonstration pairs are reserved at the syllable level, together with the syllables of
     their six-variant outputs, so that no item shares a syllable with a demonstration."""
@@ -175,16 +175,16 @@ def load_reserved(attested_path: Optional[Path] = None, demos_path: Optional[Pat
                 for v in V.ALL_VARIANTS:
                     for s in V.apply(v, a, b):
                         sylls.add(spell(s))
-        except Exception:  # noqa: BLE001 - a malformed demo file must not silently pass
+        except Exception:
             raise
     return Reserved(syllables=sylls, pairs=pairs)
 
 
 # ---------------------------------------------------------------- generator
 class Generator:
-    def __init__(self, seed: int = 20261004, inventory: Optional[Inventory] = None,
-                 words: Optional[list[str]] = None, exclude_qu: bool = True, style: str = STYLE,
-                 vulgar: Optional[VulgarLexicon] = None, reserved: Optional[Reserved] = None):
+    def __init__(self, seed: int = 20261004, inventory: Inventory | None = None,
+                 words: list[str] | None = None, exclude_qu: bool = True, style: str = STYLE,
+                 vulgar: VulgarLexicon | None = None, reserved: Reserved | None = None):
         """exclude_qu: leave out base pairs (and T2 inputs) containing a qu- syllable, whose
         analysis is ambiguous between school grammar (qu = onset) and phonology (glide in
         the rime); /k/ + glide OUTPUTS are spelled qu… unambiguously and are kept."""
@@ -420,7 +420,7 @@ class Generator:
         return sorted(by_text.values(), key=lambda e: e["output"])
 
     # ------------------------------------------------------------- T3
-    def t3_pair(self, t1_item: dict, twin_type: Optional[str] = None) -> Optional[tuple[dict, dict]]:
+    def t3_pair(self, t1_item: dict, twin_type: str | None = None) -> tuple[dict, dict] | None:
         inp = tuple(syl_from_dict(d) for d in t1_item["input_syllables"])
         out = tuple(syl_from_dict(d) for d in t1_item["gold_syllables"])
         variant = t1_item["variant"]
@@ -444,7 +444,7 @@ class Generator:
             return yes, no
         return None
 
-    def _twin(self, tt: str, variant: str, inp, out) -> Optional[str]:
+    def _twin(self, tt: str, variant: str, inp, out) -> str | None:
         gold_c = canonical_text(self.text(out))
         inp_c = canonical_text(self.text(inp))
         if tt == "other_variant":
@@ -481,7 +481,7 @@ class Generator:
                 return cand
         return None
 
-    def _misspell(self, out) -> Optional[str]:
+    def _misspell(self, out) -> str | None:
         """Violate one c/k, g/gh or ng/ngh rule in one syllable of the gold."""
         from ..vi.syllable import _onset_spelling
         words = [L.emit(s, self.style, self.inv) for s in out]
@@ -513,7 +513,7 @@ class Generator:
     # ------------------------------------------------------------- assembly
     def build(self, n_lexicon: int = 1500, n_pseudo: int = 1000, per_cell_t1: int = 1000,
               per_cell_t2: int = 500, per_cell_t3: int = 500, dev_frac: float = 0.2,
-              core_per_cell: int = 125, canary: Optional[str] = None) -> dict:
+              core_per_cell: int = 125, canary: str | None = None) -> dict:
         canary = canary or f"NOILAI-CANARY-{uuid.UUID(int=secrets.randbits(128))}"
         self.drops = Counter()
         pairs = self.base_pairs(n_lexicon, n_pseudo)
@@ -634,7 +634,7 @@ def resource_hashes() -> dict[str, str]:
     return out
 
 
-def write_release(build: dict, out_dir: Path, manifest_extra: Optional[dict] = None) -> dict:
+def write_release(build: dict, out_dir: Path, manifest_extra: dict | None = None) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     items = build["items"]
     files = {"dev": out_dir / "noilai_dev.jsonl", "test": out_dir / "noilai_test.jsonl", "core": out_dir / "noilai_core.jsonl"}
@@ -645,8 +645,7 @@ def write_release(build: dict, out_dir: Path, manifest_extra: Optional[dict] = N
         with open(path, "w", encoding="utf-8") as f:
             if name != "dev":
                 f.write(json.dumps(header, ensure_ascii=False) + "\n")
-            for it in sel:
-                f.write(json.dumps(it, ensure_ascii=False) + "\n")
+            f.writelines(json.dumps(it, ensure_ascii=False) + "\n" for it in sel)
     counts = Counter((it["task"], it["variant"], it["split"]) for it in items)
     manifest = {
         "n_items": len(items),
@@ -688,7 +687,7 @@ def load_items(path: Path) -> list[dict]:
     return out
 
 
-def read_header(path: Path) -> Optional[dict]:
+def read_header(path: Path) -> dict | None:
     with open(path, encoding="utf-8") as f:
         first = f.readline()
     d = json.loads(first) if first.strip() else {}

@@ -56,7 +56,7 @@ LOCAL_HOSTS = ("localhost", "127.0.0.1", "0.0.0.0", "::1")
 def _version(module: str) -> str | None:
     try:
         return getattr(importlib.import_module(module), "__version__", None)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return None
 
 
@@ -786,7 +786,7 @@ class GeminiBackend(Backend):
             latency = time.monotonic() - t0
             try:
                 text = resp.text or ""
-            except Exception:  # noqa: BLE001  (blocked or empty candidates)
+            except Exception:
                 text = ""
             um = getattr(resp, "usage_metadata", None)
             fr = None

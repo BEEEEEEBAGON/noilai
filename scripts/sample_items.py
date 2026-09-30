@@ -28,9 +28,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from noilai.gen import variants as V  # noqa: E402
-from noilai.gen.generate import Generator, c2_affected, load_items, read_header  # noqa: E402
-from noilai.vi.reencode import canonical_text  # noqa: E402
+from noilai.gen import variants as V
+from noilai.gen.generate import Generator, c2_affected, load_items, read_header
+from noilai.vi.reencode import canonical_text
 
 
 def sha256(path: Path) -> str:
@@ -45,8 +45,7 @@ def write_jsonl(path: Path, header: dict | None, items: list[dict]) -> None:
     with open(path, "w", encoding="utf-8") as f:
         if header:
             f.write(json.dumps(header, ensure_ascii=False) + "\n")
-        for it in items:
-            f.write(json.dumps(it, ensure_ascii=False) + "\n")
+        f.writelines(json.dumps(it, ensure_ascii=False) + "\n" for it in items)
 
 
 def _balanced(rng, pool, n, key):

@@ -26,11 +26,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from noilai.gen import variants as V  # noqa: E402
-from noilai.gen.generate import STYLE, syl_dict  # noqa: E402
-from noilai.vi import lexicon as L  # noqa: E402
-from noilai.vi.reencode import canonical_text  # noqa: E402
-from noilai.vi.syllable import try_parse  # noqa: E402
+from noilai.gen import variants as V
+from noilai.gen.generate import STYLE, syl_dict
+from noilai.vi import lexicon as L
+from noilai.vi.reencode import canonical_text
+from noilai.vi.syllable import try_parse
 
 POSITION_PAIRS_3 = ((0, 2), (1, 2), (0, 1))
 

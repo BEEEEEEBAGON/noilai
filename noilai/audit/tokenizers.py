@@ -89,7 +89,7 @@ class SentencePieceAdapter(TokenizerAdapter):
                 "remove_extra_whitespaces": m.normalizer_spec.remove_extra_whitespaces,
                 "split_by_unicode_script": m.trainer_spec.split_by_unicode_script,
             }
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             return {"type": "sentencepiece", "error": str(e)}
 
 
@@ -112,7 +112,7 @@ class HFAdapter(TokenizerAdapter):
             info["normalizer"] = json.loads(backend.to_str())["normalizer"]
             info["pre_tokenizer"] = json.loads(backend.to_str())["pre_tokenizer"]
             info["model_type"] = json.loads(backend.to_str())["model"]["type"]
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             info["error"] = str(e)
         return info
 

@@ -91,7 +91,7 @@ unverified until `verified_by` names a native validator.
 |---|---|
 | `item_id`, `task`, `variant` | copied from the item |
 | `arm` | re-encoding arm of the prompt: `base` (NFC, old-style), `nfd`, `pc`, `placement_new`, `strip_tones`, `strip_all` |
-| `arm_scope` | `item` (default) or `whole_prompt` |
+| `arm_scope` | `whole_prompt` (default, the primary condition) or `item` (DESIGN_DECISIONS 6.1) |
 | `prompt_id` | which paraphrase/template (`p0`, `p1`, `p2`) and shot count |
 | `prompt_hash` | sha256 of the exact rendered prompt string |
 | `raw` | the model's full raw completion |

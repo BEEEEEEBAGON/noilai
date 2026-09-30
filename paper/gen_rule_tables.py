@@ -38,14 +38,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from noilai.gen import variants as V  # noqa: E402
-from noilai.vi import lexicon as L  # noqa: E402
-from noilai.vi import unicode as U  # noqa: E402
-from noilai.vi.syllable import (  # noqa: E402
+from noilai.gen import variants as V
+from noilai.vi import lexicon as L
+from noilai.vi import unicode as U
+from noilai.vi.syllable import (
     CANONICAL_ONSETS,
     CLOSED_ONLY_NUCLEI,
     CODAS,
-    CONSONANT_CODAS,
     NUCLEI,
     ONSET_SPELLINGS,
     OPEN_ONLY_NUCLEI,

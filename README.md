@@ -77,7 +77,7 @@ from `google/gemma_pytorch` on GitHub and the Hunspell/word-list resources from 
 ## Build the data
 
 ```bash
-python scripts/build_data.py --out data/release/v0.1 --seed 20261004
+python scripts/build_data.py --out data/release/v0.2 --seed 20261004
 python scripts/build_data.py --out data/release/sealed --seed 777 --sealed      # regenerated at release; never sent to any API
 ```
 

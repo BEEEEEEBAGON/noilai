@@ -32,10 +32,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from noilai.audit.tokenizers import SentencePieceAdapter, audit_syllable, linguistic_boundaries  # noqa: E402
-from noilai.gen import variants as V  # noqa: E402
-from noilai.vi import unicode as U  # noqa: E402
-from noilai.vi.syllable import spell, try_parse  # noqa: E402
+from noilai.audit.tokenizers import SentencePieceAdapter, audit_syllable, linguistic_boundaries
+from noilai.gen import variants as V
+from noilai.vi import unicode as U
+from noilai.vi.syllable import spell, try_parse
 
 INPUT = ("mèo", "cái")
 VARIANT = "V1"

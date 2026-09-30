@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from functools import lru_cache
 from collections.abc import Iterable
 from functools import cache
 from pathlib import Path
@@ -183,7 +182,7 @@ ZERO_ONSET_I = {0: "y", 1: "ì", 2: "ý", 3: "ỷ", 4: "ĩ", 5: "ị"}
 _NEVER_Y_ONSETS = frozenset({"s", "v"})      # sĩ 118 vs sỹ 2, vĩ 34 vs vỹ 0 in Viet74K; sỹ survives in names
 
 
-@lru_cache(maxsize=None)
+@cache
 def iy_table() -> dict:
     """Per-syllable i/y choice for a bare /i/ after a consonant onset: the form with the higher
     count in the reference corpus (fallback: Viet74K syllable-in-entry counts). Keys are the

@@ -20,9 +20,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from noilai.vi import lexicon as L  # noqa: E402
-from noilai.vi import unicode as U  # noqa: E402
-from noilai.vi.syllable import Inventory, spell, try_parse  # noqa: E402
+from noilai.vi import lexicon as L
+from noilai.vi import unicode as U
+from noilai.vi.syllable import Inventory, try_parse
 
 
 def main(argv=None) -> int:
