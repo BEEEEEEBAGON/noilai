@@ -1,0 +1,17 @@
+# downloaded third-party resources are fetched by scripts/fetch_resources.py (hashes recorded there)
+data/external/*
+!data/external/README.md
+data/runs/*
+!data/runs/README.md
+__pycache__/
+*.pyc
+.pytest_cache/
+.hypothesis/
+*.egg-info/
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.bbl
+paper/*.blg
+paper/*.pdf
+.venv/

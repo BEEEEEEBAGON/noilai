@@ -1,0 +1,52 @@
+{
+  "tokenizer": "gemma2",
+  "summary": {
+    "nfc": {
+      "n": 6595,
+      "tokens_per_syllable_mean": 1.771948445792267,
+      "single_token_frac": 0.2988627748294162,
+      "boundary_alignment_mean": 0.938640384129391,
+      "onset_rime_split_frac": 0.506899166034875,
+      "tone_isolated_frac": 0,
+      "byte_fallback_frac": 0,
+      "n_tokens_hist": {
+        "1": 1971,
+        "2": 4159,
+        "3": 463,
+        "4": 2
+      }
+    },
+    "nfd": {
+      "n": 6595,
+      "tokens_per_syllable_mean": 2.898559514783927,
+      "single_token_frac": 0.07278241091736164,
+      "boundary_alignment_mean": 0.28983320697498105,
+      "onset_rime_split_frac": 0.043669446550416983,
+      "tone_isolated_frac": 0.5041698256254739,
+      "byte_fallback_frac": 0,
+      "n_tokens_hist": {
+        "1": 480,
+        "2": 1775,
+        "3": 2676,
+        "4": 1318,
+        "5": 290,
+        "6": 56
+      }
+    }
+  },
+  "normalization_census": {
+    "n_samples": 500,
+    "nfd_same_ids_frac": 0.034,
+    "normalizes_nfd": false,
+    "nfd_longer_frac": 0.934,
+    "nfd_byte_fallback_frac": 0.0,
+    "type": "sentencepiece",
+    "model_type": "BPE",
+    "vocab_size": 256000,
+    "normalizer": "identity",
+    "byte_fallback": true,
+    "add_dummy_prefix": false,
+    "remove_extra_whitespaces": false,
+    "split_by_unicode_script": true
+  }
+}
