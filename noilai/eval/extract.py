@@ -15,17 +15,16 @@ noilai.eval.score.
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 from ..vi import unicode as U
 from ..vi.syllable import try_parse
 
 # Folded (lowercase, diacritics removed) forms of the marker. "answer" is accepted for the
 # English-instruction ablation, whose templates still ask for "Đáp án:".
-_MARKER = re.compile(r"(?:dap\s*an|answer)\s*[:：]", re.I)
+_MARKER = re.compile(r"(?:dap\s*an|answer)\s*[:：]", re.IGNORECASE)
 _WORD = re.compile(r"[^\W\d_]+")
 _EDGE_JUNK = " \t.,;:!?\"'“”‘’()[]{}«»*_`~-–—"
-_PUNCT_CUT = re.compile(r"[.,;:!?()\[\]{}\"“”«»]|\s[-–—]\s|\s(?:hoặc|hay|or)\s", re.I)
+_PUNCT_CUT = re.compile(r"[.,;:!?()\[\]{}\"“”«»]|\s[-–—]\s|\s(?:hoặc|hay|or)\s", re.IGNORECASE)
 
 # Exact Vietnamese forms, the English words, and the diacritic-less ASCII forms a model may
 # type. A token WITH other diacritics (cô, cò, cỏ) is not an answer: folding it to "co"
@@ -67,7 +66,7 @@ def is_two_syllables(text: str) -> bool:
     return len(words) == 2 and all(try_parse(w, strict=False) is not None for w in words)
 
 
-def yesno_value(token: str) -> Optional[str]:
+def yesno_value(token: str) -> str | None:
     """'yes' / 'no' for one token (Có, Không, yes, no, and ASCII co / khong), else None."""
     low = U.nfc(token).lower()
     if low in YES_TOKENS:
@@ -77,7 +76,7 @@ def yesno_value(token: str) -> Optional[str]:
     return None
 
 
-def yesno_token(text: str) -> Optional[str]:
+def yesno_token(text: str) -> str | None:
     """The first Có/Không/yes/no token of `text` (original spelling), or None."""
     for m in _WORD.finditer(U.nfc(text)):
         if yesno_value(m.group(0)) is not None:
@@ -104,7 +103,7 @@ def _truncate_phrase(ans: str) -> tuple[str, str]:
     return ans, "marker"
 
 
-def extract_answer(raw: Optional[str], task: str) -> tuple[Optional[str], str]:
+def extract_answer(raw: str | None, task: str) -> tuple[str | None, str]:
     """See the module docstring. `task` is T1, T2, T3 or XCOPA."""
     if not raw or not raw.strip():
         return None, "none"
@@ -153,7 +152,7 @@ def extract_answer(raw: Optional[str], task: str) -> tuple[Optional[str], str]:
     return None, "none"
 
 
-def _finish(ans: str, task: str, method: str) -> tuple[Optional[str], str]:
+def _finish(ans: str, task: str, method: str) -> tuple[str | None, str]:
     if task == "T3":
         tok = yesno_token(ans)
         return (tok, method) if tok else (ans, method)
@@ -169,7 +168,7 @@ def _finish(ans: str, task: str, method: str) -> tuple[Optional[str], str]:
     return ans, method
 
 
-def t3_label(answer: Optional[str]) -> Optional[str]:
+def t3_label(answer: str | None) -> str | None:
     """Map an extracted T3 answer to 'yes' / 'no' (Có, Không, yes, no; diacritic-tolerant)."""
     if not answer:
         return None

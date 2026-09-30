@@ -23,10 +23,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from noilai.eval import backends as B  # noqa: E402
-from noilai.eval import prompts as P  # noqa: E402
-from noilai.eval.run import RUNS_DIR, RunOptions, load_item_file, run  # noqa: E402
-from noilai.gen import variants as V  # noqa: E402
+from noilai.eval import backends as B
+from noilai.eval import prompts as P
+from noilai.eval.run import RUNS_DIR, RunOptions, load_item_file, run
+from noilai.gen import variants as V
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -101,7 +101,7 @@ def main(argv=None) -> int:
         backend.close()
     print(run_dir)
     if args.score:
-        from score_run import score_run_dir  # noqa: E402  (sibling script)
+        from score_run import score_run_dir
 
         score_run_dir(run_dir, items_path=args.items, audit=args.audit)
     return 0

@@ -23,13 +23,14 @@ server through the OpenAI-compatible backend (local, so not an API for the safet
 """
 from __future__ import annotations
 
+import contextlib
 import importlib
 import os
 import random
 import re
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional
 from urllib.parse import urlparse
 
 import yaml
@@ -40,14 +41,14 @@ API_BACKENDS = ("openai_compat", "gemini")
 LOCAL_HOSTS = ("localhost", "127.0.0.1", "0.0.0.0", "::1")
 
 
-def _version(module: str) -> Optional[str]:
+def _version(module: str) -> str | None:
     try:
         return getattr(importlib.import_module(module), "__version__", None)
     except Exception:  # noqa: BLE001
         return None
 
 
-def backend_versions() -> dict[str, Optional[str]]:
+def backend_versions() -> dict[str, str | None]:
     return {m: _version(m) for m in ("torch", "transformers", "vllm", "openai", "google.genai", "tokenizers",
                                      "sentencepiece", "accelerate", "bitsandbytes")}
 
@@ -62,7 +63,7 @@ class Backend:
     name: str = "base"
     is_api: bool = False
     supports_logprobs: bool = False
-    model_id: Optional[str] = None
+    model_id: str | None = None
 
     def generate(self, messages_batch: list[list[dict]], max_new_tokens: int = 64, greedy: bool = True) -> list[dict]:
         raise NotImplementedError
@@ -115,7 +116,7 @@ class ScriptedBackend(Backend):
     """
     kind = "scripted"
 
-    def __init__(self, script=None, default: str = "Đáp án: ?", logprob_fn: Optional[Callable] = None,
+    def __init__(self, script=None, default: str = "Đáp án: ?", logprob_fn: Callable | None = None,
                  is_api: bool = False, name: str = "scripted", model_id: str = "scripted"):
         self.script = script
         self.default = default
@@ -172,11 +173,11 @@ class HFBackend(Backend):
     kind = "hf"
     supports_logprobs = True
 
-    def __init__(self, model_id: Optional[str] = None, revision: Optional[str] = None, dtype: Optional[str] = "auto",
-                 quantization: Optional[dict] = None, device: str = "auto", batch_size: int = 8, seed: int = 0,
-                 trust_remote_code: bool = False, chat_template_kwargs: Optional[dict] = None,
-                 max_model_len: Optional[int] = None, attn_implementation: Optional[str] = None,
-                 model=None, tokenizer=None, name: Optional[str] = None):
+    def __init__(self, model_id: str | None = None, revision: str | None = None, dtype: str | None = "auto",
+                 quantization: dict | None = None, device: str = "auto", batch_size: int = 8, seed: int = 0,
+                 trust_remote_code: bool = False, chat_template_kwargs: dict | None = None,
+                 max_model_len: int | None = None, attn_implementation: str | None = None,
+                 model=None, tokenizer=None, name: str | None = None):
         import torch
 
         self.torch = torch
@@ -208,11 +209,9 @@ class HFBackend(Backend):
     # ---- setup
     def _seed_all(self, seed: int) -> None:
         random.seed(seed)
-        try:
+        with contextlib.suppress(Exception):      # numpy is optional for the backend itself
             import numpy as np
             np.random.seed(seed % (2 ** 32))
-        except Exception:  # noqa: BLE001
-            pass
         self.torch.manual_seed(seed)
         if self.torch.cuda.is_available():
             self.torch.cuda.manual_seed_all(seed)
@@ -273,7 +272,7 @@ class HFBackend(Backend):
         try:
             return self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=add_generation_prompt,
                                                       **self.chat_template_kwargs)
-        except Exception as e:  # noqa: BLE001  (templates that reject a system role)
+        except Exception as e:
             if any(m["role"] == "system" for m in messages):
                 folded = [{"role": "user", "content": "\n\n".join(m["content"] for m in messages)}]
                 return self.tokenizer.apply_chat_template(folded, tokenize=False, add_generation_prompt=add_generation_prompt,
@@ -381,13 +380,13 @@ class VLLMBackend(Backend):
     kind = "vllm"
     supports_logprobs = True
 
-    def __init__(self, model_id: str, revision: Optional[str] = None, dtype: str = "half",
-                 quantization: Optional[dict] = None, max_model_len: int = 2048, gpu_memory_utilization: float = 0.9,
+    def __init__(self, model_id: str, revision: str | None = None, dtype: str = "half",
+                 quantization: dict | None = None, max_model_len: int = 2048, gpu_memory_utilization: float = 0.9,
                  enforce_eager: bool = False, tensor_parallel_size: int = 1, seed: int = 0,
-                 trust_remote_code: bool = False, chat_template_kwargs: Optional[dict] = None,
-                 extra_engine_kwargs: Optional[dict] = None, name: Optional[str] = None):
+                 trust_remote_code: bool = False, chat_template_kwargs: dict | None = None,
+                 extra_engine_kwargs: dict | None = None, name: str | None = None):
         try:
-            from vllm import LLM, SamplingParams  # noqa: F401
+            from vllm import LLM, SamplingParams
         except ImportError as e:
             raise BackendError("vllm is not installed; `pip install vllm` on the GPU machine") from e
         self.SamplingParams = SamplingParams
@@ -463,13 +462,13 @@ class VLLMBackend(Backend):
 
 
 # ------------------------------------------------------------------ retry helper
-def _sleep_for(attempt: int, base: float, cap: float, retry_after: Optional[float] = None) -> float:
+def _sleep_for(attempt: int, base: float, cap: float, retry_after: float | None = None) -> float:
     if retry_after is not None and retry_after > 0:
         return min(retry_after, cap)
     return min(cap, base * (2 ** attempt)) * (0.5 + random.random() / 2)
 
 
-def _retry_after_seconds(exc) -> Optional[float]:
+def _retry_after_seconds(exc) -> float | None:
     resp = getattr(exc, "response", None)
     headers = getattr(resp, "headers", None) if resp is not None else None
     if headers is None:
@@ -482,7 +481,7 @@ def _retry_after_seconds(exc) -> Optional[float]:
 
 
 class _Throttle:
-    def __init__(self, requests_per_minute: Optional[float]):
+    def __init__(self, requests_per_minute: float | None):
         self.interval = 60.0 / requests_per_minute if requests_per_minute else 0.0
         self.last = 0.0
 
@@ -503,11 +502,11 @@ class OpenAICompatBackend(Backend):
     chat APIs do not return them for arbitrary continuations."""
     kind = "openai_compat"
 
-    def __init__(self, model_id: str, base_url: Optional[str] = None, api_key: Optional[str] = None,
-                 api_key_env: str = "OPENAI_API_KEY", generation_kwargs: Optional[dict] = None,
-                 extra_body: Optional[dict] = None, max_retries: int = 8, base_sleep: float = 2.0,
-                 max_sleep: float = 120.0, requests_per_minute: Optional[float] = None, timeout: float = 120.0,
-                 seed: Optional[int] = None, client=None, is_api: Optional[bool] = None, name: Optional[str] = None,
+    def __init__(self, model_id: str, base_url: str | None = None, api_key: str | None = None,
+                 api_key_env: str = "OPENAI_API_KEY", generation_kwargs: dict | None = None,
+                 extra_body: dict | None = None, max_retries: int = 8, base_sleep: float = 2.0,
+                 max_sleep: float = 120.0, requests_per_minute: float | None = None, timeout: float = 120.0,
+                 seed: int | None = None, client=None, is_api: bool | None = None, name: str | None = None,
                  sleep: Callable[[float], None] = time.sleep):
         self.model_id = model_id
         self.name = name or model_id
@@ -566,7 +565,7 @@ class OpenAICompatBackend(Backend):
                 try:
                     resp = self._call(messages, max_new_tokens, greedy)
                     break
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     msg = str(e)
                     if self._token_param == "max_tokens" and "max_completion_tokens" in msg:
                         self._token_param = "max_completion_tokens"
@@ -603,10 +602,10 @@ class GeminiBackend(Backend):
     kind = "gemini"
     is_api = True
 
-    def __init__(self, model_id: str, api_key: Optional[str] = None, api_key_env: str = "GEMINI_API_KEY",
-                 generation_kwargs: Optional[dict] = None, max_retries: int = 8, base_sleep: float = 4.0,
-                 max_sleep: float = 120.0, requests_per_minute: Optional[float] = None, seed: Optional[int] = None,
-                 client=None, name: Optional[str] = None, sleep: Callable[[float], None] = time.sleep):
+    def __init__(self, model_id: str, api_key: str | None = None, api_key_env: str = "GEMINI_API_KEY",
+                 generation_kwargs: dict | None = None, max_retries: int = 8, base_sleep: float = 4.0,
+                 max_sleep: float = 120.0, requests_per_minute: float | None = None, seed: int | None = None,
+                 client=None, name: str | None = None, sleep: Callable[[float], None] = time.sleep):
         self.model_id = model_id
         self.name = name or model_id
         self.generation_kwargs = dict(generation_kwargs or {})
@@ -632,7 +631,7 @@ class GeminiBackend(Backend):
             client = genai.Client(api_key=key)
         self.client = client
 
-    def _config(self, system: Optional[str], max_new_tokens: int, greedy: bool):
+    def _config(self, system: str | None, max_new_tokens: int, greedy: bool):
         t = self.types
         kw = {"temperature": 0.0 if greedy else self.generation_kwargs.get("temperature", 1.0),
               "max_output_tokens": max_new_tokens}
@@ -665,7 +664,7 @@ class GeminiBackend(Backend):
                     resp = self.client.models.generate_content(model=self.model_id, contents=contents,
                                                                config=self._config(system, max_new_tokens, greedy))
                     break
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     if not self._retryable(e) or attempt >= self.max_retries:
                         raise
                     self.n_retries += 1
@@ -717,7 +716,7 @@ def get_model_entry(cfg: dict, name: str) -> dict:
     return entry
 
 
-def make_backend(entry: dict, backend: Optional[str] = None, **overrides) -> Backend:
+def make_backend(entry: dict, backend: str | None = None, **overrides) -> Backend:
     """Build a Backend from a model entry (configs/models.yaml schema). `backend` overrides the
     entry's backend (e.g. the entry's `fallback_backend`); keyword overrides win over the
     entry's fields (device, batch_size, ...)."""

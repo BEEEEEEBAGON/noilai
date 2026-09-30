@@ -1,0 +1,69 @@
+% Appendices. Reviewers need not read them; every claim must stand in the eight pages.
+% Tables under tables/ are generated (gen_rule_tables.py, gen_prompt_appendix.py).
+% Protocols follow docs/DESIGN_DECISIONS.md sections 10 and 11.
+
+\section{Prompts}
+\label{app:prompts}
+
+Every prompt is rendered from a YAML template by the evaluation harness; the three paraphrases (p0, p1, p2) carry the same content in different wording and order, and the English-instruction ablation changes only the instruction language while the item and the answer marker \vi{đáp án:} stay Vietnamese. Demonstrations are built by the rule engine from three fixed base pairs (\vi{trung bình}, \vi{làm chủ}, \vi{vô hình}) whose syllables occur in no item; \task{T2} demonstrations are the same for every item because the prompt withholds the variant. No model receives a system prompt; the three demonstrations are inline in the single user turn. The examples below are the p0 templates with three demonstrations, exactly as rendered, for one example item per task; the sha256 of every prompt sent to a model is stored with its output. \placeholder{[NATIVE-CHECK] Every Vietnamese string awaits validation by a native speaker before the runs; the six-type overview and the region-neutral wording of DESIGN\_DECISIONS 3 are to be reflected in the templates.}
+
+\input{tables/prompt_examples}
+
+\section{Rule Tables}
+\label{app:rules}
+
+The tables in this appendix are generated from the parser's constants and the spelling lists, so that they cannot drift from the code: Table~\ref{tab:components} lists the canonical symbols, Table~\ref{tab:onsets} the surface spelling of every onset, Table~\ref{tab:spelling} the remaining spelling rules with engine-spelled examples, Table~\ref{tab:placement} the 69 syllables whose tone-mark letter differs between the two placement conventions, and Table~\ref{tab:variants} the six variants with engine-computed examples and the status of each (the four generated \task{T1} cells; \var{5}, the onset swap, and \var{6}, onsets and tones, are the order-reversed readings of \var{4} and \var{1} and enter the taxonomy, the \task{T2} gold and the \task{T3} twins).
+
+\input{tables/rules_components}
+\input{tables/rules_onsets}
+\input{tables/rules_spelling}
+\input{tables/rules_placement}
+\input{tables/rules_variants}
+
+\section{Validation Protocol and Human Baseline}
+\label{app:validation}
+
+\paragraph{Validation.}
+A probability sample of 1,000 items with known stratum weights over the twelve task $\times$ variant cells and the covariate strata is assigned so that every item is judged by two of three validators and a 200-item overlap by all three; to it are added every core \task{T2} gold set, every attested row, the 20-pair \vi{qu}- convention check, a 20-pair ``which variant do you produce spontaneously?'' item and the placement and \vi{i/y} convention checks. For each item the validator answers with \emph{yes}, \emph{no} or \emph{unsure}: (1) \emph{correct}: the output is the correct nói lái of the input under the named variant (for \task{T3}, the system's verdict is right); (2) \emph{spelling}: the output is spelled acceptably, either tone-mark placement and the \vi{lí/lý} alternation being acceptable; (3) \emph{lexical}: the input, and separately the output, is a real Vietnamese word or phrase (not dictionary membership); (4) \emph{offensive}: the item has an offensive or vulgar reading; for \task{T2} items, which readings they accept; and a region tag per validator. Agreement is Krippendorff's nominal $\alpha$ with a bootstrap interval, reported with raw agreement, the marginal distribution and Gwet's AC1, and with MASI and Jaccard distances for the set-valued \task{T2} gold. An item on which the two assigned validators disagree goes to the third; a remaining disagreement is adjudicated by the authors with a logged reason; a disagreement pattern that points at a rule triggers a review of the rule tables, and a confirmed generator bug triggers a fix and a full regeneration before any model run, which is reported. Generator precision per cell is the weighted share of items whose majority judgment on (1) is \emph{yes}, with a clustered interval. The instructions given to validators, in Vietnamese and English, and the consent form are released with the data.
+
+\paragraph{Human baseline.}
+About twenty adult native speakers each complete one form of 30 items (about 20 minutes): six anchor items seen by everyone (one per generated variant, one \task{T2}, one \task{T3}) and 24 items assigned so that every non-anchor item is seen by exactly two people, 246 items in all, about twenty per cell, drawn from the open-model main sample so that every model is scored on exactly these items; items flagged vulgar are excluded. Respondents see the same p0 prompt text and the same three demonstrations as the models, in randomized item order, with one instruction-check item, and write the answer (\task{T1}, \task{T2}) or tick yes/no (\task{T3}); they are asked not to use a dictionary, a search engine or an AI assistant and to say whether they did. Answers are scored by the same code as the models. Item-level human accuracy is the mean of its two judgments; the comparator is mean-human accuracy, with ``any human correct'' as a ceiling reported separately and an interval from a two-way bootstrap over persons and items; results are reported by output lexicality and by region, and the agreement between the two raters of an item is reported as nominal $\alpha$ on the produced answer and on correctness. Forms with fewer than half of the items answered are excluded and counted. If more volunteers materialize, items receive a third rater before the item set widens.
+
+\section{Data Statement}
+\label{app:datastatement}
+
+Following \citet{Q18-1041}. \emph{Curation rationale}: items are generated by a rule engine from two-syllable entries of a Vietnamese word list and from sampled attested syllables, to test whether models can manipulate the components of a syllable; attested examples are collected from published collections of folk and literary nói lái, each with its source. \emph{Language variety}: standard written Vietnamese (\texttt{vi-VN}), lowercase, NFC, stored in the majority placement convention, \vi{i/y} per the stated rule; the attested subset includes Southern forms. \emph{Speaker demographics}: not applicable to generated items; attested items are folk material of unknown authorship or literary quotations with their source cited; the attested curation reflects the author's region. \emph{Annotator demographics}: three adult native speakers and about twenty human-baseline respondents, described in aggregate by age band, region grown up in, years in Vietnam and whether raised abroad (\placeholder{reported at submission}). \emph{Speech situation}: written wordplay, out of context. \emph{Text characteristics}: two-syllable phrases (three in a few attested cases), no punctuation, with per-syllable structure, lexicality and frequency covariates. \emph{Provenance}: the spelling list and word list (GPLv2), XCOPA (CC~BY~4.0), per-row citations for attested items, the generator commit and seed, resource hashes; the canary GUID \placeholder{printed here at release}; split sizes and vulgar-flag counts; the rule-versus-folk mismatches and out-of-design rows of the attested set; the list entries the parser rejects, listed and explained; known limitations (\vi{qu}, regional labels, the \vi{i/y} convention); and the full parse table of the syllable inventory as supplementary material. The long-form statement is in the repository.
+
+\section{Pre-registration}
+\label{app:prereg}
+
+The hypotheses of Sections~\ref{sec:results}--\ref{sec:tone} were fixed before any model was run and committed with the metrics, exclusion rules, stopping rules and analysis plan on 30 September 2026 (commit \placeholder{hash}); deviations are logged with a date in the repository. Table~\ref{tab:hypotheses} restates them with their directional predictions and the quantity that decides each.
+
+\begin{table*}[t]
+  \centering\small
+  \begin{tabular}{@{}lp{0.44\textwidth}p{0.38\textwidth}@{}}
+    \toprule
+    & Prediction & Decided by \\
+    \midrule
+    \hyp{1} & Alignment predicts \task{T1} accuracy more than count: $\beta(\text{align}) > 0$, $\beta(\text{tokens}) < 0$, standardized $|\beta(\text{align})| > |\beta(\text{tokens})|$. & Cluster-bootstrap 95\% CI of the standardized difference excludes 0 in the model-fixed-effect fit and the random-slope check. \\
+    \hyp{2} & PhoGPT-4B-Chat has lower per-syllable NLL on held-out text than Qwen3.5-4B and Gemma~3 4B and lower \task{T1} accuracy on the same items. & Descriptive dissociation ($n = 1$); paired bootstrap for the accuracy contrast. \\
+    \hyp{3} & In pass-through tokenizers, $\tau(\mathrm{NFD})$ on \task{T1} \var{3} $> 0$ and on XCOPA $< 0$. & Two paired tests per model, Holm within the pair; both pooled random-effects CIs on the predicted side. \\
+    \hyp{3b} & The NFD gain on \var{3} is larger where the tone mark is isolated than where it stays attached (DiD $> 0$); the \var{1} contrast $\approx 0$. & Matched items, cluster bootstrap, McNemar mid-$p$, Holm over the four contrasts. \\
+    \hyp{4} & The rarer placement convention (expected: new style, fixed by a corpus count before any run) lowers accuracy on affected items in models generally. & Per-model paired test on affected items, Holm across the panel; $k$ of $N$ plus the pooled estimate; TOST with $\delta = 2$ points for nulls. \\
+    \hyp{5} & In a Gemma~3 model with \var{3} accuracy $< 25\%$, tone is decodable (selectivity and excess) at a non-local position by layer $L/2$, and the perception readout recovers under patching where the manipulation readout does not. & Section~\ref{sec:tone} protocol; $\delta_{\mathrm{sel}} = 0.15$ provisional; syllable-clustered CIs. \\
+    \hyp{6} & Exact attested items outscore matched generated items (pooled); guided-instruction contamination $> 0$ on attested, $\approx 0$ on matched generated. & Matching on variant, task, lexicality, trigger and tone class; per-model tests Holm across the panel plus pooled; four contamination discriminators. \\
+    \bottomrule
+  \end{tabular}
+  \caption{Pre-registered hypotheses, their directional predictions and the quantity that decides each; ``pooled'' is a random-effects estimate over per-model paired effects, never a count of significant models.}
+  \label{tab:hypotheses}
+\end{table*}
+
+\section{Compute, Environment and Panel Details}
+\label{app:compute}
+
+\placeholder{Per-run table: model, checkpoint id and revision, engine and version, requested and resolved precision, quantization, hardware, wall time, GPU-hours; totals for checklist item C1. Tokenizer profile and census verdict of every panel model (tokens per syllable, single-token share, alignment among split syllables, onset$|$rime split, NFD tone isolation, passes through / normalizes / corrupts per engine). Package versions (C4). Models that failed smoke tests and why. The adult account holder's role for the API runs.}
+
+\section{Additional Results}
+\label{app:extra}
+
+\placeholder{Accuracy range over paraphrases per model; lenient \task{T1}; the spelling-twin column of \task{T3}; bf16 drift on about 200 items per quantized model; the two-engine C1 agreement on Gemma~3 1B; the reasoning-cost curve (accuracy against reasoning tokens on 500 items); per-variant results restricted to non-degenerate items; per-stratum tables; the realized design effect and per-model ICC; the \vi{qu}- stratum if its convention is settled in time.}

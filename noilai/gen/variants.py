@@ -29,18 +29,30 @@ from dataclasses import dataclass
 
 from ..vi.syllable import Syllable, replace
 
+# The four generated T1 cells (the plan's V1-V4) and the two further members of the
+# six-type tradition (docs/DESIGN_DECISIONS.md section 3): V5 swaps onsets only and V6
+# swaps onsets and tones. Under order reversal reverse(V1) = V6, reverse(V2) = V3 and
+# reverse(V4) = V5, so V5/V6 add no new unordered output pair; they enter the taxonomy,
+# T2 gold, T3 twin material and the attested labels, but are not T1 cells.
 VARIANTS = ("V1", "V2", "V3", "V4")
+ALL_VARIANTS = ("V1", "V2", "V3", "V4", "V5", "V6")
+UNORDERED_CLASS = {"V1": "V1/V6", "V6": "V1/V6", "V2": "V2/V3", "V3": "V2/V3", "V4": "V4/V5", "V5": "V4/V5"}
+REVERSE_OF = {"V1": "V6", "V6": "V1", "V2": "V3", "V3": "V2", "V4": "V5", "V5": "V4"}
 VARIANT_NAMES_VI = {
     "V1": "đổi vần, giữ phụ âm đầu và thanh",
     "V2": "đổi cả phụ âm đầu và vần, giữ thanh",
     "V3": "đổi thanh, giữ phụ âm đầu và vần",
     "V4": "đổi vần và thanh, giữ phụ âm đầu",
+    "V5": "đổi phụ âm đầu, giữ vần và thanh",
+    "V6": "đổi phụ âm đầu và thanh, giữ vần",
 }
 VARIANT_NAMES_EN = {
     "V1": "swap rimes; keep onsets and tones",
     "V2": "swap onsets and rimes; keep tones in place",
     "V3": "swap tones; keep onsets and rimes",
     "V4": "swap rimes and tones; keep onsets",
+    "V5": "swap onsets; keep rimes and tones",
+    "V6": "swap onsets and tones; keep rimes",
 }
 # Which components move under each variant (used for T3 twin construction and the error taxonomy).
 MOVES = {
@@ -48,6 +60,8 @@ MOVES = {
     "V2": {"onset", "rime"},
     "V3": {"tone"},
     "V4": {"rime", "tone"},
+    "V5": {"onset"},
+    "V6": {"onset", "tone"},
 }
 
 
@@ -63,7 +77,16 @@ def apply(variant: str, a: Syllable, b: Syllable) -> tuple[Syllable, Syllable]:
     if variant == "V4":
         return (replace(a, glide=b.glide, nucleus=b.nucleus, coda=b.coda, tone=b.tone),
                 replace(b, glide=a.glide, nucleus=a.nucleus, coda=a.coda, tone=a.tone))
+    if variant == "V5":
+        return (replace(a, onset=b.onset), replace(b, onset=a.onset))
+    if variant == "V6":
+        return (replace(a, onset=b.onset, tone=b.tone), replace(b, onset=a.onset, tone=a.tone))
     raise ValueError(f"unknown variant {variant!r}")
+
+
+def is_plain_reversal(variant: str, a: Syllable, b: Syllable) -> bool:
+    """True when the variant's output is just the input in the other order."""
+    return apply(variant, a, b) == (b, a)
 
 
 def is_identity(variant: str, a: Syllable, b: Syllable) -> bool:
@@ -83,7 +106,7 @@ def identify(a: Syllable, b: Syllable, x: Syllable, y: Syllable) -> str | None:
 def identify_any_order(a: Syllable, b: Syllable, x: Syllable, y: Syllable) -> list[tuple[str, bool]]:
     """All (variant, reversed) pairs mapping (a, b) onto {x, y} in either order."""
     out = []
-    for v in VARIANTS:
+    for v in ALL_VARIANTS:
         o = apply(v, a, b)
         if o == (x, y):
             out.append((v, False))

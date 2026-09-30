@@ -1,0 +1,165 @@
+# Pre-registration: NóiLái, orthographic counterfactuals and tone probing
+
+**Date registered:** 2026-09-30 (before any model has been run on any item).
+**Registered by:** the author (anonymous during review).
+**Commit hash of this registration:** `PREREG_COMMIT = <fill with the output of `git rev-parse HEAD` for the commit that adds this file, which must also be the commit that freezes the generator and analysis code; never amend that commit>`
+**Relation to the design document:** this file is the `docs/PREREG_<date>.md` that `docs/DESIGN_DECISIONS.md` §8.8 calls for (kept under the name `PREREGISTRATION.md`). Where this file and the design document disagree, the design document wins and the disagreement is logged in §12.
+**Amendments:** never by editing the text above §12. Every change is a dated entry in §12 **and** in `docs/DEVIATIONS.md` (created at the registration commit), with the commit hash.
+
+This document fixes the hypotheses, primary and secondary metrics, design and sample sizes, exclusion rules, stopping rules, model-panel freeze rule, analysis plan and the Gate 1 go/no-go rule of the paper *Tones Hidden in Tokens: How LLMs Handle Vietnamese Sub-Syllabic Structure* (ACL 2027 long paper, ARR January 2027 cycle). Sources: the founding plan (`docs/PLAN_2026-09-30.md`), the implementation record (`docs/IMPLEMENTATION_DECISIONS.md`) and the binding design document (`docs/DESIGN_DECISIONS.md`, section numbers cited as DD §x). Every analysis not listed here is exploratory and is labelled as such in the paper.
+
+---
+
+## 1. Research questions
+
+**RQ1 (E1).** Can subword LLMs manipulate the onset, rime and tone of a Vietnamese syllable when instructed to, given that tokenization never exposes these units? **RQ2 (E2).** What predicts failure: the number of tokens per syllable, or whether token boundaries align with onset|rime and other sub-syllabic boundaries? **RQ3 (E3).** Does changing only the code points, with meaning and information held fixed (NFC vs NFD vs the partially composed form; tone-mark placement convention), change behaviour, and in which direction? **RQ4 (E4).** In Gemma 3 1B/4B, where is tone information linearly present, is it transported to the answer position, and is it causally used?
+
+## 2. Hypotheses, tests and falsifiers (DD §1, verbatim in substance)
+
+"Pooled" means a random-effects estimate across models (DerSimonian–Laird or REML on the per-model paired effects), **never** a count of significant models. τ_m(a) is the within-item average treatment effect of arm a on model m (§8.5).
+
+| # | Statement (directional) | Test | Falsified when |
+|---|---|---|---|
+| **H1** *alignment over count* | In the E2 model (§8.4) β(align_w) > 0, β(tps_w) < 0, and standardized \|β(align_w)\| > \|β(tps_w)\|. | Base-pair cluster-bootstrap 95% CI of the standardized difference excludes 0, in the model-fixed-effect specification (primary) **and** in the random-slope specification (generalization check). Secondary: ΔAIC of M0 + tps vs M0 + split + align. | The CI includes 0, or the sign of either coefficient is reversed. |
+| **H2** *whole-syllable vocabulary* | PhoGPT-4B-Chat (20,480-piece syllable-level vocabulary) has lower per-syllable NLL on a named held-out Vietnamese text sample than Qwen3.5-4B and Gemma 3 4B **and** lower strict T1 accuracy on the same items. | Descriptive dissociation on one model (n = 1); paired base-pair bootstrap for the accuracy contrast; the mechanism is the share of whole-syllable tokens from the audit. Not a population claim. | Either inequality fails. |
+| **H3** *crossover* | In pass-through tokenizers (census §8.6): τ_m(NFD, T1-V3) > 0 and τ_m(NFD, XCOPA) < 0. | Two paired tests per model, Holm within the pair; the paper-level claim requires **both pooled** random-effects CIs on the predicted side. Normalizing tokenizers are a sanity assertion (Δ = 0 exactly), not a test; corrupting engine paths are excluded and reported. | Either pooled CI on the wrong side or including 0. |
+| **H3b** *tone isolation* | Gemma 3 4B (replicated on 1B): Δ = [acc(V3, NFD-isolated) − acc(V3, NFC)] − [acc(V3, NFD-not-isolated) − acc(V3, NFC)] > 0, and the same contrast on V1 ≈ 0. | Matched items (§8.7), cluster bootstrap by base pair, McNemar mid-p on base-pair-aggregated outcomes, Holm over the four contrasts. | Δ(V3) CI includes 0 or ≤ 0, or Δ(V1) CI excludes 0. |
+| **H4** *the rarer placement convention costs* | The placement convention that is rarer in the reference corpus (expected: new style `hoà`; counted before any model run, §8.8) lowers accuracy on affected items in models generally. | Per-model paired test on C2-affected items, Holm across the panel; report k of N with adjusted CI excluding 0 **plus** the pooled estimate; for models whose CI includes 0, TOST equivalence with δ = 2 points. Never "in every model". | Pooled CI includes 0 or is on the wrong side. |
+| **H5** *perception without manipulation* | In a Gemma 3 model whose T1-V3 accuracy < 25%, tone satisfies the two-condition decodability definition (§8.9) at a non-local position (`after`) at some hidden index ≤ L/2, **and** patching shows the perception readout recovering where the manipulation readout does not. | §8.9–8.10 protocol; δ_sel = 0.15 (provisional; frozen from the pilot before the main extraction) and excess > 0 with a syllable-clustered CI excluding 0. | Probes fail conditions (i)–(ii) at every ℓ ≤ L/2, or both readouts recover alike. |
+| **H6** *memorization* | Exact attested two-syllable items outscore matched generated items: acc(attested) − acc(matched) > 0 pooled; guided-instruction contamination rate > 0 on attested and ≈ 0 on matched generated. | Matching per §8.8; per-model tests Holm across the panel plus the pooled estimate; the guided-instruction, closed-book-recall, conditional-log-probability and name-only tests carry the memorization inference, H6 alone does not. | Pooled difference CI includes 0 or is negative. |
+
+Secondary directional expectations (reported, not tested as hypotheses): strict T1 accuracy orders V2 > V1 ≈ V4 > V3 on non-degenerate items; spelling errors concentrate on items with a c>k, g>gh or ng>ngh trigger; copy and reversal errors concentrate in the smallest models; under NFD the first decodable layer for tone is earlier than under NFC.
+
+## 3. Metrics (DD §5)
+
+**Primary metric of the paper:** strict T1 accuracy (parsed structures of the answer's two syllables equal the gold's, in the named order, after canonicalization: NFC, thinking blocks removed, answer extracted, casefold, strict parse, re-spell; misspellings and regional homophones are **not** repaired), averaged over the three paraphrases, pooled over V1–V4 with equal weight, per model, under the default condition (Vietnamese instructions, explained variant, three demonstrations, raw input format, baseline encoding).
+
+**Other primary quantities (one per hypothesis):**
+- T2 accuracy: the canonical answer is one of the gold readings (any of the six variants, either order); the validated gold set for core items, the dictionary set elsewhere, both reported.
+- T3 accuracy (generated), reported as accuracy **and** balanced accuracy / d′, with **spelling twins excluded from the headline** and reported as their own column; forced-choice log-probability accuracy over the yes/no pair for open models, reported separately and never compared with generated accuracy.
+- τ_m(a): the within-item paired difference in accuracy, arm a minus baseline, over identical items (§8.5), for `nfd`, `pc`, `placement_new` (affected items), `strip_tones`, `strip_all`, on NóiLái T1 (all variants and V3), T3 and XCOPA-vi.
+- Probe selectivity and excess (§8.9); patching recovery (§8.10).
+
+**Secondary metrics:** lenient (unordered) T1 accuracy; per-component accuracy (onset, rime, tone); rates of every error class (unparseable, lenient_only, copy, reversal, wrong_variant, spelling, homophone, doublet, component, illegal); T2 variant-class accuracy over {V1/V6}, {V2/V3}, {V4/V5} and the plausible_nongold rate; paraphrase range; accuracy under each ablation and under the explicit onset–rime–tone input; tokenizer profile per model (tokens per syllable, single-token share, split rate, alignment among split syllables, NFD tone isolation, census verdict); human-baseline accuracies; generator precision per cell; Krippendorff's α with raw agreement and Gwet's AC1; bf16 drift; reasoning-cost curve; the 200-pair LD drift check if bf16 is used in E4.
+
+## 4. Design and sample sizes (DD §4.5–4.6, §7, §8.5)
+
+- **Items**: v0.2 release at the plan's sizes (≈ 2,500 base pairs; T1 1,000, T2 500, T3 500 yes/no pairs per variant; ≈ 10,000 items), built at the registration commit; split by base pair into dev (≈ 20%) and test; **core** of 125 items per T1/T2 cell and 62 yes/no pairs per T3 cell inside the test split; every test file carries the BIG-bench canary header and every test item the canary GUID and `do_not_train` flags. Item-file SHA-256s are recorded in `configs/run_plan.yaml` at the data freeze and verified before every run.
+- **Open-model main sample**: a seeded stratified sample of **4,200** test items (350 per task × variant cell, T3 counted in items), containing the core, under three paraphrases (p0 main; p1, p2 for the range); the E3 arms on the same items; the **C2-enriched set** (every test T1 item with `c2_affected = true`, target ≥ 500) for the placement arm.
+- **API models**: the core only under p0, plus a seeded 300-item subset of the core under p1 and p2; never the sealed split, never a vulgar-flagged item, never any item file whose path contains `validation`, `human` or `sealed`.
+- **Attested**: 200–400 rows; all in T2; exact two-syllable rows in T1-style scoring and H6.
+- **XCOPA-vi**: the 500 test items under baseline, `nfd`, `pc`, `placement_new` (analysed on the 43 affected items only, with the detectable effect stated) and `strip_tones`; expected flip rate for the power statement: 10% (resolves 3.9 points).
+- **Human baseline**: 20 respondents × 30 items = 246 distinct items (6 anchors + 240 double-judged), all inside the open-model main sample (§8.11).
+- **E4**: Gemma 3 1B and 4B, fp32; probe stimuli 1,800 syllables × ≥ 3 carriers × 2 encodings; ≥ 600 candidate patching pairs per orientation to net ≥ 200 clean pairs.
+- **Decoding**: greedy, ≤ 64 new tokens, thinking off (template census; `n_thinking_chars` MUST be 0 in main runs), no system prompt, chat template rendered in the runner.
+- **Pilot (Gate 1)**: 200 items on three models (§10).
+
+## 5. Exclusion rules (DD §8.8)
+
+1. **Model outputs** are never excluded: unparseable, empty, refused and truncated outputs count as wrong and are reported as error classes with their rate per model × prompt.
+2. **Items**: removed only when a native validator's majority judgment marks the gold as incorrect **and** the cause is a confirmed generator bug; the fix triggers a full regeneration **before any model run**, is recorded, and every affected run is repeated. No post hoc item exclusion. Items judged "unsure" by the majority stay in the benchmark and out of the generator-precision estimate.
+3. **Vulgar-flagged items** (blocklist at generation + validator flags) are removed from the public dev split and from every API prompt and human form by the stated rule; they stay, flagged, in the gated test file.
+4. **Demonstration and attested overlap**: an item sharing a syllable or a canonical phrase with the demonstration pairs or the attested set is excluded at build; the runner refuses such a file.
+5. **Models**: a panel model is dropped only for a documented engineering failure (fails the 20-item smoke test after two configuration attempts) and is named in the appendix with the reason; a model that completes part of its run is reported on the items it completed, flagged. A **corrupting** tokenizer path (census) has the affected arm refused on that engine and reported.
+6. **bf16 drift**: disagreement above 5 percentage points between the quantized/fp16 run and the bf16 re-run on the 200-item check flags the run (reported; the run is not excluded).
+7. **Human baseline**: a form with fewer than 15 of 30 items answered; a respondent who reports using a dictionary, a search engine or an AI assistant; a failed instruction-check item. All counts reported.
+8. **Probes/patching**: layers are never excluded; pairs are filtered only by the pre-specified filters (§8.10) with retention reported at every filter.
+
+## 6. Stopping rules (DD §8.8: fixed n, no sequential testing)
+
+- **Data**: the generator is frozen at the registration commit; after it only rule 5.2 may change the items, logged with a regeneration. The data freeze (Gate 2, 8 Nov 2026) records the item hashes.
+- **Runs**: model runs stop at the results freeze (Gate 3, 22 Nov 2026); runs finished later enter the appendix only. No run is repeated because of its result.
+- **Sample sizes** (§4) are fixed in advance. The pilot may **raise** n before any test-set run (if pilot discordance > 35%, cell-level claims are dropped or n is raised, never after); nothing is added or removed after looking at test-set results in order to change a verdict.
+- **API budgets**: a hosted model that cannot complete the core by the results freeze is reported on the items it completed, flagged.
+- **Hypotheses**: H1–H6 and H3b are not modified after this date; a hypothesis suggested by the data is reported as exploratory.
+
+## 7. Model-panel freeze rule (DD §7.1)
+
+The panel of `configs/models.yaml` (17 self-hosted + 4 API = 21) is frozen **at Gate 1 (18 October 2026)** in a commit that (a) resolves every `hf_id_status: uncertain` entry to a concrete checkpoint id and full-commit revision or removes it with a reason (names stay, ids are fixed), (b) records each entry's smoke-test result and census verdict per engine, (c) records the free-tier limits read from the providers' consoles, and (d) records tokenizer SHA-256s (a "tokenizer-fixed" control pair requires byte-identical files; otherwise the control claim is dropped). After the freeze no model enters the main tables; a model may be dropped only under rule 5.5; a model added later appears in the appendix labelled post-freeze. Serving variants (bf16 reference, thinking-on) are not panel changes.
+
+## 8. Analysis plan (DD §6.4, §8, §9)
+
+### 8.1 Unit of analysis and clustering
+The **base pair** is the sampled unit and the only cluster; everything derived from it (all items, T3 twins, three paraphrases, every model's responses) is one cluster. Paraphrases are within-item repeated measures: aggregate each item × model to its paraphrase mean, or keep rows and cluster by base pair. Never cluster by base pair × model. Models are a fixed set of 21; claims are about these 21 unless the random-slope model is used.
+
+### 8.2 Bootstrap and paired tests
+Cluster bootstrap by base pair, B = 2,000, fixed seed, percentile intervals (BCa when a cell has ≥ 50 base pairs), stratified by base-pair type (lexical vs pseudo). Every comparison is paired by item and computed inside each replicate. p-values from the same bootstrap (two-sided) or from a paired t on base-pair-level mean differences (≥ 200 base pairs); McNemar exact mid-p only on base-pair-aggregated outcomes (or GEE/conditional logit clustered by base pair). Never test across scoring modes (generation vs log-probability) or across API vs open panels. Cells at 0% or 100% or with < 20 base pairs: Wilson (or rule of three) on n/DEFF. Every cell reports point estimate, CI, number of items, number of base pairs, realized design effect and unparseable rate.
+
+### 8.3 Holm families (`statsmodels.stats.multitest.multipletests(method="holm")`, α = 0.05)
+- Table 2 (E1): estimation only; the pairwise model contrasts are not tested; "best model vs human" is one test if claimed.
+- Table 3 (E3): one family per model row = {C1 nfd, C2 placement, C3 strip} × {NóiLái, XCOPA} = 6 tests, Holm within the row.
+- H3: per pass-through model, family of 2; the claim rests on the two pooled random-effects estimates.
+- H3b: Holm over the four DiD contrasts.
+- H4, H6: per-model tests, Holm across the panel; report k of N plus pooled.
+- Ablations, explicit-input condition, probes, patching, steering: estimation with CIs, no Holm.
+
+### 8.4 Mixed-effects model (E2; decides H1)
+Covariates are item × tokenizer quantities with a within–between (Mundlak) decomposition: `tps_w` = tokens per syllable minus the model's mean; `tps_b` = the model's mean; `split` = 1[tokens per syllable > 1]; `align_w` = share of aligned boundaries among split syllables (0 when `split` = 0). Frequency = standardized log frequency of each syllable in a **reference corpus independent of the tokenizers' training data** (candidate: the Vietnamese Wikipedia dump; decided before Gate 1, §11); the Viet74K count is a secondary column. Reference specification (paraphrases aggregated to binomial counts per item × model):
+
+```
+cbind(k, 3 - k) ~ 1 + split + tps_w + align_w + lexical_in + lexical_out
+                  + logfreq_s1 + logfreq_s2 + variant + task
+                  + (1 + split + tps_w + align_w | model) + (1 | base_pair/item)
+```
+
+**Primary fit** = logistic regression with model fixed effects, `C(model):tps_w` and `C(model):align_w` interactions, two-way (base pair × model) cluster-robust SEs; the mean of the 21 slopes with a bootstrap CI. **Generalization check** = the random-slope model (bambi/PyMC, or `lme4::glmer` via rpy2). `BinomialBayesMixedGLM.fit_vb` gives point estimates and variance-component screening only (its mean-field posterior SDs are not reported as uncertainty). **Robustness** = GEE clustered by base pair, exchangeable working correlation. Scoring modes are fitted separately. Reported for H1: the standardized coefficients of `align_w` and `tps_w` with their CIs, the CI of their standardized difference, and the share of per-model slopes with the predicted sign.
+
+### 8.5 Intervention estimand (E3; decides H3, H4)
+For arm a on model m: τ_m(a) = E_i[Y_i(a) − Y_i(base)] over the sampled items, base-pair cluster-bootstrap CI and paired mid-p McNemar on aggregated outcomes; identified without assumptions beyond representativeness of the item sample, because the same item is scored under both arms with prompt, paraphrase, decoding and engine fixed. Baseline = NFC, **old-style placement** (the majority convention; §8.8), canonical i/y. Arms are applied to the item text by default (`arm_scope: item`); whole-prompt scope is a secondary condition. A run whose two arms produce byte-identical prompts is skipped and recorded `unchanged`.
+
+### 8.6 The tokenizer census (pre-flight gate; E3 eligibility)
+For every panel tokenizer and every engine path it runs through, on a fixed 1,000-string probe set (500 multi-syllable words + 500 NóiLái items), classify: **passes through** (ids differ, decoding returns the input), **normalizes** (ids identical to NFC → the NFD/PC arms are skipped and a "0 by construction" row is emitted), **corrupts** (decoding does not return the input → the arm is refused on that engine). Native-`sentencepiece` and HF token ids MUST be asserted equal per model. C1 is run through two engines on Gemma 3 1B for a 500-item subset and the agreement reported. The census verdict is copied into every manifest and is a column of Table 3.
+
+### 8.7 What replaces "share mediated by token count" (E3 secondary; DD §8.6)
+"Share of the intervention effect mediated by token count" is **not** estimated: within (item, model) the arm determines the token sequence deterministically, token count is a coarsening of it, the cross-world counterfactual corresponds to no manipulable state, and positivity fails across items. Pre-registered replacement, in priority order: (1) τ_m(a) per model (§8.5), the headline, with no mediation language; (2) **effect modification** by Δk: τ_m(k) = E[Y(NFD) − Y(base) | Δk = k], adjusted for baseline difficulty (base-arm accuracy), the number of tone and quality marks, syllable frequency and length, variant, lexicality, glide and spelling trigger, labelled **associational**; (3) the **zero-dose contrast** within a tokenizer (Δk = 0 but different ids vs Δk > 0), reported only where the stratum has ≥ 100 items per model; (4) the **interventional tests of the count mechanism**: the three-arm ordered contrast base < pc < nfd in token count, and the encoding × character-spacing 2 × 2 from the input-format condition (budget permitting); normalizing tokenizers are the negative control. H3b's matching: nearest neighbour within base-pair strata on syllable frequency, NFC token count and NFD token count; ≥ 500 items per cell. Figure 4 shows "effect of re-encoding by Δtokens stratum, by encoding form, and under character spacing". The implementation in `noilai.stats.mediation` (dose–response decomposition and matched contrast) is item (2)–(3) and is reported under those labels only.
+
+### 8.8 H6 matching, contamination controls, and the placement count
+Restrict to generated items with lexical output. Match each exact attested item to 3–5 generated items from base pairs outside the attested set, exactly on variant, task, output lexicality, spelling-trigger presence and tone-pair class, nearest on log frequency of each input/output syllable and syllable length (coarsened exact matching or Mahalanobis with a 0.2-SD caliper); report standardized mean differences after matching (< 0.1); estimate = mean over attested items of (acc_attested − mean acc of controls), CI by base-pair bootstrap. Discriminators, all pre-registered: the **guided-instruction test** (Golchin & Surdeanu 2023; guided prompt = source cue + input, general prompt = the rule instruction; match = normalized exact match or edit distance ≤ 1; signal = rate(match | guided) − rate(match | general), with the same pair of prompts on matched generated items as the null); **closed-book recall** ("list 20 well-known nói lái") scored as overlap with the attested set; the **conditional log-probability contrast** log p(Y | X, template) attested vs matched generated (open models); the **name-only prompt** (generated near 0, attested above 0 reveals recall). **Placement count**: before Gate 1 the author counts old- and new-style spellings of the 69 affected syllable types in the reference corpus with `count_placement_changes`; the majority convention is the baseline and H4's direction follows; the count and the decision are logged in `DEVIATIONS.md` if they flip the expected direction.
+
+### 8.9 Probes (E4; decides H5 condition (i)–(ii)) — DD §9.1–9.2
+Layer-wise multinomial logistic probes (full-batch LBFGS) on the residual stream at positions `first`, `last`, `mark` (NFD bare tone mark) and `after`; features tone (primary), onset, coda, nucleus, coarse rime, with n_tokens as a nuisance feature; stimuli = legal syllables balanced by tone (300 per tone) including legal non-word syllables, in ≥ 4 NV carriers with a tone-neutral following word; only the target syllable re-encoded (whole-carrier NFD secondary); split nested by syllable identity 60/10/30 (dev tunes L2 ∈ {0.01, 0.1, 1, 10}) and a second split held out by rime; 5 split seeds × 5 control-label seeds. **Tone is linearly decodable at (ℓ, p, E) iff** (i) **selectivity** a − a_control ≥ δ_sel (Hewitt–Liang random label per syllable type; δ_sel = 0.15 provisional, frozen from the pilot) **and** (ii) **excess** a − b_E(p) > 0 with a syllable-clustered 95% CI excluding 0, where b_E(p) is the structural baseline: the same probe fitted on one-hot token ids of the span plus the coda class. Report the layer-0 baseline curve, majority and coda-conditional baselines, pooled and per token-type regime, and the reconstruction layer ℓ* on the single-token subset.
+
+### 8.10 Patching and steering (E4; decides H5's dissociation) — DD §9.3–9.4
+Pairs: prompts identical token for token except one syllable whose tone differs, both attested, same onset/glide/nucleus/coda; **the varying syllable is the second input syllable** (`build_pairs(target_first=False)`); example clean `bí mà → bì má`, corrupt `bí mạ → bị má`, readout `▁bì` vs `▁bị`. The `bí mật / bí mất` pair is **not** a legal V3 pair (equal tones make V3 the identity) and is used for V4 patching only. Filters in order, retention reported at each: (1) equal token length with differences inside the varying syllable's span; (2) tone-only readout (pieces differ in the tone mark alone); (3) LD_clean − LD_corrupt ≥ 1.0 nat and greedy clean answer correct. A model that loses every pair at (3) has an undefined manipulation readout — reported as a result with its clean-run V3 accuracy. Readouts: **A (perception)** "Chữ «bí» mang thanh gì? Đáp án: thanh" → digits 1–6; **B (manipulation)** the E1 V3 prompt with the chat template, teacher-forced answer with a leading space. Metric LD = logit(tok_clean) − logit(tok_corrupt) at the first diverging answer token; denoising recovery = (LD_patched − LD_corrupt)/(LD_clean − LD_corrupt), plus noising and raw nats; mean with syllable-clustered CI. Position groups G1 (varying syllable), G1a/b/c (its tokens), G2 (fixed syllable), G3 (instruction), G4 (marker and newline), G5 (final position), G6 (everything from the varying syllable onward; must reach 1.0). Steering: d = normalize(μ_b − μ_a) at ℓ_p at `last`/`after`, α ∈ {0.25, 0.5, 1, 2, 4} × median‖h‖, at G1 (and G5 as contrast), ℓ_p − 2 … ℓ_p + 2; success = LD sign flip on readout A then B; baselines = random direction of equal norm and an onset-class direction; specificity = onset/rime probes at `after` unchanged. Steering is exploratory.
+
+### 8.11 Human baseline analysis (DD §10.2)
+Item-level human accuracy = mean of the item's two judgments; the comparator is **mean-human** accuracy (a model is one rater; "any human correct" is a ceiling reported separately); CI by a two-way (person, item) cluster bootstrap or `correct ~ 1 + (1|person) + (1|item)`; expected precision ±4–5 points → a reference band, no cell-level human comparison; report by output lexicality and by region; nominal α between the two raters over the 240 double-judged items on the produced answer and on correctness. Every model is scored on exactly the 246 human items for the human–model comparison.
+
+### 8.12 Agreement (DD §10.1)
+Nominal Krippendorff's α on binary correctness and on each category label, bootstrap CI, **reported with raw agreement, the marginal distribution and Gwet's AC1**; MASI- and Jaccard-distance α for the set-valued T2 gold; generator precision per cell with a CI from the weighted probability sample.
+
+### 8.13 Reporting rules
+Main tables report p0 with the mean and range over {p0, p1, p2}; a claim about a model holds only if its direction holds under all three paraphrases; every paper sentence about models in general rests on a pooled estimate; every headline size carries its cluster count; tables are produced by `noilai.stats.tables` (analysis entry point `python -m noilai.stats.analyze --config configs/analysis.yaml --runs data/runs/<manifest>`, **planned**; until it exists, `scripts/score_run.py` + the `noilai.stats` functions named above, with the exact call recorded in `docs/RESULTS_LOG.md`). No number in the paper is typed by hand.
+
+### 8.14 Exploratory (labelled as such)
+Error taxonomy by variant and model group; per-stratum accuracies; the SEA-LION E2B vs Gemma 4 E2B contrast (only with byte-identical tokenizer files; "suggests", never "isolates"); the reasoning-cost curve; Gemma Scope 2 SAE features (only if they beat the probe baseline); the qu- stratum (only if its convention is settled before the data freeze); steering flip curves.
+
+## 9. Power and precision (DD §8.5; normal approximations cross-checked with exact binomial)
+
+1,000 iid items at 70% → ±2.84 points; under base-pair clustering with m items per pair and ICC ρ, DEFF = 1 + (m − 1)ρ: m = 3, ρ = 0.2 → ±3.4; m = 6, ρ = 0.2 → ±4.0; m = 12, ρ = 0.4 → ±6.6. The plan's "94% power for a 5-point paired difference at 20% discordance, n = 1,000" is a best case: power is 0.81 at 30% discordance, 0.68 at 40%, 0.65 at 44% (independent errors at 70% vs 65%), 0.82 at the Holm first step α/6, 0.83 with DEFF 1.5. Items per cell for a 10-point paired contrast at 80% power: 100 (15% discordance), 145 (20%), 227 (30%), 308 (40%), 356 (46%), times DEFF. **Rule: ≥ 300–350 items per cell for any cell-level 10-point claim** → the open-model main sample is 4,200 items (350 per cell); the 125-item API cells resolve 11–17 points, so cell-level claims rest on open models. XCOPA's 500 paired items resolve 2.7 / 3.9 / 5.5 points at flip rates 5 / 10 / 20%. The 200-item pilot has ±6–7 points. Pilot measurements that fix n before any test-set run: ICC by cell; discordance between two paraphrases and between two models.
+
+## 10. Gate 1 (18 October 2026): the pilot go/no-go, in numbers
+
+**Pilot design** (run plan `pilot`): three open models — gemma-3-1b-it, qwen3.5-2b, phogpt-4b-chat — on (a) 200 dev-split T1 items balanced over the four variants (50 each), p0, three demonstrations, baseline encoding; (b) the same 200 items under `nfd` (paired); (c) 200 XCOPA-vi items under baseline and `nfd` (paired), log-likelihood scoring. Census on all three tokenizers first (§8.6).
+
+**Go (A's premise holds) iff:** for at least one of the three pilot models, pooled strict T1 accuracy exceeds the copy baseline by **≥ 15 points** with the base-pair cluster-bootstrap 95% CI of the difference excluding 0 (DD §8.5; the copy baseline scores 0 by construction, so this is accuracy ≥ 15% with the CI's lower bound above 0). **No-go** otherwise: A's premise fails and the plan's switching rule (Bundle B, or the Sino-Vietnamese short paper) applies.
+
+**Scope decisions made at the same gate (not go/no-go):**
+- *Saturation*: if every pilot model scores ≥ 90% strict T1, the main runs add the reasoning-cost and explicit-input conditions as headline results and the paper's framing shifts to cost; nothing else changes.
+- *E3 at full scale*: continues if, for at least one pilot model whose tokenizer passes through, the paired baseline−NFD difference on T1 or on XCOPA-vi has |Δ| ≥ 5 points with McNemar mid-p < 0.05 (six pre-specified tests, uncorrected at the pilot stage; all six reported). Otherwise E3 shrinks to the census plus the null result reported as such (a logged scope decision, not a failure of A).
+- *Sample sizes*: the pilot's ICC and discordance fix n (§9); if discordance > 35%, cell-level claims are dropped or n is raised before any test run.
+- *Novelty*: independently of the pilot, Gate 1 requires that the repeated sweep found no prior LLM study of nói lái or of Vietnamese NFC/NFD or placement re-encoding (`docs/NOVELTY_SWEEP_2026-09-30.md`).
+
+## 11. Decided before Gate 1 but not by this document
+
+The reference corpus for frequency and the placement count (§8.4, §8.8; the count fixes H4's direction); the exact prompt wording (awaiting native validation; the six-type overview and region-neutral wording per DD §3); the attested set's final size (200–400); the concrete checkpoint ids (§7); the number of human-baseline respondents (target 20; three raters per item before the item set widens); δ_sel frozen from the pilot (§8.9). Each is logged, not registered.
+
+## 12. Amendments log
+
+| Date | Commit | Section | Change and reason |
+|---|---|---|---|
+| — | — | — | (none yet; mirror every entry in `docs/DEVIATIONS.md`) |
+
+---
+
+*Registration commit:* `PREREG_COMMIT = <fill>` — the SHA-1 of the commit that adds this file and freezes the generator and analysis code, obtained with `git rev-parse HEAD` immediately after committing; also record it in `paper/appendix.tex` (Appendix "Pre-registration") and in the README change log.

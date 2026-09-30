@@ -1,23 +1,36 @@
-input	output	variant	gloss_input	gloss_output	note	confidence	vulgar	verified_by
-đầu tiên	tiền đâu	V2	first	where is the money?	classic folk example	high	no
-trò chơi	trời cho	V1	game	heaven-given	classic folk example	high	no
-hiện đại	hại điện	V1	modern	harmful to electricity	classic joke about appliances; V1 = V4 since tones are equal	high	no
-thầy giáo	tháo giày	V4	teacher	take off shoes	attested output writes giày (Southern ay) where the rule gives giầy; both accepted	high	no
-bí mật	bật mí	V4	secret	reveal	classic; also decodes V3 to bị mất	high	no
-bí mật	bị mất	V3	secret	got lost	classic	high	no
-mèo cái	mài kéo	V1	female cat	sharpen scissors	classic; c becomes k before e	high	no
-đấu tranh	tránh đâu	V2	to struggle	avoid where?	classic: đấu tranh thì tránh đâu	high	no
-thi đua	thua đi	V1	to compete (emulation)	just lose	classic: thi đua là thua đi	high	no
-đại học	độc hại	V1	university	toxic	student joke; V1 = V4 since tones are equal	high	no
-hộ khẩu	hậu khổ	V1	household registration	later misery	joke	medium	no
-cờ tây	cầy tơ	V1	western flag	young dog (meat)	classic euphemism: hạ cờ tây = hạ cầy tơ (three syllables, first fixed)	high	no
-chà đồ nhôm	chôm đồ nhà	V4	polish aluminium	steal from home	three syllables; outer two swap rime and tone, middle fixed	high	no
-khoái ăn sang	sáng ăn khoai	V3	likes eating fancy	morning eats sweet potato	three syllables; outer two swap tones AND positions	high	no
-lộng kiếng	liệng cống	V1	to frame in glass	throw into the sewer	Southern classic	medium	no
-cá đối	cối đá	V1	mullet fish	stone mortar	classic	high	no
-Vũ Như Cẩn	Vẫn Như Cũ	V1	(a name)	still the same	attested output cũ shows the Southern hỏi/ngã merger (rule gives củ)	high	no
-củ đậu	cậu đủ	V4	yam bean	uncle is enough	plausible joke	low	no
-bảo đảm	bám đảo	V1	to guarantee	cling to the island	rule gives bảm đảo; attested form may differ	low	no
-con cá đối	con cối đá	V1	the mullet	the stone mortar	classifier fixed	medium	no
-đơn giản	đang giỏn	V4	simple	being playful	doubtful	low	no
-mộng mơ	mờ mông	V4	dreamy	blurry bottom	mild vulgar reading; screen	medium	yes
+input	output	variant	positions	exactness	region_tag	gloss_input	gloss_output	note	confidence	vulgar	source	verified_by
+đầu tiên	tiền đâu	V2	0-1	exact		first	where is the money?	classic folk example	high	no	folk; widely cited (e.g. plo.vn "Người Việt nói lái")
+trò chơi	trời cho	V1	0-1	exact		game	heaven-given	classic folk example	high	no	folk
+hiện đại	hại điện	V1	0-1	exact		modern	harmful to electricity	joke about appliances; equal tones so V1 = V4	high	no	folk
+thầy giáo	tháo giày	V4	0-1	approx(ay/ây)		teacher	take off shoes	folk output writes giày where the rule gives giầy (ay/ây doublet)	high	no	folk
+bí mật	bật mí	V4	0-1	exact		secret	reveal	classic; the phrase also decodes under V3 to bị mất	high	no	folk
+bí mật	bị mất	V3	0-1	exact		secret	got lost	classic	high	no	folk
+mèo cái	mài kéo	V1	0-1	exact		female cat	sharpen scissors	classic; c becomes k before e	high	no	folk
+đấu tranh	tránh đâu	V2	0-1	exact		to struggle	avoid where?	classic: đấu tranh thì tránh đâu	high	no	folk
+thi đua	thua đi	V1	0-1	exact		to compete (emulation)	just lose	classic: thi đua là thua đi; equal tones so V1 = V4	high	no	folk
+đại học	độc hại	V1	0-1	approx(o/ô)		university	toxic	student joke; rule gives đọc hại	high	no	folk
+hộ khẩu	hậu khổ	V1	0-1	exact		household registration	later misery	joke	medium	no	folk
+cờ tây	cầy tơ	V1	0-1	exact	S	western flag	young dog (meat)	hạ cờ tây = hạ cầy tơ (three syllables, first fixed)	high	no	folk euphemism
+hạ cờ tây	hạ cầy tơ	V1	1-2	exact	S	lower the western flag	slaughter a young dog	three-syllable form of the previous row	high	no	folk euphemism
+chà đồ nhôm	chôm đồ nhà	V4	0-2	exact	S	polish aluminium	steal from home	three syllables; outer two swap rime and tone	high	no	folk
+khoái ăn sang	sáng ăn khoai	V3	0-2 reversed	exact		likes eating fancy	morning eats sweet potato	three syllables; outer two swap tones and positions	high	no	folk
+lộng kiếng	liệng cống	V1	0-1	exact	S	to frame in glass	throw into the sewer	Southern classic; k becomes c	medium	no	folk
+cá đối	cối đá	V1	0-1	exact		mullet fish	stone mortar	classic	high	no	folk
+vũ như cẩn	vẫn như cũ	V1	0-2	approx(hỏi/ngã)	S	(a name)	still the same	folk output cũ shows the Southern hỏi/ngã merger (rule gives củ)	high	no	folk
+củ đậu	cậu đủ	V4	0-1	exact		yam bean	uncle is enough	plausible joke	low	no	folk?
+bảo đảm	bám đảo	V1	0-1	approx(tone)		to guarantee	cling to the island	rule gives bảm đảo	low	no	folk?
+con cá đối	con cối đá	V1	1-2	exact		the mullet	the stone mortar	classifier fixed	medium	no	folk
+đơn giản	đang giỡn	V4	0-1	approx(n/ng+hỏi/ngã)	S	simple	just kidding	Southern merger; doubtful as a rule output	low	no	folk?
+mộng mơ	mờ mông	V4	0-1	approx(tone)		dreamy	blurry buttocks	not a rule output; mild vulgar reading	medium	yes	folk?
+thụy điển	thủy điện	V3	0-1	exact		Sweden	hydroelectricity	rule output; equal segments	high	no	folk
+tượng lo	lọ tương	V2	0-1	exact	N	statue worries	jar of soy sauce	Northern manner example in the survey literature	medium	no	survey snippet
+cây còn	con cầy	V4	0-1	exact		the tree remains	civet	equal onsets so V4 is the plain reversal; kept as attested only	medium	no	folk
+cao đẳng	đau cẳng	V5	0-1	approx(ao/au)	S	junior college	leg hurts	onset swap; rule gives đao cẳng	medium	no	folk
+giải pháp	phải giáp	V5	0-1	exact		solution	must face	onset swap example	medium	no	folk
+thay đổi	thôi đảy	V1	0-1	exact		to change	(six-way textbook illustration)	Lê Trung Hoa & Hồ Lê, Thú chơi chữ (1990), as recalled; NV	medium	no	Thú chơi chữ 1990 [UNCERTAIN]
+thay đổi	đôi thảy	V2	0-1	exact		to change	(six-way textbook illustration)	same source	medium	no	Thú chơi chữ 1990 [UNCERTAIN]
+thay đổi	thảy đôi	V3	0-1	exact		to change	(six-way textbook illustration)	same source	medium	no	Thú chơi chữ 1990 [UNCERTAIN]
+thay đổi	thổi đay	V4	0-1	exact		to change	(six-way textbook illustration)	same source	medium	no	Thú chơi chữ 1990 [UNCERTAIN]
+thay đổi	đay thổi	V5	0-1	exact		to change	(six-way textbook illustration)	same source	medium	no	Thú chơi chữ 1990 [UNCERTAIN]
+thay đổi	đảy thôi	V6	0-1	exact		to change	(six-way textbook illustration)	same source	medium	no	Thú chơi chữ 1990 [UNCERTAIN]
+trái gió	giái tró	V6	0-1	exact		wrong wind	(vulgar reading under gi/d and tr/ch mergers)	Hồ Xuân Hương; vulgar; gated split only	medium	yes	Hồ Xuân Hương (attributed)

@@ -12,16 +12,15 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Optional
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from noilai.eval import score as S  # noqa: E402
-from noilai.eval.run import load_item_file, read_manifest, read_outputs  # noqa: E402
+from noilai.eval import score as S
+from noilai.eval.run import load_item_file, read_manifest, read_outputs
 
 
-def score_run_dir(run_dir: Path, items_path: Optional[Path] = None, audit: Optional[Path] = None,
+def score_run_dir(run_dir: Path, items_path: Path | None = None, audit: Path | None = None,
                   quiet: bool = False) -> dict:
     run_dir = Path(run_dir)
     manifest = read_manifest(run_dir)

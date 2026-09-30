@@ -2,20 +2,20 @@
 # derives three demonstrations for every task x variant cell with the rule engine
 # (noilai.gen.variants). The pairs were chosen so that every variant yields a legal,
 # non-identity output and so that none of their syllables (inputs or outputs) occurs in
-# the pilot item file; the run refuses an item file that shares a syllable with them
-# unless --allow-demo-overlap is given (see docs: the release generator should reserve
-# these syllables).
+# the pilot item file or the attested seed (data/attested_seed.tsv, inputs and outputs);
+# the run refuses an item file that shares a syllable with them unless --allow-demo-overlap
+# is given (the release generator should reserve these syllables).
 #
 # [NATIVE-CHECK] the three inputs are ordinary words; the outputs are rule outputs and
 # need not be words. Glosses are for the validator, not for the prompt.
 version: 1
 pairs:
-  - syllables: [chủ, nhà]
-    gloss: "host / landlord"
-  - syllables: [cá, đồng]
-    gloss: "field fish"
-  - syllables: [cổ, tay]
-    gloss: "wrist"
+  - syllables: [trung, bình]
+    gloss: "average"
+  - syllables: [làm, chủ]
+    gloss: "to own; to be master of"
+  - syllables: [vô, hình]
+    gloss: "invisible"
 # T3 demonstrations alternate yes / no / yes over the three pairs; the "no" demonstration
 # uses the output of another variant on the same input (an other_variant twin).
 t3_pattern: ["yes", "no", "yes"]

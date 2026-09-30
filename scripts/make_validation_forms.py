@@ -64,7 +64,6 @@ def _display(it: dict) -> dict:
 def cmd_sample(args) -> int:
     rng = random.Random(args.seed)
     items = load_items(Path(args.items)) + (load_items(Path(args.dev)) if args.dev else [])
-    items = [it for it in items if not (it["task"] == "T3" and it["gold"] == "no" and it.get("twin_type") == "spelling" and False)]
     strata = defaultdict(list)
     for it in items:
         strata[(it["task"], it["variant"], it["source"], it["split"])].append(it)
@@ -149,7 +148,7 @@ def cmd_score(args) -> int:
 
 def cmd_baseline(args) -> int:
     rng = random.Random(args.seed)
-    items = [it for it in load_items(Path(args.items)) if it["task"] in ("T1", "T2", "T3")]
+    items = [it for it in load_items(Path(args.items)) if it["task"] in ("T1", "T2", "T3") and not it.get("vulgar")]
     by_cell = defaultdict(list)
     for it in items:
         by_cell[(it["task"], it["variant"])].append(it)

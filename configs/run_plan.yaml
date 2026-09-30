@@ -5,7 +5,10 @@
 # `scripts/run_eval.py` command per model:
 #
 #   run_eval.py --model-config <name> --items <path> --tasks ... --variants ... --paraphrases ...
-#               --shots N --arms ... [--limit N] [--in-core-only] --resume --out data/runs/<id>__<name>
+#               --shots N --arms ... [--limit N] [--in-core-only] --resume --run-id <id>__<name> --out-root data/runs
+#
+# (`run_eval_out_style` below chooses between the CLI's `--run-id/--out-root` pair, as landed, and
+# the `--out <dir>` flag of the first specification; the run directory is data/runs/<id>__<name> either way.)
 #
 # Item files are referenced by key. `sha256` is null until the data freeze (Gate 2, 8 Nov
 # 2026); once recorded, scripts/kaggle_verify_items.py refuses a file whose hash differs.
@@ -18,6 +21,7 @@ version: 1
 date: 2026-09-30
 plan: docs/PLAN_2026-09-30.md
 run_eval_cli: scripts/run_eval.py
+run_eval_out_style: run_id_root      # run_id_root -> "--run-id <id>__<name> --out-root <runs_root>"; out -> "--out <runs_root>/<id>__<name>"
 runs_root: data/runs
 compute_log: data/compute_log.csv
 
@@ -144,11 +148,29 @@ runs:
     shots: 3
     limit: 3000
     in_core_only: false
-    extra_item_files: [attested]
-    estimate: {unit: gpu_hours, low: 10, high: 20}
+    estimate: {unit: gpu_hours, low: 9, high: 18}
     counts_toward: noilai_main
     week: "Nov 9-15"
     ablations: "zero-shot, name-only and English-instruction prompts run as separate paraphrase ids on the core (plan 2.5); logged under E1_main__<model>/ablations"
+
+  - id: E1_attested
+    experiment: E1
+    purpose: "the 200-400 attested folk/literary examples (task 'attested', rendered as T1): H6 memorization signature; open models only (vulgar rows never reach an API)"
+    platform: kaggle
+    hardware: mixed
+    models: {set: self_hosted}
+    items: attested
+    tasks: [attested]
+    variants: [V1, V2, V3, V4]
+    arms: [nfc]
+    paraphrases: [p0, p1, p2]
+    shots: 3
+    limit: null
+    in_core_only: false
+    estimate: {unit: gpu_hours, low: 1, high: 2}
+    counts_toward: noilai_main
+    week: "Nov 9-15"
+    note: "run_eval.py takes one item file per run; demonstration syllables that occur in attested items need --allow-demo-overlap (EXTRA_ARGS) or a demos.yaml that reserves them"
 
   - id: E1_api_core
     experiment: E1
@@ -309,11 +331,10 @@ runs:
     shots: 3
     limit: 3000
     in_core_only: false
-    extra_item_files: [attested]
     estimate: {unit: tpu_hours, low: 4, high: 8}
     counts_toward: tpu_models_and_bf16
     week: "Nov 9-15 (TPU week)"
-    note: "identical command to E1_main for these models; run whichever notebook reaches them first, --resume makes the other a no-op"
+    note: "identical command to E1_main for these models (E1_attested covers their attested run); run whichever notebook reaches them first, --resume makes the other a no-op"
 
   - id: bf16_drift_200
     experiment: bf16_drift

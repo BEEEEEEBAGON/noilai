@@ -13,7 +13,11 @@ For each (run, model) the command is
 
     <python> scripts/run_eval.py --model-config <name> --items <path> --tasks ... --variants ...
         --paraphrases ... --shots N --arms ... [--limit N] [--in-core-only] --resume
-        --out data/runs/<run_id>__<name> [extra args]
+        --run-id <run_id>__<name> --out-root data/runs [extra args]
+
+The output flags follow `run_eval_out_style` in run_plan.yaml: "run_id_root" (default; the CLI
+as landed writes data/runs/<run-id>/) or "out" (the first specification's `--out <dir>`).
+The run directory is data/runs/<run_id>__<name> either way.
 
 Guards (raise before anything runs): an API-served model must run with --in-core-only, and an
 item file flagged `never_to_api` never reaches an API backend (plan 2.3: APIs see only the
@@ -147,7 +151,15 @@ def build_command(run: dict, model: str, plan: dict, models_cfg: dict, project_r
         cmd += ["--limit", str(run["limit"])]
     if run.get("in_core_only"):
         cmd.append("--in-core-only")
-    cmd += ["--resume", "--out", run_dir(plan, run, model)]
+    cmd.append("--resume")
+    rd = run_dir(plan, run, model)
+    style = plan.get("run_eval_out_style", "run_id_root")
+    if style == "run_id_root":          # the CLI as landed: --run-id <dir name> --out-root <runs root>
+        cmd += ["--run-id", Path(rd).name, "--out-root", plan.get("runs_root", "data/runs")]
+    elif style == "out":                # the CLI as first specified: --out <dir>
+        cmd += ["--out", rd]
+    else:
+        raise ValueError(f"run_eval_out_style must be 'run_id_root' or 'out', not {style!r}")
     cmd += list(extra)
     return cmd
 

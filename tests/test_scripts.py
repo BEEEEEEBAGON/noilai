@@ -28,8 +28,10 @@ def test_build_data_writes_release_and_manifest(release):
     assert m["n_items"] > 0 and m["seed"] == 3 and "git_commit" in m and m["canary"].startswith("NOILAI-CANARY-")
     for name in ("noilai_dev.jsonl", "noilai_test.jsonl", "noilai_core.jsonl"):
         assert (release / name).exists()
-    core = [json.loads(l) for l in open(release / "noilai_core.jsonl", encoding="utf-8")]
+    from noilai.gen.generate import load_items, read_header
+    core = load_items(release / "noilai_core.jsonl")
     assert all(it["in_core"] and it["split"] == "test" for it in core)
+    assert read_header(release / "noilai_core.jsonl")["canary"] == m["canary"]
     assert sum(m["core_counts"].values()) == len(core)
 
 
@@ -37,19 +39,24 @@ def test_build_attested(tmp_path):
     out = tmp_path / "attested.jsonl"
     r = run("scripts/build_attested.py", "--out", str(out))
     rows = [json.loads(l) for l in open(out, encoding="utf-8")]
-    assert len(rows) >= 20 and "rule reproduces" in r.stdout
+    assert len(rows) >= 30 and "rule reproduces" in r.stdout
     by_in = {(r["input"], r["variant"]): r for r in rows}
-    assert by_in[("mèo cái", "V1")]["rule_matches_attested"] is True
+    assert by_in[("mèo cái", "V1")]["rule_matches_attested"] is True and by_in[("mèo cái", "V1")]["eligible_h6"]
     assert by_in[("đầu tiên", "V2")]["rule_matches_attested"] is True
     assert by_in[("bí mật", "V3")]["rule_matches_attested"] is True
-    # the ây/ay case: rule gives 'tháo giầy', attested 'tháo giày' -> recorded as a mismatch, both in gold
+    # the ây/ay case: rule gives 'tháo giầy', attested 'tháo giày' -> approx, both forms in gold, not H6-eligible
     r_ = by_in[("thầy giáo", "V4")]
     assert r_["rule_matches_attested"] is False and "tháo giầy" in r_["gold"] and "tháo giày" in r_["gold"]
-    # three-syllable examples: outer pair by default, any position pair and order accepted
-    assert by_in[("chà đồ nhôm", "V4")]["rule_output"] == "chôm đồ nhà" and by_in[("chà đồ nhôm", "V4")]["matched_positions"] == "0-2"
-    assert by_in[("khoái ăn sang", "V3")]["matched_positions"] == "0-2 reversed"
-    assert by_in[("con cá đối", "V1")]["matched_positions"] == "1-2"
-    assert all(r["parse_ok"] for r in rows)
+    assert r_["exactness"].startswith("approx") and not r_["eligible_h6"]
+    # three-syllable rows use their declared positions; the reproducing labels record every match
+    assert by_in[("chà đồ nhôm", "V4")]["rule_output"] == "chôm đồ nhà" and by_in[("chà đồ nhôm", "V4")]["positions"] == "0-2"
+    assert by_in[("khoái ăn sang", "V3")]["rule_matches_attested"] is True and "V3@0-2 reversed" in by_in[("khoái ăn sang", "V3")]["reproducing_labels"]
+    assert by_in[("con cá đối", "V1")]["rule_matches_attested"] is True and by_in[("con cá đối", "V1")]["positions"] == "1-2"
+    # the six-way textbook illustration: every variant reproduces its row
+    for v in ("V1", "V2", "V3", "V4", "V5", "V6"):
+        assert by_in[("thay đổi", v)]["rule_matches_attested"] is True, v
+    assert by_in[("trái gió", "V6")]["vulgar"] is True
+    assert all(r["parse_ok"] for r in rows) and not any(r["eligible_h6"] for r in rows if r["n_syllables"] == 3)
 
 
 def test_validation_forms_sample_and_score(release, tmp_path):
@@ -115,8 +122,9 @@ def test_audit_items_script(release, tmp_path):
         pytest.skip("no Gemma 3 tokenizer downloaded")
     out = tmp_path / "items.jsonl"
     run("scripts/audit_items.py", "--items", str(release / "noilai_core.jsonl"), "--spm", f"{spm}:g3", "--out", str(out))
+    from noilai.gen.generate import load_items
     rows = [json.loads(l) for l in open(out, encoding="utf-8")]
-    core = [json.loads(l) for l in open(release / "noilai_core.jsonl", encoding="utf-8")]
+    core = load_items(release / "noilai_core.jsonl")
     assert len(rows) == 2 * len(core)
     nfd = [r for r in rows if r["encoding"] == "nfd"]
     assert all(r["delta_tokens_vs_nfc"] >= 0 for r in nfd) and any(r["delta_tokens_vs_nfc"] > 0 for r in nfd)

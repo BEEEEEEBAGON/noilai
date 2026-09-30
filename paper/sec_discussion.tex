@@ -1,0 +1,10 @@
+% Section 8 -- Discussion and conclusion. Budget: 0.50 page.
+% STATUS: framing written; every conclusion that depends on a result is a \placeholder.
+\section{Discussion and Conclusion}
+\label{sec:discussion}
+
+We asked whether subword LLMs can reach the onset, rime and tone inside a Vietnamese syllable, and used a rule-generated wordplay benchmark, meaning-preserving re-encodings and small-model probes to answer it from three directions. \placeholder{Summary of the answers to \hyp{1}--\hyp{6} in three sentences, written from the results.}
+
+Three points hold whatever the numbers turn out to be. First, a benchmark whose gold is computed rather than annotated can be regenerated after any leak and scored without an LLM judge, which makes its uncertainty estimates cheap and its comparisons paired; we think this is the right shape for probing sub-token competence in any rule-governed script. Second, the two re-encodings are interventions available on every deployed model at zero training cost, and the normalization census that must precede them is itself a useful piece of documentation: whether a tokenizer maps NFD onto NFC decides whether a whole class of Vietnamese text reaches the model as intended. Third, the decomposition of an intervention effect into a form-only part and a token-count part is descriptive, and we have resisted calling it mediation; the causal claim is confined to the item-level contrast, where meaning is held fixed by construction.
+
+\placeholder{Implications: for Vietnamese and other diacritic-heavy scripts (input normalization at inference time; tokenizer training that respects onset--rime boundaries, as the syllable-factorized tokenizers propose); for the character-knowledge literature (tone as a character-level feature that is neither a letter nor a word); for evaluation practice (paired designs, base-pair clustering).} The generator, parser, re-encoder, prompts, outputs and analysis code are released so that the benchmark can be regenerated, extended to the \vi{qu}- stratum once its convention is settled, and applied to tokenizers that did not exist when this paper was written.

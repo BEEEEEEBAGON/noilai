@@ -377,7 +377,7 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
         md("""
         ### RUN CELL (f) — the run
         Loops over `MODELS` (or every model of `RUN_ID`) calling
-        `scripts/run_eval.py --model-config <name> --items ... --tasks ... --arms ... --resume --out data/runs/<RUN_ID>__<name>`.
+        `scripts/run_eval.py --model-config <name> --items ... --tasks ... --arms ... --resume --run-id <RUN_ID>__<name> --out-root data/runs`.
         `--resume` makes a re-run after a session timeout continue where it stopped. Each model's wall
         time is appended to `data/compute_log.csv` with the device type from `models.yaml`.
         """),

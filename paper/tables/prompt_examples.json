@@ -1,0 +1,99 @@
+{
+ "generated": "2026-09-30 15:10Z",
+ "prompt_file_sha256": {
+  "demos.yaml": "5fe710f9964597a7ca69476419e5ab2c4b839727910169f08c9bd8a2139a6d61",
+  "noilai.yaml": "830b0da9c142590c7f1b2c04394d19c1d32844469555cf1e13122b7f15ece1c6",
+  "xcopa.yaml": "de275fa2df4b9bcb9599f9262f588a66a7e130ac7cc6f708bf3e398e847132b6",
+  "_all": "4d91959e49e91a90e94730357dc59b0fb18b5911573744d3eeea77edf6aa8f57"
+ },
+ "paraphrase": "p0",
+ "shots": 3,
+ "examples": [
+  {
+   "task": "T1",
+   "item": {
+    "item_id": "example-T1",
+    "task": "T1",
+    "variant": "V1",
+    "input": "mèo cái",
+    "input_syllables": [
+     {
+      "onset": "m",
+      "glide": false,
+      "nucleus": "e",
+      "coda": "w",
+      "tone": 1,
+      "spelled": "mèo"
+     },
+     {
+      "onset": "c",
+      "glide": false,
+      "nucleus": "a",
+      "coda": "j",
+      "tone": 2,
+      "spelled": "cái"
+     }
+    ],
+    "gold": [
+     "mài kéo"
+    ]
+   },
+   "prompt_id": "vi-p0-s3-explained-raw",
+   "prompt_hash": "b7b90ba2608846540030e4906a36c2b731e27805c36523f8f69a555e988d2d03",
+   "content": "Nói lái là một cách chơi chữ trong tiếng Việt: hai âm tiết của một cụm từ trao đổi với nhau một số thành phần (phụ âm đầu, vần hoặc thanh điệu) để tạo thành một cụm từ mới.\nMỗi âm tiết tiếng Việt gồm ba phần: phụ âm đầu (có thể không có), vần (âm đệm nếu có, âm chính và âm cuối nếu có) và thanh điệu (một trong sáu thanh: ngang, huyền, sắc, hỏi, ngã, nặng). Ví dụ: \"trung\" gồm phụ âm đầu \"tr\", vần \"ung\" và thanh ngang; \"bình\" gồm phụ âm đầu \"b\", vần \"inh\" và thanh huyền.\n\nKiểu nói lái cần áp dụng: đổi vần, giữ phụ âm đầu và thanh điệu.\nCách làm từng bước:\n1. Tách mỗi âm tiết thành phụ âm đầu, vần và thanh điệu.\n2. Đổi vần của âm tiết thứ nhất cho vần của âm tiết thứ hai.\n3. Giữ nguyên phụ âm đầu và thanh điệu của mỗi âm tiết ở vị trí cũ.\n4. Ghép lại thành hai âm tiết và viết đúng chính tả.\nKhi ghép lại, hãy viết đúng chính tả tiếng Việt: âm /k/ viết là \"k\" trước e, ê, i, viết là \"q\" trước âm đệm u và viết là \"c\" trong các trường hợp còn lại (ví dụ \"c\" ghép với vần \"eo\" phải viết là \"keo\", không viết \"ceo\"); tương tự, \"gh\" và \"ngh\" đứng trước e, ê, i (ví dụ \"nghe\", không viết \"nge\"); dấu thanh đặt trên âm chính.\n\nVí dụ:\nCụm từ: trung bình\nĐáp án: trinh bùng\n\nCụm từ: làm chủ\nĐáp án: lù chảm\n\nCụm từ: vô hình\nĐáp án: vinh hồ\n\nBây giờ hãy áp dụng kiểu nói lái trên cho cụm từ sau.\nCụm từ: mèo cái\nChỉ viết cụm từ kết quả trên một dòng riêng ở cuối, theo đúng dạng:\nĐáp án: <cụm từ kết quả>"
+  },
+  {
+   "task": "T2",
+   "item": {
+    "item_id": "example-T2",
+    "task": "T2",
+    "variant": "V1",
+    "input": "mài kéo",
+    "input_syllables": [
+     {
+      "onset": "m",
+      "glide": false,
+      "nucleus": "a",
+      "coda": "j",
+      "tone": 1,
+      "spelled": "mài"
+     },
+     {
+      "onset": "c",
+      "glide": false,
+      "nucleus": "e",
+      "coda": "w",
+      "tone": 2,
+      "spelled": "kéo"
+     }
+    ],
+    "gold": [
+     {
+      "variant": "V1",
+      "reversed": false,
+      "output": "mèo cái"
+     }
+    ]
+   },
+   "prompt_id": "vi-p0-s3-explained-raw",
+   "prompt_hash": "785246b4733d47062af36f32f9544335f68bc5838dd1859c64217ec01b125cfa",
+   "content": "Nói lái là một cách chơi chữ trong tiếng Việt: hai âm tiết của một cụm từ trao đổi với nhau một số thành phần (phụ âm đầu, vần hoặc thanh điệu) để tạo thành một cụm từ mới. Có bốn kiểu nói lái thường gặp:\n- đổi vần, giữ phụ âm đầu và thanh điệu: Đổi vần của âm tiết thứ nhất cho vần của âm tiết thứ hai. Giữ nguyên phụ âm đầu và thanh điệu của mỗi âm tiết ở vị trí cũ.\n- đổi cả phụ âm đầu và vần, giữ thanh điệu: Đổi chỗ phần phụ âm đầu và vần của hai âm tiết cho nhau (tức là đổi chỗ hai âm tiết). Giữ thanh điệu ở vị trí cũ: âm tiết đứng trước vẫn mang thanh của âm tiết đứng trước, âm tiết đứng sau vẫn mang thanh của âm tiết đứng sau.\n- đổi thanh điệu, giữ phụ âm đầu và vần: Đổi thanh điệu của âm tiết thứ nhất cho thanh điệu của âm tiết thứ hai. Giữ nguyên phụ âm đầu và vần của mỗi âm tiết.\n- đổi vần và thanh điệu, giữ phụ âm đầu: Đổi cả vần và thanh điệu của âm tiết thứ nhất cho vần và thanh điệu của âm tiết thứ hai. Giữ nguyên phụ âm đầu của mỗi âm tiết ở vị trí cũ.\nMỗi âm tiết tiếng Việt gồm ba phần: phụ âm đầu (có thể không có), vần (âm đệm nếu có, âm chính và âm cuối nếu có) và thanh điệu (một trong sáu thanh: ngang, huyền, sắc, hỏi, ngã, nặng). Ví dụ: \"trung\" gồm phụ âm đầu \"tr\", vần \"ung\" và thanh ngang; \"bình\" gồm phụ âm đầu \"b\", vần \"inh\" và thanh huyền.\n\nVí dụ:\nCụm từ: trinh bùng\nĐáp án: trung bình\n\nCụm từ: chù lảm\nĐáp án: làm chủ\n\nCụm từ: vồ hinh\nĐáp án: vô hình\n\nCụm từ sau đây là một cách nói lái. Cụm từ gốc là gì?\nCụm từ: mài kéo\nChỉ viết cụm từ gốc trên một dòng riêng ở cuối, theo đúng dạng:\nĐáp án: <cụm từ gốc>"
+  },
+  {
+   "task": "T3",
+   "item": {
+    "item_id": "example-T3",
+    "task": "T3",
+    "variant": "V1",
+    "input": "mèo cái",
+    "candidate": "mài céo",
+    "correct_output": "mài kéo",
+    "gold": "no",
+    "twin_type": "spelling"
+   },
+   "prompt_id": "vi-p0-s3-explained-raw",
+   "prompt_hash": "5888e02e705c99916fb9d072003c182bf915b2dead2fea00c97c3a65e387cc1d",
+   "content": "Nói lái là một cách chơi chữ trong tiếng Việt: hai âm tiết của một cụm từ trao đổi với nhau một số thành phần (phụ âm đầu, vần hoặc thanh điệu) để tạo thành một cụm từ mới.\nMỗi âm tiết tiếng Việt gồm ba phần: phụ âm đầu (có thể không có), vần (âm đệm nếu có, âm chính và âm cuối nếu có) và thanh điệu (một trong sáu thanh: ngang, huyền, sắc, hỏi, ngã, nặng). Ví dụ: \"trung\" gồm phụ âm đầu \"tr\", vần \"ung\" và thanh ngang; \"bình\" gồm phụ âm đầu \"b\", vần \"inh\" và thanh huyền.\n\nKiểu nói lái đang xét: đổi vần, giữ phụ âm đầu và thanh điệu.\nCách làm từng bước:\n1. Tách mỗi âm tiết thành phụ âm đầu, vần và thanh điệu.\n2. Đổi vần của âm tiết thứ nhất cho vần của âm tiết thứ hai.\n3. Giữ nguyên phụ âm đầu và thanh điệu của mỗi âm tiết ở vị trí cũ.\n4. Ghép lại thành hai âm tiết và viết đúng chính tả.\nKhi ghép lại, hãy viết đúng chính tả tiếng Việt: âm /k/ viết là \"k\" trước e, ê, i, viết là \"q\" trước âm đệm u và viết là \"c\" trong các trường hợp còn lại (ví dụ \"c\" ghép với vần \"eo\" phải viết là \"keo\", không viết \"ceo\"); tương tự, \"gh\" và \"ngh\" đứng trước e, ê, i (ví dụ \"nghe\", không viết \"nge\"); dấu thanh đặt trên âm chính.\n\nVí dụ:\nCụm từ gốc: trung bình; cụm từ cần xét: trinh bùng\nĐáp án: Có\n\nCụm từ gốc: làm chủ; cụm từ cần xét: chù lảm\nĐáp án: Không\n\nCụm từ gốc: vô hình; cụm từ cần xét: vinh hồ\nĐáp án: Có\n\nCâu hỏi: Cụm từ \"mài céo\" có phải là kết quả đúng khi nói lái cụm từ \"mèo cái\" theo kiểu trên không? Kết quả đúng phải đúng cả phụ âm đầu, vần, thanh điệu và chính tả.\nTrả lời \"Có\" hoặc \"Không\" trên một dòng riêng ở cuối, theo đúng dạng:\nĐáp án: <Có hoặc Không>"
+  }
+ ]
+}

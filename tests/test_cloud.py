@@ -301,9 +301,16 @@ def test_build_command_matches_the_specified_cli_and_guards(plan, models_cfg):
     joined = " ".join(cmd)
     for flag in ("--model-config gemma-3-1b-it", "--items data/release/v0.1/noilai_test.jsonl", "--tasks T1 T2 T3",
                  "--variants V1 V2 V3 V4", "--paraphrases p0 p1 p2", "--shots 3", "--arms nfc", "--limit 3000",
-                 "--resume", "--out data/runs/E1_main__gemma-3-1b-it"):
+                 "--resume", "--run-id E1_main__gemma-3-1b-it --out-root data/runs"):
         assert flag in joined, flag
-    assert "--in-core-only" not in cmd
+    assert "--in-core-only" not in cmd and "--out" not in cmd
+    # the first specification's --out style stays available through run_plan.yaml
+    alt = KRP.build_command(run, "gemma-3-1b-it", dict(plan, run_eval_out_style="out"), models_cfg, python="py")
+    assert alt[-2:] == ["--out", "data/runs/E1_main__gemma-3-1b-it"] and "--run-id" not in alt
+    with pytest.raises(ValueError):
+        KRP.build_command(run, "gemma-3-1b-it", dict(plan, run_eval_out_style="elsewhere"), models_cfg)
+    xcopa = KRP.build_command(KRP.find_run(plan, "E3_xcopa"), "gemma-3-1b-it", plan, models_cfg, python="py")
+    assert "--variants" not in xcopa and "--tasks XCOPA" in " ".join(xcopa) and "--arms nfc nfd placement_old strip_tones" in " ".join(xcopa)
     api = KRP.build_command(KRP.find_run(plan, "E1_api_core"), "gemini-flash", plan, models_cfg, python="py")
     assert "--in-core-only" in api and "--limit" not in api
     extra = KRP.build_command(run, "qwen3.5-2b", plan, models_cfg, python="py", extra=["--seed", "7"])
@@ -325,7 +332,7 @@ def test_build_command_matches_the_specified_cli_and_guards(plan, models_cfg):
 STUB_RUN_EVAL = '''
 import argparse, json, pathlib, sys
 ap = argparse.ArgumentParser()
-for f in ("--model-config", "--items", "--out", "--shots", "--limit"):
+for f in ("--model-config", "--items", "--out", "--run-id", "--out-root", "--shots", "--limit"):
     ap.add_argument(f)
 for f in ("--tasks", "--variants", "--paraphrases", "--arms"):
     ap.add_argument(f, nargs="*")
@@ -333,7 +340,8 @@ ap.add_argument("--in-core-only", action="store_true")
 ap.add_argument("--resume", action="store_true")
 ap.add_argument("--fail", action="store_true")
 a = ap.parse_args()
-out = pathlib.Path(a.out); out.mkdir(parents=True, exist_ok=True)
+out = pathlib.Path(a.out_root) / a.run_id if a.run_id else pathlib.Path(a.out)
+out.mkdir(parents=True, exist_ok=True)
 n = 3
 with open(out / "outputs.jsonl", "a") as f:
     for i in range(n):
@@ -541,3 +549,18 @@ def test_scripts_run_as_programs_with_help():
     for name in ("compute_log.py", "kaggle_run_plan.py", "kaggle_verify_items.py", "kaggle_dataset.py", "kaggle_build_notebooks.py"):
         r = subprocess.run([sys.executable, str(SCRIPTS / name), "--help"], capture_output=True, text=True)
         assert r.returncode == 0, (name, r.stderr[-500:])
+
+
+@pytest.mark.skipif(not (SCRIPTS / "run_eval.py").exists(), reason="scripts/run_eval.py (noilai/eval) not landed yet")
+def test_every_flag_the_driver_emits_is_accepted_by_the_real_run_eval_cli(plan, models_cfg):
+    """The driver's flag mapping must match the eval CLI that actually exists, not the one first specified."""
+    r = subprocess.run([sys.executable, str(SCRIPTS / "run_eval.py"), "--help"], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr[-500:]
+    accepted = set(re.findall(r"(?<![\w-])(--[a-z][a-z0-9-]*)", r.stdout))
+    for run in plan["runs"]:
+        if run.get("not_a_run_eval_line"):
+            continue
+        model = KRP.expand_models(run, plan, models_cfg)[0]
+        cmd = KRP.build_command(run, model, plan, models_cfg)
+        emitted = {tok for tok in cmd if tok.startswith("--")}
+        assert emitted <= accepted, (run["id"], emitted - accepted)

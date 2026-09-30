@@ -20,7 +20,7 @@
 version: 1
 answer_marker: "Đáp án:"
 
-example_syllables: [chủ, nhà, keo, ceo, nghe, nge]
+example_syllables: [trung, bình, keo, ceo, nghe, nge]
 
 concepts:
   vi:
@@ -30,8 +30,8 @@ concepts:
     structure: >-
       Mỗi âm tiết tiếng Việt gồm ba phần: phụ âm đầu (có thể không có), vần (âm đệm nếu có,
       âm chính và âm cuối nếu có) và thanh điệu (một trong sáu thanh: ngang, huyền, sắc, hỏi,
-      ngã, nặng). Ví dụ: "chủ" gồm phụ âm đầu "ch", vần "u" và thanh hỏi; "nhà" gồm phụ âm
-      đầu "nh", vần "a" và thanh huyền.
+      ngã, nặng). Ví dụ: "trung" gồm phụ âm đầu "tr", vần "ung" và thanh ngang; "bình" gồm
+      phụ âm đầu "b", vần "inh" và thanh huyền.
     spelling: >-
       Khi ghép lại, hãy viết đúng chính tả tiếng Việt: âm /k/ viết là "k" trước e, ê, i, viết
       là "q" trước âm đệm u và viết là "c" trong các trường hợp còn lại (ví dụ "c" ghép với
@@ -45,8 +45,8 @@ concepts:
     structure: >-
       Every Vietnamese syllable has three parts: an onset (initial consonant, possibly empty),
       a rime (an optional glide, the main vowel and an optional final) and a tone (one of six:
-      ngang, huyền, sắc, hỏi, ngã, nặng). For example "chủ" is onset "ch" + rime "u" + tone
-      hỏi; "nhà" is onset "nh" + rime "a" + tone huyền.
+      ngang, huyền, sắc, hỏi, ngã, nặng). For example "trung" is onset "tr" + rime "ung" + tone
+      ngang; "bình" is onset "b" + rime "inh" + tone huyền.
     spelling: >-
       When reassembling, follow Vietnamese spelling: the sound /k/ is written "k" before e, ê,
       i, "q" before the glide u and "c" otherwise (so "c" + rime "eo" is written "keo", not

@@ -47,15 +47,14 @@ def demos():
 def item_file(build, demos, tmp_path_factory):
     """The test split with the demonstration syllables reserved (what the release generator
     must guarantee; here the colliding items are dropped). Returns (path, items)."""
-    g, b, rel = build
+    _g, b, _rel = build
     items = [it for it in b["items"] if it["split"] == "test"]
     sylls = P.demo_syllables(demos)
     kept = [it for it in items if not any(w in sylls for t in P.item_texts(it) for w in t.split())]
     assert len(kept) >= 0.8 * len(items)
     path = tmp_path_factory.mktemp("items") / "noilai_test.jsonl"
     with open(path, "w", encoding="utf-8") as f:
-        for it in kept:
-            f.write(json.dumps(it, ensure_ascii=False) + "\n")
+        f.writelines(json.dumps(it, ensure_ascii=False) + "\n" for it in kept)
     return path, kept
 
 
@@ -177,7 +176,7 @@ def test_strip_arms_touch_the_item_text_only():
     lines = c.splitlines()
     assert lines[-1] == "Đáp án: <cụm từ kết quả>"                  # instruction intact
     assert "Cụm từ: meo cai" in lines                               # item stripped
-    assert "Cụm từ: chu nha" in lines and "Đáp án: chả nhù" in lines  # demo input stripped, demo answer kept
+    assert "Cụm từ: trung binh" in lines and "Đáp án: trinh bùng" in lines  # demo input stripped, demo answer kept
     c2 = P.render(it, arm="strip_all")[0]["content"]
     assert "Cụm từ: meo cai" in c2 and "Nói lái là" in c2
     with pytest.raises(ValueError):
@@ -223,7 +222,7 @@ def test_input_formats_components_and_spaced():
     it = make_t1("mèo", "cái", "V1")
     c = P.render(it, input_format="components")[0]["content"]
     assert 'Cụm từ: [phụ âm đầu "m", vần "eo", thanh huyền]' in c and "tách sẵn" in c
-    assert 'Cụm từ: [phụ âm đầu "ch", vần "u", thanh hỏi]' in c          # demos in the same format
+    assert 'Cụm từ: [phụ âm đầu "tr", vần "ung", thanh ngang]' in c      # demos in the same format
     assert "m è o / c á i" in P.render(it, input_format="spaced")[0]["content"]
 
 
@@ -273,7 +272,7 @@ def test_demos_exist_for_every_cell_and_follow_the_rules(demos):
 
 
 def test_demo_syllables_are_disjoint_from_the_item_file(item_file, demos):
-    path, items = item_file
+    _path, items = item_file
     assert len(items) > 100
     assert P.demo_overlap(demos, items) == {}
     # the same check through the run guard
@@ -282,16 +281,16 @@ def test_demo_syllables_are_disjoint_from_the_item_file(item_file, demos):
 
 
 def test_demo_overlap_detects_a_collision(demos):
-    items = [make_t1("chủ", "nhà", "V1", item_id="T1-V1-000009"), make_t1("mèo", "cái", "V1", item_id="T1-V1-000010")]
+    items = [make_t1("trung", "bình", "V1", item_id="T1-V1-000009"), make_t1("mèo", "cái", "V1", item_id="T1-V1-000010")]
     ov = P.demo_overlap(demos, items)
-    assert set(ov) >= {"chủ", "nhà", "chả", "nhù"} and ov["chủ"] == ["T1-V1-000009"]
+    assert set(ov) >= {"trung", "bình", "trinh", "bùng"} and ov["trung"] == ["T1-V1-000009"]
     with pytest.raises(RN.DemoOverlapError):
         RN.check_demo_overlap(items, RN.RunOptions(), "noilai")
     assert RN.check_demo_overlap(items, RN.RunOptions(allow_demo_overlap=True), "noilai") == ov
 
 
 def test_bad_demo_pair_fails_loudly():
-    spec = {"pairs": [{"syllables": ["hoa", "quả"]}, {"syllables": ["chủ", "nhà"]}, {"syllables": ["cá", "đồng"]}]}
+    spec = {"pairs": [{"syllables": ["hoa", "quả"]}, {"syllables": ["làm", "chủ"]}, {"syllables": ["vô", "hình"]}]}
     with pytest.raises(ValueError):          # hoa quả: equal rimes -> V1 is the identity
         P.build_demos(spec)
 
@@ -449,6 +448,52 @@ def test_aggregate_and_scores_file(tmp_path, meo_cai):
     assert len(back) == 4 and {"correct", "error_class", "component_errors", "item_id", "task", "variant"} <= set(back[0])
 
 
+def _attested(item_id, inp, variant, golds, rule_output, vulgar=False):
+    syls = [syl_dict(S_(w)) for w in inp.split()]
+    return {"item_id": item_id, "task": "attested", "variant": variant, "input": inp, "input_syllables": syls,
+            "gold": golds, "rule_output": rule_output, "attested_output": golds[0], "vulgar": vulgar,
+            "source": "attested", "base_pair_id": "att-" + inp.replace(" ", "_"), "strata": {}}
+
+
+def test_attested_items_render_as_t1_and_accept_every_listed_gold(tmp_path):
+    it = _attested("ATT-0004", "thầy giáo", "V4", ["tháo giày", "tháo giầy"], "tháo giầy")
+    c = P.render(it)[0]["content"]
+    assert "thầy giáo" in c and c.count("Đáp án:") == 4 and "Kiểu nói lái cần áp dụng" in c
+    assert set(P.item_texts(it)) == {"thầy giáo", "tháo giày", "tháo giầy"}
+    for ans in ("tháo giày", "Tháo giầy."):
+        r = S.score_t1(it, ans)
+        assert r["correct"] and r["error_class"] == "correct", ans
+    assert S.score_t1(it, "thầy giáo")["error_class"] == "copy"
+    r = S.score_t1(it, "tháo giầu")                     # a third form: classified against the rule output
+    assert r["error_class"] == "component" and r["component_errors"] == ["rime"]
+    assert S.score_t1(it, "tháo giáy")["component_errors"] == ["rime", "tone"]
+    assert S.score_t1(it, None)["error_class"] == "unparseable"
+    assert S.score_t1(it, "tháo")["error_class"] == "unparseable"
+    three = _attested("ATT-0013", "chà đồ nhôm", "V4", ["chôm đồ nhà"], "chôm đồ nhà")
+    assert "chà đồ nhôm" in P.render(three)[0]["content"]
+    assert S.score_t1(three, "chôm đồ nhà")["correct"]
+    assert S.score_t1(three, "chà đồ nhôm")["error_class"] == "copy"
+    assert S.score_t1(three, "chôm đồ nhè")["error_class"] == "wrong"
+    assert S.score_t1(three, "chôm nhà")["error_class"] == "unparseable"
+    # dispatch from an outputs row, and a run: attested items are API-eligible, vulgar ones are not
+    row = S.score_output(it, {"raw": "Đáp án: tháo giày", "arm": "nfc", "prompt_id": "p"})
+    assert row["task"] == "attested" and row["correct"]
+    vul = _attested("ATT-0022", "mộng mơ", "V4", ["mơ mộng", "mờ mông"], "mơ mộng", vulgar=True)
+    api = B.ScriptedBackend(default="Đáp án: tháo giày", is_api=True)
+    items = [it, three, vul]
+    f = tmp_path / "attested.jsonl"
+    f.write_text("\n".join(json.dumps(x, ensure_ascii=False) for x in items) + "\n", encoding="utf-8")
+    run_dir = RN.run(api, {"name": "api", "backend": "scripted"}, items, f, RN.RunOptions(out_root=tmp_path, run_id="att"),
+                     log=lambda *a: None)
+    outs = RN.read_outputs(run_dir)
+    assert [o["item_id"] for o in outs] == ["ATT-0004", "ATT-0013"]
+    assert RN.read_manifest(run_dir)["api_safety"]["n_excluded_vulgar"] == 1
+    rows = S.score_outputs(items, outs)
+    assert [r["correct"] for r in rows] == [True, False]
+    agg = S.aggregate(rows)
+    assert agg["by_task"]["attested"]["n"] == 2
+
+
 # ------------------------------------------------------------------ runs
 @pytest.fixture(scope="module")
 def oracle_run(item_file, tmp_path_factory):
@@ -462,7 +507,7 @@ def oracle_run(item_file, tmp_path_factory):
 
 
 def test_run_writes_outputs_with_the_documented_keys(oracle_run):
-    be, run_dir, items, path, opts = oracle_run
+    _be, run_dir, items, _path, _opts = oracle_run
     outs = RN.read_outputs(run_dir)
     assert len(outs) == len(items) * 2 * 2
     keys = {"item_id", "task", "variant", "arm", "prompt_id", "prompt_hash", "raw", "answer", "n_prompt_tokens",
@@ -480,7 +525,7 @@ def test_run_writes_outputs_with_the_documented_keys(oracle_run):
 
 
 def test_run_manifest_fields(oracle_run):
-    be, run_dir, items, path, opts = oracle_run
+    be, run_dir, items, path, _opts = oracle_run
     m = RN.read_manifest(run_dir)
     for k in ("run_id", "model", "backend", "backend_versions", "seed", "prompt_files_sha256", "item_file", "hardware",
               "started_utc", "finished_utc", "gpu_hours", "wall_s", "canary_check", "resource_sha256", "git_commit",
@@ -497,7 +542,7 @@ def test_run_manifest_fields(oracle_run):
 
 
 def test_oracle_run_scores_perfectly_on_generated_answers(oracle_run):
-    be, run_dir, items, path, opts = oracle_run
+    _be, run_dir, items, _path, _opts = oracle_run
     rows = S.score_outputs(items, RN.read_outputs(run_dir))
     agg = S.aggregate(rows)
     for task in ("T1", "T2", "T3"):
@@ -564,8 +609,8 @@ def test_api_guard_refuses_noncore_and_drops_vulgar_items(item_file, tmp_path):
 
 
 def test_run_refuses_demo_overlap_unless_allowed(build, tmp_path):
-    g, b, rel = build
-    items = [it for it in b["items"] if it["split"] == "test"] + [make_t1("chủ", "nhà", "V1", item_id="T1-V1-999999")]
+    _g, b, rel = build
+    items = [it for it in b["items"] if it["split"] == "test"] + [make_t1("trung", "bình", "V1", item_id="T1-V1-999999")]
     be = B.EchoBackend()
     opts = RN.RunOptions(out_root=tmp_path, run_id="ov", limit=0, tasks=("T1",))
     with pytest.raises(RN.DemoOverlapError):
@@ -575,7 +620,7 @@ def test_run_refuses_demo_overlap_unless_allowed(build, tmp_path):
     assert RN.read_manifest(run_dir)["demo_overlap"] == {}     # the limit cut the colliding item away
     opts3 = RN.RunOptions(out_root=tmp_path, run_id="ov3", tasks=("T1",), allow_demo_overlap=True)
     run_dir = RN.run(be, {"name": "echo", "backend": "echo"}, items, rel / "noilai_test.jsonl", opts3, log=lambda *a: None)
-    assert "chủ" in RN.read_manifest(run_dir)["demo_overlap"]
+    assert "trung" in RN.read_manifest(run_dir)["demo_overlap"]
 
 
 # ------------------------------------------------------------------ backends
@@ -753,7 +798,7 @@ def test_xcopa_items_prompts_and_scoring(tmp_path):
 
 # ------------------------------------------------------------------ scripts
 def test_run_eval_and_score_run_scripts(item_file, tmp_path):
-    path, items = item_file
+    path, _items = item_file
     r = subprocess.run([PY, "scripts/run_eval.py", "--items", str(path), "--backend", "echo", "--tasks", "T1", "T3",
                         "--limit", "6", "--out-root", str(tmp_path), "--run-id", "echo-run", "--arms", "nfc",
                         "--paraphrases", "p2", "--shots", "0"], cwd=ROOT, text=True, capture_output=True, check=True)

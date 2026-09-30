@@ -1,8 +1,11 @@
 """Scoring: correctness, error taxonomy, aggregation, scores.jsonl.
 
-T1  correct iff canonical_text(answer) == canonical_text(gold). canonical_text (from
-    noilai.vi.reencode) normalizes encoding, tone-mark placement, case and the lí/lý
-    alternation but deliberately does NOT repair misspellings, so "mài céo" is wrong.
+T1  correct iff canonical_text(answer) == canonical_text(gold) for one of the listed golds
+    (generated items have exactly one; attested items may list the folk form next to the rule
+    output). canonical_text (from noilai.vi.reencode) normalizes encoding, tone-mark
+    placement, case and the lí/lý alternation but deliberately does NOT repair misspellings,
+    so "mài céo" is wrong. Attested items (task "attested") are scored here; three-syllable
+    attested phrases get only correct / copy / unparseable / wrong.
     Error classes, decided in this order:
       unparseable    no answer extracted, not two syllables, or a syllable the parser rejects
       correct
@@ -35,8 +38,8 @@ import csv
 import json
 import re
 from collections import Counter, defaultdict
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, Optional
 
 from ..gen import variants as V
 from ..vi import unicode as U
@@ -44,7 +47,8 @@ from ..vi.reencode import canonical_text
 from ..vi.syllable import Inventory, Syllable, spell, try_parse
 from .extract import extract_answer, t3_label
 
-ERROR_CLASSES = ("correct", "copy", "spelling", "illegal", "order", "wrong_variant", "component", "unparseable")
+ERROR_CLASSES = ("correct", "copy", "spelling", "illegal", "order", "wrong_variant", "component", "unparseable",
+                 "wrong")   # "wrong": T3/XCOPA answers of the wrong label; attested phrases of != 2 syllables
 COMPONENTS = ("onset", "rime", "tone")
 STRATA_KEYS = ("input_lexical", "output_lexical", "output_syllables_attested", "has_glide", "has_zero_onset",
                "has_stop_coda", "spelling_triggers", "tone_pair", "same_tone", "same_rime", "input_freq",
@@ -57,27 +61,17 @@ def _syl(d: dict) -> Syllable:
     return Syllable(onset=d["onset"], glide=d["glide"], nucleus=d["nucleus"], coda=d["coda"], tone=d["tone"])
 
 
-def _inventory(inv: Optional[Inventory]) -> Inventory:
+def _inventory(inv: Inventory | None) -> Inventory:
     if inv is not None:
         return inv
     from ..vi import lexicon as L
     return L.load_inventory()
 
 
-def parse_phrase(text: str) -> Optional[tuple[list[Syllable], list[bool]]]:
+def parse_phrase(text: str) -> tuple[list[Syllable], list[bool]] | None:
     """Two syllables (non-strict) and, per syllable, whether the STRICT parse also succeeds.
     None when the text is not two parseable syllables."""
-    words = canonical_text(text).split()
-    if len(words) != 2:
-        return None
-    syls, strict_ok = [], []
-    for w in words:
-        p = try_parse(w, strict=False)
-        if p is None:
-            return None
-        syls.append(p.syllable)
-        strict_ok.append(try_parse(w, strict=True) is not None and p.i_y_variant != "nonstandard")
-    return syls, strict_ok
+    return parse_words(text, 2)
 
 
 def _component_diff(ans: list[Syllable], gold: list[Syllable]) -> tuple[list[list[str]], dict[str, list[bool]]]:
@@ -98,7 +92,7 @@ def _component_diff(ans: list[Syllable], gold: list[Syllable]) -> tuple[list[lis
     return detail, correct
 
 
-def _base(item: dict, answer: Optional[str], method: str) -> dict:
+def _base(item: dict, answer: str | None, method: str) -> dict:
     return {"item_id": item["item_id"], "task": item["task"], "variant": item["variant"], "answer": answer,
             "extraction_method": method, "correct": False, "error_class": "unparseable",
             "component_errors": [], "component_detail": None, "component_correct": None,
@@ -106,28 +100,58 @@ def _base(item: dict, answer: Optional[str], method: str) -> dict:
 
 
 # ------------------------------------------------------------------ T1
-def score_t1(item: dict, answer: Optional[str], method: str = "marker", inv: Optional[Inventory] = None) -> dict:
+def parse_words(text: str, n: int) -> tuple[list[Syllable], list[bool]] | None:
+    """`n` syllables (non-strict) and, per syllable, whether the strict parse also succeeds."""
+    words = canonical_text(text).split()
+    if len(words) != n:
+        return None
+    syls, strict_ok = [], []
+    for w in words:
+        p = try_parse(w, strict=False)
+        if p is None:
+            return None
+        syls.append(p.syllable)
+        strict_ok.append(try_parse(w, strict=True) is not None and p.i_y_variant != "nonstandard")
+    return syls, strict_ok
+
+
+def score_t1(item: dict, answer: str | None, method: str = "marker", inv: Inventory | None = None) -> dict:
+    """T1 and attested items. `gold` may list several accepted forms (attested examples whose
+    folk form bends the rule output); the answer is correct if it matches ANY of them, and the
+    error taxonomy is computed against the reference form (`rule_output` when present, else the
+    first gold). Phrases of other than two syllables (three-syllable attested examples) get the
+    classes correct / copy / unparseable / wrong only."""
     row = _base(item, answer, method)
-    gold = item["gold"][0]
-    row["gold"] = gold
+    golds = list(item["gold"]) if isinstance(item["gold"], list) else [item["gold"]]
+    ref = item.get("rule_output") or golds[0]
+    row["gold"] = golds[0] if len(golds) == 1 else golds
     if answer is None:
         return row
-    ca, cg = canonical_text(answer), canonical_text(gold)
+    ca = canonical_text(answer)
+    n = len(item["input"].split())
     inp = [_syl(d) for d in item["input_syllables"]]
-    gold_syls = [_syl(d) for d in item["gold_syllables"]] if item.get("gold_syllables") else list(
-        V.apply(item["variant"], *inp))
-    parsed = parse_phrase(answer)
-    if parsed is not None:
+    if item.get("gold_syllables"):
+        gold_syls = [_syl(d) for d in item["gold_syllables"]]
+    elif n == 2:
+        gp = parse_words(ref, 2)
+        gold_syls = gp[0] if gp else list(V.apply(item["variant"], *inp))
+    else:
+        gold_syls = None
+    parsed = parse_words(answer, n)
+    if parsed is not None and gold_syls is not None:
         # per-component view of every parseable answer (correct and copy included), so that
         # per-component accuracy is defined over all structural answers
         row["component_detail"], row["component_correct"] = _component_diff(parsed[0], gold_syls)
-    if ca == cg:
+    if ca in {canonical_text(g) for g in golds}:
         row.update(correct=True, error_class="correct")
         return row
     if ca == canonical_text(item["input"]):
         row["error_class"] = "copy"
         return row
     if parsed is None:
+        return row
+    if gold_syls is None or n != 2:
+        row["error_class"] = "wrong"
         return row
     syls, strict_ok = parsed
     spelling_bad = not all(strict_ok)
@@ -156,7 +180,7 @@ def score_t1(item: dict, answer: Optional[str], method: str = "marker", inv: Opt
 
 
 # ------------------------------------------------------------------ T2
-def named_variant(raw: Optional[str], templates: Optional[dict] = None) -> Optional[str]:
+def named_variant(raw: str | None, templates: dict | None = None) -> str | None:
     """A variant the model names in its completion: 'V3', or a variant name from the templates."""
     if not raw:
         return None
@@ -177,8 +201,8 @@ def named_variant(raw: Optional[str], templates: Optional[dict] = None) -> Optio
     return max(hits)[1] if hits else None
 
 
-def score_t2(item: dict, answer: Optional[str], method: str = "marker", raw: Optional[str] = None,
-             inv: Optional[Inventory] = None) -> dict:
+def score_t2(item: dict, answer: str | None, method: str = "marker", raw: str | None = None,
+             inv: Inventory | None = None) -> dict:
     row = _base(item, answer, method)
     golds = {canonical_text(g["output"]): g for g in item["gold"]}
     row["gold"] = [g["output"] for g in item["gold"]]
@@ -245,7 +269,7 @@ def score_t2(item: dict, answer: Optional[str], method: str = "marker", raw: Opt
 
 
 # ------------------------------------------------------------------ T3
-def score_t3(item: dict, answer: Optional[str], method: str = "marker", logprobs: Optional[dict] = None) -> dict:
+def score_t3(item: dict, answer: str | None, method: str = "marker", logprobs: dict | None = None) -> dict:
     row = _base(item, answer, method)
     row["gold"] = item["gold"]
     pred = t3_label(answer)
@@ -293,7 +317,7 @@ def paired_t3(rows: list[dict]) -> list[dict]:
 
 
 # ------------------------------------------------------------------ XCOPA
-def score_xcopa(item: dict, answer: Optional[str], method: str = "marker", logprobs: Optional[dict] = None) -> dict:
+def score_xcopa(item: dict, answer: str | None, method: str = "marker", logprobs: dict | None = None) -> dict:
     row = _base(item, answer, method)
     gold = str(item["gold"])
     row["gold"] = gold
@@ -313,7 +337,7 @@ def score_xcopa(item: dict, answer: Optional[str], method: str = "marker", logpr
 
 
 # ------------------------------------------------------------------ dispatch
-def score_output(item: dict, out: dict, inv: Optional[Inventory] = None) -> dict:
+def score_output(item: dict, out: dict, inv: Inventory | None = None) -> dict:
     """Score one outputs.jsonl row against its item. Re-extracts the answer from `raw` when
     the row has no `answer` key (older runs)."""
     task = item["task"]
@@ -321,7 +345,7 @@ def score_output(item: dict, out: dict, inv: Optional[Inventory] = None) -> dict
         answer, method = out["answer"], out["extraction_method"]
     else:
         answer, method = extract_answer(out.get("raw"), task)
-    if task == "T1":
+    if task in ("T1", "attested"):
         row = score_t1(item, answer, method, inv)
     elif task == "T2":
         row = score_t2(item, answer, method, out.get("raw"), inv)
@@ -345,8 +369,8 @@ def score_output(item: dict, out: dict, inv: Optional[Inventory] = None) -> dict
     return row
 
 
-def score_outputs(items: Iterable[dict], outputs: Iterable[dict], inv: Optional[Inventory] = None,
-                  audit_rows: Optional[dict] = None) -> list[dict]:
+def score_outputs(items: Iterable[dict], outputs: Iterable[dict], inv: Inventory | None = None,
+                  audit_rows: dict | None = None) -> list[dict]:
     by_id = {it["item_id"]: it for it in items}
     rows = []
     for out in outputs:
@@ -370,7 +394,7 @@ def load_audit_rows(path: Path) -> dict[tuple[str, str], int]:
     return out
 
 
-def input_token_counts(item: dict, arm: str, audit_rows: dict) -> Optional[list[Optional[int]]]:
+def input_token_counts(item: dict, arm: str, audit_rows: dict) -> list[int | None] | None:
     enc = "nfd" if arm == "nfd" else "nfc"
     if arm not in ("nfc", "nfd"):
         return None   # placement/strip arms change the spelling; the audit has no row for them
@@ -378,7 +402,7 @@ def input_token_counts(item: dict, arm: str, audit_rows: dict) -> Optional[list[
 
 
 # ------------------------------------------------------------------ aggregation
-def _rate(rows: list[dict], key: str) -> Optional[float]:
+def _rate(rows: list[dict], key: str) -> float | None:
     vals = [r[key] for r in rows if r.get(key) is not None]
     return (sum(1 for v in vals if v) / len(vals)) if vals else None
 
@@ -452,8 +476,7 @@ def write_scores(rows: list[dict], path: Path) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        for r in rows:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        f.writelines(json.dumps(r, ensure_ascii=False) + "\n" for r in rows)
 
 
 def read_jsonl(path: Path) -> list[dict]:

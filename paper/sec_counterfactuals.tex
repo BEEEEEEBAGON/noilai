@@ -1,0 +1,38 @@
+% Section 6 -- Orthographic counterfactuals. Budget: 1.00 page, holds Table 3 and Figure 4.
+% Follows docs/DESIGN_DECISIONS.md sections 6 and 8.6 (per-model ATE, three-arm contrast,
+% tone-isolation DiD, placement direction, no mediation language).
+% STATUS: hypotheses only. No model has been run. Every result is a \placeholder.
+\section{Orthographic Counterfactuals}
+\label{sec:counterfactuals}
+
+The re-encoding arms hold meaning and information fixed and change only the code points, hence the token sequence, so a difference between arms is caused by tokenization and by nothing else about the item. For arm $a$ on model $m$ the estimand is the within-item average treatment effect $\tau_m(a) = \mathbb{E}_i[Y_i(a) - Y_i(\mathrm{base})]$ over the sampled items, identified without assumptions beyond the representativeness of the item sample, because the same item is scored under both arms with prompt, paraphrase, decoding and engine fixed. We run C1 (NFD), C1$'$ (the partially composed form) and C2 (placement) on \noilai{} and on the 500 Vietnamese test items of XCOPA \citep{ponti-etal-2020-xcopa}, whose text is pure NFC in the older placement convention so that every arm is a genuine re-encoding of it; C3 strips information and is a contrast, not a counterfactual. XCOPA's items may have been memorized in one spelling, so every effect estimated there is re-estimated on fresh \noilai{} items.
+
+\paragraph{Pre-registered hypotheses.}
+\hyp{3} (\emph{a crossover}): in models whose tokenizer passes NFD through, $\tau_m(\mathrm{NFD})$ is positive on \task{T1} \var{3}, because NFD makes the tone an explicit symbol the model can move, and negative on XCOPA, because the same change produces longer and rarer sequences; a pure count account predicts harm in both places. The claim rests on the two pooled random-effects estimates across pass-through models, both on the predicted side; normalizing tokenizers are the negative control with an effect of exactly zero. \hyp{3b} (\emph{tone isolation}): in Gemma~3, the NFD gain on \var{3} is larger on items whose tone mark becomes a token of its own than on matched items whose mark stays attached (a difference in differences), and the same contrast on \var{1}, which does not move tones, is near zero. \hyp{4} (\emph{the rarer convention costs}): rewriting affected items into the placement convention that is rarer in the reference corpus (expected: the newer one; the direction was fixed by a corpus count before any model run) lowers accuracy on those items in models generally, whatever their normalizer, because the rarer spellings are rarer in training text; the claim is the pooled estimate with the number of models whose Holm-adjusted interval excludes zero, and an equivalence test with a 2-point margin for the rest, never ``in every model''.
+
+\paragraph{Effects.}
+\placeholder{Table~\ref{tab:arms}: per model, the census verdict, the mean token-count change, and $\tau_m$ for each arm on \task{T1} (all variants and \var{3}), \task{T3} and XCOPA with clustered 95\% intervals, Holm-adjusted within the model's family of six; C2 on the affected items of the enriched set and on the 43 affected XCOPA items with the detectable effect stated.} \placeholder{Verdicts on \hyp{3}, \hyp{3b} and \hyp{4}: the pooled estimates and their intervals.}
+
+\begin{table*}[t]
+  \centering\small
+  \begin{tabular}{@{}llrrrrrrr@{}}
+    \toprule
+    Model & Census & $\Delta$tok & \multicolumn{2}{c}{C1: NFD} & C1$'$: PC & C2: placement & C3a: no tones & XCOPA C1 \\
+    & & C1 & \task{T1} all & \task{T1} \var{3} & \task{T1} all & \task{T1} affected & \task{T1} all & \\
+    \midrule
+    \placeholder{one row per model} & \placeholder{passes / normalizes / corrupts} & & & & & & & \\
+    \bottomrule
+  \end{tabular}
+  \caption{Within-item effect of each re-encoding arm on accuracy (percentage points, arm minus baseline), paired over identical items, with 95\% clustered intervals; bold marks effects significant after Holm correction within the model's family. Census: whether the tokenizer passes NFD through, normalizes it to NFC (effect zero by construction, asserted) or corrupts it (arm refused on that engine). \placeholder{TODO: filled by \texttt{noilai.stats.tables.intervention\_table}.}}
+  \label{tab:arms}
+\end{table*}
+
+\paragraph{Does the effect track token count or the tone symbol?}
+Within one tokenizer, re-encoding an item changes its token sequence deterministically, so token count is a coarsening of the intervention rather than a mediator, and the ``share of the effect mediated by token count'' the founding plan asked for is not an identified quantity; we do not estimate it. Instead, four pre-registered analyses ask whether the count mechanism can account for the effect. First, effect modification: $\tau_m$ as a function of the item's token-count change, adjusted for baseline difficulty, the number of tone and quality marks, syllable frequency and length, variant, lexicality, glide and spelling trigger, labelled associational, since the count change is nearly the number of diacritics. Second, the zero-dose contrast within a tokenizer, items whose count does not change but whose ids do against items whose count grows, reported where the stratum holds at least 100 items per model (realistic for C2 and for vocabularies with NFD pieces, nearly empty for byte-level C1). Third, the three-arm ordered contrast baseline $<$ PC $<$ NFD in token count: if accuracy tracks the extra tokens, PC sits between the two; if NFD moves accuracy beyond what its extra tokens predict, an explicit tone symbol is operating. Fourth, the encoding $\times$ character-spacing $2 \times 2$ from the input-format condition, where spacing saturates the token count for both encodings. \placeholder{Figure~\ref{fig:mediation}: the effect of re-encoding by token-count-change stratum, by encoding form, and under character spacing, per model.}
+
+\begin{figure}[t]
+  \centering
+  \fbox{\parbox{0.95\columnwidth}{\centering\vspace{2.5cm}\placeholder{Figure 4: effect of re-encoding by $\Delta$tokens stratum, by encoding form (baseline, PC, NFD) and under character spacing}\vspace{2.5cm}}}
+  \caption{\placeholder{Effect of re-encoding by token-count-change stratum (left), by encoding form ordered in token count (middle) and under character spacing (right), with clustered 95\% intervals; normalizing tokenizers as the zero reference.}}
+  \label{fig:mediation}
+\end{figure}

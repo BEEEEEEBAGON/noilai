@@ -25,12 +25,21 @@ noilai/
   audit/      tokenizers.py  tokens per syllable, boundary alignment (STAD-style), NFD tone isolation, normalization census
   stats/      clustered bootstrap, McNemar + Holm families, mixed models (E2), effect decomposition, power, agreement, tables
   probe/      hidden-state extraction at syllable positions, layer-wise probes with control tasks, patching, steering (E4)
-  eval/       [planned] backends (hf | vllm | openai_compat | gemini), prompt building, answer extraction, scoring, run.py
+  eval/       prompts.py (YAML templates -> chat messages, demos, arms, prompt hash), backends.py (hf | vllm |
+              openai_compat | gemini | llama_cpp + echo/scripted test backends), extract.py (the "Đáp án:" line),
+              score.py (T1/T2/T3 scoring, error taxonomy, scores.jsonl), xcopa.py (E3 on XCOPA vi), run.py (a run:
+              requests, streaming outputs.jsonl, manifest.json, --resume, API and demo-overlap guards)
 scripts/
   fetch_resources.py      third-party resources -> data/external/, SHA-256 checked against data/HASHES.json
   build_data.py           a release: data/release/<version>/{noilai_dev,noilai_test,noilai_core,attested}.jsonl + manifest
   audit_tokenizers.py     tokenizer audit -> data/audit/<name>.json (+ per-syllable rows)
-  run_eval.py             [planned, noilai/eval] one model x one item file x tasks/arms/paraphrases -> data/runs/<id>/
+  run_eval.py             one model x one item file x tasks/variants/paraphrases/shots/arms -> data/runs/<run-id>/
+  score_run.py            score a run directory: scores.jsonl + summary.json (also run_eval.py --score)
+  run_probe.py            E4 driver: layer-wise probes, activation patching and steering on one model
+  build_attested.py       data/attested_seed.tsv -> the release file attested.jsonl
+  audit_items.py          annotate an item file with per-syllable tokenization covariates for one tokenizer
+  check_tokenizer_consistency.py  a model's HF tokenizer vs the SentencePiece model file used offline
+  make_validation_forms.py  sample the native-validation set and the human-baseline forms; score returned sheets
   kaggle_run_plan.py      configs/run_plan.yaml -> run_eval.py commands; runs them, logs hours, keeps the API daily ledger
   kaggle_verify_items.py  item-file gate: SHA-256 against run_plan.yaml, canary on every row, row count
   kaggle_dataset.py       stage data/runs and push a versioned private Kaggle dataset (kaggle CLI, import guarded)
@@ -41,7 +50,8 @@ configs/
   models.yaml   the 21-model panel + bf16-reference and thinking variants: ids, hardware, dtype, quantization, limits, risks
   run_plan.yaml the run matrix (pilot, smoke, E1, E3, reasoning, bf16 drift, E4) with the plan's compute estimates
 notebooks/      kaggle_eval_t4, kaggle_eval_tpu, colab_probe_gemma3, api_runs  (generated; see below)
-prompts/        [planned] the Vietnamese prompt templates p0–p2, zero-shot / name-only / English ablations
+prompts/        noilai.yaml (Vietnamese templates p0–p2 and the ablation variants), demos.yaml (few-shot demonstrations built
+                from syllables outside the test set), xcopa.yaml (the COPA framing); every string awaits a [NATIVE-CHECK]
 data/           HASHES.json (resource hashes), attested_seed.tsv, audit/ (committed), external/ and runs/ (ignored), release/
 docs/           PLAN_2026-09-30.md (founding plan), DATA_FORMAT.md (item, output, score schemas), DESIGN_DECISIONS.md
 paper/          ACL 2027 LaTeX sources
@@ -112,10 +122,12 @@ rerun buffer (`configs/run_plan.yaml`, `plan_lines`).
    E1 API core/paraphrase, E3 NóiLái/XCOPA/API, reasoning sub-study, TPU main, bf16 drift, E4)
    naming the item file, tasks, variants, arms, paraphrases, shots, limit, `in_core_only` and the
    plan's estimate. `python scripts/kaggle_run_plan.py --list` shows the expansion.
-3. **The eval CLI** (planned, owned by `noilai/eval`):
+3. **The eval CLI** (`noilai/eval`, `scripts/run_eval.py`):
    `scripts/run_eval.py --model-config <name> --items <file> --tasks T1 T2 T3 --variants V1 V2 V3 V4
-   --paraphrases p0 p1 p2 --shots 3 --arms nfc [--limit N] [--in-core-only] --resume --out data/runs/<id>`.
-   `kaggle_run_plan.py` builds exactly that command per (run, model), refuses an API model
+   --paraphrases p0 p1 p2 --shots 3 --arms nfc [--limit N] [--in-core-only] --resume --run-id <id>__<name> --out-root data/runs`
+   (the run directory is `data/runs/<id>__<name>/`; `run_plan.yaml`'s `run_eval_out_style` can switch the
+   driver back to a single `--out <dir>` flag). `kaggle_run_plan.py` builds exactly that command per
+   (run, model) — a test checks every emitted flag against `run_eval.py --help` — refuses an API model
    without `--in-core-only` and refuses the sealed split for any API, then runs the commands,
    logs each model's wall time with its device type, and keeps `data/runs/api_ledger.json`
    (requests per model per UTC day) so that a Groq model at its 1,000-requests/day cap is
@@ -154,13 +166,13 @@ to the outputs (`data/runs/env/`, checklist C4).
   `tests` (exact/mid-p McNemar, Holm within declared families), `mixed` (Bayesian mixed GLM +
   GEE for E2), `mediation` (dose–response decomposition of an arm's effect by token-count change),
   `power`, `agreement` (Krippendorff's α with bootstrap CI), `tables` (LaTeX fragments; no number
-  in the paper is typed by hand). A `scripts/run_stats.py` driver over `data/runs/*/scores.jsonl`
-  is **planned**.
+  in the paper is typed by hand). `scripts/score_run.py` produces the `scores.jsonl` these read; a
+  `scripts/run_stats.py` driver over `data/runs/*/scores.jsonl` is **planned**.
 * `noilai.probe` (present): `extract` (residual stream at the syllable's last sub-token / the token
   after it, NFC and NFD), `probes` (layer-wise logistic probes, syllable-disjoint split, control
   labels, selectivity), `patching` (residual cache, layer/position patching, recovery of the logit
-  difference, difference-in-means steering). The Colab notebook is the driver; a
-  `scripts/run_probe.py` is **planned**.
+  difference, difference-in-means steering). `scripts/run_probe.py` is the batch driver; the Colab
+  notebook `colab_probe_gemma3.ipynb` is the interactive skeleton for the same calls.
 
 ## Resources and licensing
 
@@ -203,5 +215,8 @@ per the ARR policy on generative assistance.
   real Gemma 3 numbers; statistics and probe modules; the cloud run kit (`configs/models.yaml`
   with the 21-model panel and its variants, `configs/run_plan.yaml`, the four generated notebooks,
   `kaggle_run_plan.py`, `kaggle_verify_items.py`, `kaggle_dataset.py`, `colab_setup.py`,
-  `compute_log.py`, `tests/test_cloud.py`) and this README. `noilai/eval` and `scripts/run_eval.py`
-  are in progress; `prompts/` is empty until the Vietnamese templates are written and native-checked.
+  `compute_log.py`, `tests/test_cloud.py`) and this README. The evaluation harness (`noilai/eval`,
+  `scripts/run_eval.py`, `scripts/score_run.py`), the prompt templates under `prompts/` and the probe
+  driver `scripts/run_probe.py` landed the same day; the run kit's driver follows the CLI as landed
+  (`--run-id`/`--out-root`) and a test keeps the two in step. No model has been run yet; every
+  Vietnamese string awaits native validation.

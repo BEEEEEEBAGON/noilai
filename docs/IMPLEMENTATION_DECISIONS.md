@@ -1,5 +1,11 @@
 # Implementation decisions (30 September 2026)
 
+> Status: `DESIGN_DECISIONS.md` (the design review's synthesis) is binding; its section 12
+> overrides decisions 6 (i/y emission now prefers the attested `y` form after h k l m t s),
+> 7's storage default (release text is stored old-style), 12 (six variants are computed;
+> V5/V6 enter the taxonomy, T2 gold and twins but are not T1 cells) and 23 (the variational
+> Bayes fit is demoted to screening). The generator of v0.2 implements those overrides.
+
 Decisions taken while implementing the founding plan, each with the reason and the place in
 the code that enforces it. `DESIGN_DECISIONS.md` (from the design review) is the binding
 design document; where the two disagree, the disagreement is listed in its section 12 and

@@ -15,13 +15,15 @@ GPU-hours (wall x n_gpus), resource hashes, options and counts.
 Safety guards
   * the canary is never part of a prompt (render() asserts it) and the manifest records
     whether it appears in any output;
-  * an API backend refuses an item file with non-core items unless allow_noncore_api, and
-    silently never sends an attested item whose `vulgar` flag is set (counted in the manifest);
+  * an API backend refuses an item file with non-core items unless allow_noncore_api (the
+    core set and the public attested examples are API-eligible), and never sends an attested
+    item whose `vulgar` flag is set (counted in the manifest);
   * an item file sharing a syllable with the demonstrations is refused unless
     allow_demo_overlap (the overlap is recorded either way).
 """
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import hashlib
 import json
@@ -32,7 +34,6 @@ import sys
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Iterable, Optional
 
 from ..gen import variants as V
 from ..vi import reencode as R
@@ -56,7 +57,7 @@ class DemoOverlapError(RuntimeError):
 
 @dataclass
 class RunOptions:
-    tasks: tuple = ("T1", "T2", "T3")
+    tasks: tuple = ("T1", "T2", "T3", "attested")
     variants: tuple = V.VARIANTS
     paraphrases: tuple = ("p0",)
     shots: tuple = (3,)
@@ -73,10 +74,10 @@ class RunOptions:
     instruction: str = "explained"
     language: str = "vi"
     seed: int = 0
-    run_id: Optional[str] = None
+    run_id: str | None = None
     out_root: Path = RUNS_DIR
-    system_prompt: Optional[str] = None
-    n_accelerators: Optional[int] = None  # override for TPUs, which torch.cuda cannot count
+    system_prompt: str | None = None
+    n_accelerators: int | None = None  # override for TPUs, which torch.cuda cannot count
     xcopa_logprob_mode: str = "choice"    # 'choice' (candidate continuations) or 'none'
     notes: dict = field(default_factory=dict)
 
@@ -125,7 +126,9 @@ def check_api_safety(backend: Backend, items: list[dict], opts: RunOptions) -> t
     report = {"is_api": backend.is_api, "n_excluded_vulgar": 0, "n_noncore": 0}
     if not backend.is_api:
         return items, report
-    noncore = [it for it in items if not it.get("in_core")]
+    # the core set and the (public, folk) attested examples may go to an API; nothing else
+    noncore = [it for it in items if not (it.get("in_core") or it.get("task") == "attested"
+                                          or it.get("source") == "attested")]
     report["n_noncore"] = len(noncore)
     if noncore and not opts.allow_noncore_api:
         raise ApiSafetyError(f"{len(noncore)} items are not in the core set; an API backend receives the core only "
@@ -240,18 +243,16 @@ def git_info() -> dict:
     return {"git_commit": commit or "unknown", "git_dirty": (bool(dirty) if dirty is not None else None)}
 
 
-def hardware_info(n_override: Optional[int] = None) -> dict:
+def hardware_info(n_override: int | None = None) -> dict:
     info = {"platform": platform.platform(), "python": sys.version.split()[0], "cpu": platform.processor() or None,
             "gpus": [], "n_gpus": 0}
-    try:
+    with contextlib.suppress(Exception):      # no torch, or a broken CUDA install: report no GPU
         import torch
 
         if torch.cuda.is_available():
             info["gpus"] = [torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())]
             info["n_gpus"] = torch.cuda.device_count()
             info["cuda"] = torch.version.cuda
-    except Exception:  # noqa: BLE001
-        pass
     if n_override is not None:
         info["n_gpus"] = int(n_override)
         info["n_accelerators_override"] = int(n_override)
@@ -294,7 +295,7 @@ def default_run_id(entry: dict, item_path: Path) -> str:
 
 # ------------------------------------------------------------------ the run
 def run(backend: Backend, entry: dict, items: list[dict], item_path: Path, opts: RunOptions,
-        kind: Optional[str] = None, log=print) -> Path:
+        kind: str | None = None, log=print) -> Path:
     item_path = Path(item_path)
     kind = kind or ("xcopa" if items and items[0].get("task") == X.XCOPA_TASK else "noilai")
     if kind == "noilai" and opts.input_format != "raw" and any(a in P.STRIP_ARMS for a in opts.arms):
@@ -382,7 +383,7 @@ def run(backend: Backend, entry: dict, items: list[dict], item_path: Path, opts:
     return run_dir
 
 
-def canary_check(outputs_path: Path, canary: Optional[str]) -> dict:
+def canary_check(outputs_path: Path, canary: str | None) -> dict:
     """The canary must never be echoed: it is never put in a prompt, and a model producing it
     would be evidence of contamination."""
     if canary is None:

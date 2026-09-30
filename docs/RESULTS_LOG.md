@@ -50,3 +50,18 @@ Of the 4,000 T1 items, 288 have a lexical output (287 from lexical inputs). T3 t
 494, rime 486, onset 476, other-variant 458, spelling 86 (spelling twins exist only when the
 gold has a c/k, g/gh or ng/ngh trigger). T2 inputs have 1 reading in 728 cases, 2 in 939,
 3+ in 333. Attested seed: 22 rows, 16 reproduced exactly by the engine.
+
+## 2026-09-30 — Benchmark build v0.2 (six-variant generator; supersedes v0.1)
+
+Source: `data/release/v0.2/manifest.json` (seed 20261004; the manifest's `git_commit` names
+the generator code, rebuilt at the freeze commit). Design changes applied (docs/DESIGN_DECISIONS.md
+section 12: items 4, 5, 15, 16, 23, 24): six-variant outputs with identity and plain-reversal
+drops and merged `variant_labels`; old-style placement storage with attested i/y; vulgar screen
+at generation; reserved attested and demonstration pairs; canary header. 2,500 base pairs;
+10,000 items (T1 4,000, T2 2,000, T3 4,000); core 1,496; 37 items vulgar-flagged (forced to the
+gated test split); 364 items C2-affected. Drop counts per filter are in the manifest: for the
+2,500 pairs the six variants produced 15,000 candidate outputs, of which identity 1,789,
+plain reversal 1,789 and illegal 4,474 were dropped (the identity/plain-reversal counts are
+mirror images across V1/V6, V2/V3, V4/V5, as the algebra requires). Attested seed: 35 rows,
+27 reproduced exactly by the engine at the declared positions (the six-way `thay đổi`
+illustration reproduces under all six variants).

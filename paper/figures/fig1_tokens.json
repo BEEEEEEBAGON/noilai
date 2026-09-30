@@ -1,0 +1,178 @@
+{
+ "tokenizer": "gemma3",
+ "model_file": "/home/user/ntcf/noilai/data/external/gemma3_tokenizer.model",
+ "normalizer_info": {
+  "type": "sentencepiece",
+  "model_type": "BPE",
+  "vocab_size": 262144,
+  "normalizer": "identity",
+  "byte_fallback": true,
+  "add_dummy_prefix": false,
+  "remove_extra_whitespaces": false,
+  "split_by_unicode_script": true
+ },
+ "variant": "V1",
+ "input": "mèo cái",
+ "output": "mài kéo",
+ "rows": {
+  "input": {
+   "nfc": [
+    {
+     "syllable": "mèo",
+     "encoding": "nfc",
+     "pieces": [
+      "▁mèo"
+     ],
+     "ids": [
+      201461
+     ],
+     "n_tokens": 1,
+     "boundaries": [],
+     "boundary_alignment": 1.0,
+     "onset_rime_split": false,
+     "tone_isolated": false
+    },
+    {
+     "syllable": "cái",
+     "encoding": "nfc",
+     "pieces": [
+      "▁cái"
+     ],
+     "ids": [
+      12827
+     ],
+     "n_tokens": 1,
+     "boundaries": [],
+     "boundary_alignment": 1.0,
+     "onset_rime_split": false,
+     "tone_isolated": false
+    }
+   ],
+   "nfd": [
+    {
+     "syllable": "mèo",
+     "encoding": "nfd",
+     "pieces": [
+      "▁me",
+      "̀",
+      "o"
+     ],
+     "ids": [
+      786,
+      239101,
+      236748
+     ],
+     "n_tokens": 3,
+     "boundaries": [
+      1.5,
+      2
+     ],
+     "boundary_alignment": 0.5,
+     "onset_rime_split": false,
+     "tone_isolated": true
+    },
+    {
+     "syllable": "cái",
+     "encoding": "nfd",
+     "pieces": [
+      "▁ca",
+      "́i"
+     ],
+     "ids": [
+      2146,
+      121115
+     ],
+     "n_tokens": 2,
+     "boundaries": [
+      1.5
+     ],
+     "boundary_alignment": 0.0,
+     "onset_rime_split": false,
+     "tone_isolated": false
+    }
+   ]
+  },
+  "output": {
+   "nfc": [
+    {
+     "syllable": "mài",
+     "encoding": "nfc",
+     "pieces": [
+      "▁m",
+      "ài"
+     ],
+     "ids": [
+      520,
+      8158
+     ],
+     "n_tokens": 2,
+     "boundaries": [
+      1
+     ],
+     "boundary_alignment": 1.0,
+     "onset_rime_split": true,
+     "tone_isolated": false
+    },
+    {
+     "syllable": "kéo",
+     "encoding": "nfc",
+     "pieces": [
+      "▁kéo"
+     ],
+     "ids": [
+      87624
+     ],
+     "n_tokens": 1,
+     "boundaries": [],
+     "boundary_alignment": 1.0,
+     "onset_rime_split": false,
+     "tone_isolated": false
+    }
+   ],
+   "nfd": [
+    {
+     "syllable": "mài",
+     "encoding": "nfd",
+     "pieces": [
+      "▁ma",
+      "̀i"
+     ],
+     "ids": [
+      3504,
+      143667
+     ],
+     "n_tokens": 2,
+     "boundaries": [
+      1.5
+     ],
+     "boundary_alignment": 0.0,
+     "onset_rime_split": false,
+     "tone_isolated": false
+    },
+    {
+     "syllable": "kéo",
+     "encoding": "nfd",
+     "pieces": [
+      "▁ke",
+      "́",
+      "o"
+     ],
+     "ids": [
+      1596,
+      238288,
+      236748
+     ],
+     "n_tokens": 3,
+     "boundaries": [
+      1.5,
+      2
+     ],
+     "boundary_alignment": 0.5,
+     "onset_rime_split": false,
+     "tone_isolated": true
+    }
+   ]
+  }
+ },
+ "generated": "2026-09-30 15:10Z"
+}

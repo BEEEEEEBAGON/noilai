@@ -170,3 +170,25 @@ def syllable_frequencies(words: Iterable[str] | None = None) -> Counter:
 def lexical_pairs() -> set[tuple[str, str]]:
     """Canonical two-syllable entries of the word list (cached)."""
     return {tuple(p) for p in wordlist_index()["two_syllable_pairs"]}
+
+
+# ---------------------------------------------------------------- emission (design 2.2 R5c)
+_Y_PREFERRED_ONSETS = frozenset({"h", "c", "l", "m", "t", "s"})   # h k l m t s (canonical c = /k/)
+
+
+def emit(syl, style: str = "old", inventory=None) -> str:
+    """Spell a syllable for release: the tone mark per `style` and, for a bare /i/ after
+    h k l m t s (lý/lí, kỹ/kĩ, mỹ/mĩ), the attested spelling with y preferred when both
+    are attested (design decision 12.15). Everything else is the standard spelling."""
+    from .syllable import spell
+    std = spell(syl, style=style)
+    if syl.nucleus == "i" and not syl.glide and syl.coda == "" and syl.onset in _Y_PREFERRED_ONSETS:
+        inv = inventory or load_inventory()
+        alt = std[:-1] + U.compose_letter("y", "", syl.tone)     # keep the tone on the new letter
+        if alt in inv.syllables:
+            return alt
+    return std
+
+
+def emit_phrase(sylls, style: str = "old", inventory=None) -> str:
+    return " ".join(emit(s, style, inventory) for s in sylls)

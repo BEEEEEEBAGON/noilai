@@ -36,9 +36,9 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from functools import lru_cache
+from collections.abc import Iterable
+from functools import cache
 from pathlib import Path
-from typing import Iterable, Optional
 
 import yaml
 
@@ -54,6 +54,8 @@ DEMOS_FILE = PROMPTS_DIR / "demos.yaml"
 XCOPA_FILE = PROMPTS_DIR / "xcopa.yaml"
 
 TASKS = ("T1", "T2", "T3")
+# item tasks rendered with another task's templates: attested examples are transformation items
+TEMPLATE_TASK = {"attested": "T1"}
 PARAPHRASES = ("p0", "p1", "p2")
 LANGUAGES = ("vi", "en")
 INSTRUCTIONS = ("explained", "name_only")
@@ -65,13 +67,13 @@ _PLACEHOLDER = re.compile(r"\{([a-z_0-9]+)\}")
 
 
 # ------------------------------------------------------------------ loading
-@lru_cache(maxsize=None)
+@cache
 def load_templates(path: Path = TEMPLATE_FILE) -> dict:
     with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
-@lru_cache(maxsize=None)
+@cache
 def load_demo_spec(path: Path = DEMOS_FILE) -> dict:
     with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f)
@@ -138,7 +140,7 @@ def _twin(variant: str, a: Syllable, b: Syllable, out: tuple[Syllable, Syllable]
     raise ValueError(f"no twin for demo pair {_text((a, b))} under {variant}")
 
 
-def build_demos(spec: Optional[dict] = None, inventory: Optional[Inventory] = None) -> dict[tuple[str, str], list[dict]]:
+def build_demos(spec: dict | None = None, inventory: Inventory | None = None) -> dict[tuple[str, str], list[dict]]:
     """Expand the fixed base pairs into demonstrations for every (task, variant).
 
     Returns {(task, variant): [demo, ...]} with demo = {input, answer, candidate, label,
@@ -192,12 +194,12 @@ def build_demos(spec: Optional[dict] = None, inventory: Optional[Inventory] = No
     return demos
 
 
-@lru_cache(maxsize=None)
+@cache
 def default_demos() -> dict[tuple[str, str], list[dict]]:
     return build_demos()
 
 
-def demo_syllables(demos: dict, templates: Optional[dict] = None) -> set[str]:
+def demo_syllables(demos: dict, templates: dict | None = None) -> set[str]:
     """Every syllable shown in a demonstration (inputs, answers, candidates) plus the
     example syllables used inside the instruction text."""
     out: set[str] = set()
@@ -223,10 +225,12 @@ def item_texts(item: dict) -> list[str]:
         texts.extend(g["output"] for g in item["gold"])
     elif task == "T3":
         texts.extend(x for x in (item.get("candidate"), item.get("correct_output")) if x)
+    elif task == "attested":
+        texts.extend(item.get("gold", []))
     return texts
 
 
-def demo_overlap(demos: dict, items: Iterable[dict], templates: Optional[dict] = None) -> dict[str, list[str]]:
+def demo_overlap(demos: dict, items: Iterable[dict], templates: dict | None = None) -> dict[str, list[str]]:
     """{syllable: [item_id, ...]} for every demo/example syllable that occurs in the items."""
     sylls = demo_syllables(demos, templates)
     hits: dict[str, set[str]] = {}
@@ -245,7 +249,7 @@ def _rime_display(onset_sp: str, rime_sp: str) -> str:
     return rime_sp
 
 
-def format_input(phrase: str, input_format: str, language: str = "vi", templates: Optional[dict] = None) -> str:
+def format_input(phrase: str, input_format: str, language: str = "vi", templates: dict | None = None) -> str:
     """Render a two-syllable phrase in the requested input format."""
     if input_format == "raw":
         return phrase
@@ -295,7 +299,7 @@ def _variants_overview(instruction: str, language: str, templates: dict) -> str:
     return "\n".join(lines)
 
 
-def _demo_block(task: str, variant: str, shots: int, language: str, input_format: str, item_arm: Optional[str],
+def _demo_block(task: str, variant: str, shots: int, language: str, input_format: str, item_arm: str | None,
                 templates: dict, demos: dict) -> str:
     if shots <= 0:
         return ""
@@ -322,10 +326,10 @@ def prompt_id(paraphrase: str = "p0", shots: int = 3, instruction: str = "explai
     return f"{language}-{paraphrase}-s{shots}-{instruction}-{input_format}"
 
 
-def render(item: dict, task: Optional[str] = None, variant: Optional[str] = None, paraphrase: str = "p0",
+def render(item: dict, task: str | None = None, variant: str | None = None, paraphrase: str = "p0",
            shots: int = 3, arm: str = "nfc", input_format: str = "raw", instruction: str = "explained",
-           language: str = "vi", templates: Optional[dict] = None, demos: Optional[dict] = None,
-           system: Optional[str] = None) -> list[dict]:
+           language: str = "vi", templates: dict | None = None, demos: dict | None = None,
+           system: str | None = None) -> list[dict]:
     """Render one item into chat messages.
 
     task/variant default to the item's own; for T2 the variant selects nothing in the text
@@ -335,7 +339,7 @@ def render(item: dict, task: Optional[str] = None, variant: Optional[str] = None
     """
     templates = templates or load_templates()
     demos = demos or default_demos()
-    task = task or item["task"]
+    task = TEMPLATE_TASK.get(task or item["task"], task or item["task"])
     variant = variant or item["variant"]
     if task not in TASKS:
         raise ValueError(f"unknown task {task!r}")
@@ -398,11 +402,11 @@ def prompt_hash(messages: list[dict]) -> str:
     return hashlib.sha256(messages_text(messages).encode("utf-8")).hexdigest()
 
 
-def answer_marker(templates: Optional[dict] = None) -> str:
+def answer_marker(templates: dict | None = None) -> str:
     return (templates or load_templates())["answer_marker"]
 
 
-def describe(templates: Optional[dict] = None) -> dict:
+def describe(templates: dict | None = None) -> dict:
     """Which cells exist: tasks x languages x paraphrases."""
     templates = templates or load_templates()
     return {t: {lang: sorted(ps) for lang, ps in templates["tasks"][t].items()} for t in TASKS}

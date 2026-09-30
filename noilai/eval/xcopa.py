@@ -11,9 +11,8 @@ as in noilai.eval.prompts.
 from __future__ import annotations
 
 import json
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
-from typing import Optional
 
 import yaml
 
@@ -25,7 +24,7 @@ XCOPA_TASK = "XCOPA"
 XCOPA_PARAPHRASES = ("p0", "p1", "p2")
 
 
-@lru_cache(maxsize=None)
+@cache
 def load_xcopa_templates(path: Path = XCOPA_FILE) -> dict:
     with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f)
@@ -40,7 +39,7 @@ def is_xcopa_file(path: Path) -> bool:
     return False
 
 
-def load_xcopa(path: Path, split: Optional[str] = None) -> list[dict]:
+def load_xcopa(path: Path, split: str | None = None) -> list[dict]:
     split = split or ("val" if "val" in Path(path).name else "test")
     items = []
     with open(path, encoding="utf-8") as f:
@@ -60,8 +59,8 @@ def load_xcopa(path: Path, split: Optional[str] = None) -> list[dict]:
     return items
 
 
-def render_xcopa(item: dict, paraphrase: str = "p0", arm: str = "nfc", templates: Optional[dict] = None,
-                 system: Optional[str] = None) -> list[dict]:
+def render_xcopa(item: dict, paraphrase: str = "p0", arm: str = "nfc", templates: dict | None = None,
+                 system: str | None = None) -> list[dict]:
     templates = templates or load_xcopa_templates()
     if arm not in R.ARMS:
         raise ValueError(f"unknown arm {arm!r}")
@@ -86,7 +85,7 @@ def _lower_first(s: str) -> str:
     return s[:1].lower() + s[1:] if s else s
 
 
-def completion_pair(item: dict, arm: str = "nfc", templates: Optional[dict] = None) -> tuple[str, list[str]]:
+def completion_pair(item: dict, arm: str = "nfc", templates: dict | None = None) -> tuple[str, list[str]]:
     """(context, [continuation_1, continuation_2]) for log-probability scoring: the premise
     without its final period, the connective, then each alternative with its first letter
     lower-cased. Continuations start with a space. The arm is applied to context and
