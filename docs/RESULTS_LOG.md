@@ -16,7 +16,7 @@ hashes: `data/HASHES.json` (gemma3 `1299c11d…`, gemma2 `61a7b147…`).
 | tokenizer | encoding | tokens / syllable | single-token share | boundary alignment | onset–rime split | tone mark isolated |
 |---|---|---|---|---|---|---|
 | Gemma 3 (262,144 BPE, normalizer = identity, byte fallback) | NFC | 1.78 | 29.5% | 0.94 | 51.5% | 0% |
-| Gemma 3 | NFD | 2.90 | 7.3% | 0.27 | 6.8% | 41.6% |
+| Gemma 3 | NFD | 2.83 | 7.1% | 0.27 | 6.8% | 41.6% |
 | Gemma 2 (256,000 BPE, normalizer = identity, byte fallback) | NFC | 1.77 | 29.9% | 0.94 | 50.7% | 0% |
 | Gemma 2 | NFD | 2.90 | 7.3% | 0.29 | 4.4% | 50.4% |
 
@@ -33,6 +33,11 @@ split). Under NFD, the split moves inside letters (a boundary between a base let
 its combining mark is never a linguistic boundary; alignment 0.27) and the tone mark
 becomes a token of its own in 42% of syllables. This is the pattern H3 relies on: NFD
 makes the tone an explicit symbol at the cost of longer, misaligned sequences.
+
+Correction (later the same day): the Gemma 3 NFD row first read 2.90 tokens per syllable and
+7.3% single-token, which are Gemma 2's numbers copied by hand; the values above are re-read from
+`data/audit/gemma3.json` by `scripts/reconcile_counts.py` (`data/audit/counts.json`), which is
+now the only source for these figures.
 
 Caveats: these are the Gemma 2/3 tokenizer FILES from google/gemma_pytorch; the Hugging
 Face tokenizers used at inference must be checked against them (same ids on the same
