@@ -40,8 +40,9 @@ def test_build_attested(tmp_path):
     r = run("scripts/build_attested.py", "--out", str(out))
     rows = [json.loads(l) for l in open(out, encoding="utf-8")]
     assert len(rows) >= 30 and "rule reproduces" in r.stdout
-    by_in = {(r["input"], r["variant"]): r for r in rows}
+    by_in = {(r["input"], r["declared_variant"]): r for r in rows}
     assert by_in[("mèo cái", "V1")]["rule_matches_attested"] is True and by_in[("mèo cái", "V1")]["eligible_h6"]
+    assert by_in[("bí mật", "V3")]["variant"] == "V3" and set(by_in[("bí mật", "V3")]["variant_labels"]) == {"V2", "V3"}
     assert by_in[("đầu tiên", "V2")]["rule_matches_attested"] is True
     assert by_in[("bí mật", "V3")]["rule_matches_attested"] is True
     # the ây/ay case: rule gives 'tháo giầy', attested 'tháo giày' -> approx, both forms in gold, not H6-eligible
@@ -140,3 +141,31 @@ def test_count_placement_on_xcopa(tmp_path):
     rep = json.loads(out.read_text())
     assert rep["affected_tokens"] > 30 and rep["old"] + rep["new"] == rep["affected_tokens"]
     assert rep["majority"] == "old" and rep["old_share"] > 0.9
+
+
+def test_sample_items_main_and_c2(release):
+    r = run("scripts/sample_items.py", "main", "--release", str(release), "--per-cell", "20", "--seed", "1")
+    info = json.loads(r.stdout.strip().splitlines()[-1])
+    from noilai.gen.generate import load_items, read_header
+    main_items = load_items(release / "noilai_main.jsonl")
+    core = load_items(release / "noilai_core.jsonl")
+    assert {it["item_id"] for it in core} <= {it["item_id"] for it in main_items}       # the core is inside the main sample
+    assert all(v <= 20 or k.startswith("T3") for k, v in info["counts"].items())
+    assert read_header(release / "noilai_main.jsonl")["canary"] == read_header(release / "noilai_test.jsonl")["canary"]
+    r2 = run("scripts/sample_items.py", "c2", "--release", str(release), "--n", "30", "--seed", "7")
+    c2 = load_items(release / "noilai_c2.jsonl")
+    rel_bp = {it["base_pair_id"] for it in load_items(release / "noilai_test.jsonl") + load_items(release / "noilai_dev.jsonl")}
+    assert c2 and all(it["strata"]["c2_affected"] for it in c2) and not ({it["base_pair_id"] for it in c2} & rel_bp)
+    m = json.loads((release / "manifest.json").read_text())
+    assert m["samples"]["main"]["sha256"] and m["samples"]["c2"]["disjoint_from_release"] is True
+
+
+def test_attested_labels_are_engine_derived(tmp_path):
+    out = tmp_path / "attested.jsonl"
+    run("scripts/build_attested.py", "--out", str(out))
+    rows = [json.loads(l) for l in open(out, encoding="utf-8")]
+    by = {(r["input"], r["declared_variant"]): r for r in rows}
+    assert "V2" in by[("khoái ăn sang", "V2")]["variant_labels"] and by[("khoái ăn sang", "V2")]["declared_matches_engine"]
+    assert set(by[("cây còn", "V1")]["variant_labels"]) >= {"V1", "V2"}
+    assert not by[("thầy giáo", "V4")]["declared_matches_engine"] and by[("thầy giáo", "V4")]["exactness"].startswith("approx(substitution")
+    assert not any(r["input"] == "mộng mơ" for r in rows)

@@ -51,7 +51,15 @@ Of the 4,000 T1 items, 288 have a lexical output (287 from lexical inputs). T3 t
 gold has a c/k, g/gh or ng/ngh trigger). T2 inputs have 1 reading in 728 cases, 2 in 939,
 3+ in 333. Attested seed: 22 rows, 16 reproduced exactly by the engine.
 
-## 2026-09-30 — Benchmark build v0.2 (six-variant generator; supersedes v0.1)
+## 2026-09-30 — Benchmark build v0.2 (six-variant generator; supersedes v0.1; rebuilt after the red-team round)
+
+Rebuilt after the red-team corrections (design 14, items 2, 8, 11, 46, 50, 56, 61): per-syllable
+i/y emission from the word-list majority (only `mĩ -> mỹ` prefers y in Viet74K), zero-onset bare
+/i/ excluded, marginal rimes by the N < 4 rule plus the loan list, pseudo pairs quota-sampled to the
+lexical marginals (achieved shares within 0.02 of target in the manifest), `content_sha256`, and
+the two seeded sub-samples `noilai_main.jsonl` (350 per cell, core included) and `noilai_c2.jsonl`
+(500 C2-affected items from an independent pool). Counts below are from the first v0.2 build and
+are superseded by `data/release/v0.2/manifest.json`.
 
 Source: `data/release/v0.2/manifest.json` (seed 20261004; the manifest's `git_commit` names
 the generator code, rebuilt at the freeze commit). Design changes applied (docs/DESIGN_DECISIONS.md

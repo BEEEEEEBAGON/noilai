@@ -92,7 +92,11 @@ def main(argv=None) -> int:
                 n_match += bool(rule_matches)
             exactness = r.get("exactness", "") or ("exact" if rule_matches else "approx(unspecified)")
             row = {
-                "item_id": f"ATT-{i+1:04d}", "task": "attested", "variant": r["variant"],
+                "item_id": f"ATT-{i+1:04d}", "task": "attested", "declared_variant": r["variant"],
+                "variant": (sorted(m.split("@")[0] for m in matches if "reversed" not in m)
+                            or sorted(m.split("@")[0] for m in matches) or [r["variant"]])[0],
+                "variant_labels": sorted({m.split("@")[0] for m in matches}),
+                "declared_matches_engine": bool(matches) and any(m.startswith(r["variant"] + "@") for m in matches),
                 "positions": f"{pi}-{pj}{' reversed' if reverse else ''}" if pi is not None else None,
                 "input": canonical_text(r["input"]), "attested_output": canonical_text(r["output"]),
                 "rule_output": canonical_text(rule_out) if rule_out else None, "rule_matches_attested": rule_matches,

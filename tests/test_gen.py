@@ -174,3 +174,32 @@ def test_write_and_load_release_with_header(build, tmp_path):
     assert read_header(tmp_path / "noilai_test.jsonl")["canary"] == CANARY and read_header(tmp_path / "noilai_dev.jsonl") is None
     assert "NEVER APPEAR IN TRAINING CORPORA" in read_header(tmp_path / "noilai_core.jsonl")["_header"]
     assert m["placement_style"] == "old" and "drops" in m and m["resource_sha256"]["vulgar_lexicon.tsv"]
+
+
+def test_iy_emission_rules_and_zero_onset_exclusion(build):
+    g, b = build
+    forbidden = {"sỹ", "vỹ", "ỳ", "ỵ", "ỹ"}
+    for it in b["items"]:
+        for t in _texts(it):
+            for w in t.split():
+                assert w not in forbidden, (it["item_id"], w)
+                s = try_parse(w, strict=True).syllable
+                assert not (s.onset == "" and s.rime == "i"), (it["item_id"], w)        # no zero-onset bare /i/ anywhere
+        assert len(it["strata"]["iy_forms"]) == 4 and set(it["strata"]["iy_forms"]) <= {"i", "y", None}
+    assert L.iy_table().get("mĩ") == "y" and L.iy_table().get("lí", "i") == "i"        # Viet74K majority forms
+
+
+def test_pseudo_quota_matches_lexical_marginals_and_manifest_has_content_hash(build, tmp_path):
+    g, b = build
+    q = b["pseudo_quota"]
+    assert q["n_pseudo"] == 80 and set(q["features"]) == {"zero_onset", "glide", "stop_coda", "tone_class"}
+    # every achieved share is within 0.1 of its target share (small build: 80 pseudo pairs)
+    for k, target in q["target_share"].items():
+        assert abs(q["achieved_share"].get(k, 0.0) - target) <= 0.1, k
+    m = write_release(b, tmp_path)
+    assert len(m["content_sha256"]) == 64 and m["pseudo_quota"]["n_pseudo"] == 80 and m["n_marginal_rimes"] >= 13
+    # the content hash ignores the canary: two builds with different canaries share it
+    kw = dict(n_lexicon=40, n_pseudo=20, per_cell_t1=15, per_cell_t2=8, per_cell_t3=6, core_per_cell=4)
+    a = Generator(seed=5).build(**kw, canary=CANARY)
+    c = Generator(seed=5).build(**kw, canary="NOILAI-CANARY-00000000-0000-0000-0000-000000000002")
+    assert a["content_sha256"] == c["content_sha256"]

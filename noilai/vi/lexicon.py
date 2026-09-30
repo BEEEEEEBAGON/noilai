@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from functools import lru_cache
 from collections.abc import Iterable
 from functools import cache
 from pathlib import Path
@@ -70,13 +71,14 @@ def wordlist_index(name: str = "Viet74K.txt") -> dict:
     path = EXTERNAL / name
     key = _file_sha256(path)[:16]
     CACHE.mkdir(parents=True, exist_ok=True)
-    cpath = CACHE / f"wordlist_{name}_{key}.json"
+    cpath = CACHE / f"wordlist_{name}_{key}_v2.json"
     if cpath.exists():
         with open(cpath, encoding="utf-8") as f:
             return json.load(f)
     from .syllable import spell
     canonical: Counter = Counter()
     strict: Counter = Counter()
+    surface_iy: Counter = Counter()
     pairs: list[list[str]] = []
     for w in load_words(name):
         parts = w.split()
@@ -87,10 +89,13 @@ def wordlist_index(name: str = "Viet74K.txt") -> dict:
             canonical[spell(pr.syllable)] += 1
             if pr.i_y_variant is None and try_parse(part, strict=True) is not None:
                 strict[part] += 1
+            sy = pr.syllable
+            if sy.nucleus == "i" and not sy.glide and sy.coda == "":
+                surface_iy[part] += 1                 # both spellings of a bare /i/ (lí and lý) as written
         if len(parts) == 2 and all(parsed):
             pairs.append([spell(parsed[0].syllable), spell(parsed[1].syllable)])
     data = {"source": name, "sha256_prefix": key, "canonical_counts": dict(canonical),
-            "strict_standard_counts": dict(strict), "two_syllable_pairs": pairs}
+            "strict_standard_counts": dict(strict), "surface_counts_iy": dict(surface_iy), "two_syllable_pairs": pairs}
     tmp = cpath.with_suffix(".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
@@ -172,22 +177,65 @@ def lexical_pairs() -> set[tuple[str, str]]:
     return {tuple(p) for p in wordlist_index()["two_syllable_pairs"]}
 
 
-# ---------------------------------------------------------------- emission (design 2.2 R5c)
-_Y_PREFERRED_ONSETS = frozenset({"h", "c", "l", "m", "t", "s"})   # h k l m t s (canonical c = /k/)
+# ---------------------------------------------------------------- emission (design 2.2 R5, items 2 and 11)
+# Zero-onset bare /i/: the lexicon form per tone (vi-DauMoi has y ý ỷ and ì í ỉ, none of ỳ ỵ ỹ).
+ZERO_ONSET_I = {0: "y", 1: "ì", 2: "ý", 3: "ỷ", 4: "ĩ", 5: "ị"}
+_NEVER_Y_ONSETS = frozenset({"s", "v"})      # sĩ 118 vs sỹ 2, vĩ 34 vs vỹ 0 in Viet74K; sỹ survives in names
+
+
+@lru_cache(maxsize=None)
+def iy_table() -> dict:
+    """Per-syllable i/y choice for a bare /i/ after a consonant onset: the form with the higher
+    count in the reference corpus (fallback: Viet74K syllable-in-entry counts). Keys are the
+    i-form spelling (standard, new style), values 'i' or 'y'. Ties and absent forms -> 'i'.
+    The reference-corpus table (design 8.4) replaces this when the author supplies it as
+    data/iy_table.json ({"lí": "y", ...})."""
+    import json
+    override = ROOT / "data" / "iy_table.json"
+    if override.exists():
+        return json.loads(override.read_text(encoding="utf-8"))
+    counts = wordlist_index()["surface_counts_iy"]
+    table = {}
+    from .syllable import spell, try_parse
+    for w in counts:
+        p = try_parse(w, strict=False)
+        if p is None:
+            continue
+        s = p.syllable
+        if s.nucleus != "i" or s.glide or s.coda or s.onset == "":
+            continue
+        i_form = spell(s)                               # standard i spelling
+        key = i_form
+        y_form = i_form[:-1] + U.compose_letter("y", "", s.tone)
+        ci = counts.get(i_form, 0)
+        cy = counts.get(y_form, 0)
+        table[key] = "y" if (cy > ci and s.onset not in _NEVER_Y_ONSETS) else "i"
+    return table
 
 
 def emit(syl, style: str = "old", inventory=None) -> str:
-    """Spell a syllable for release: the tone mark per `style` and, for a bare /i/ after
-    h k l m t s (lý/lí, kỹ/kĩ, mỹ/mĩ), the attested spelling with y preferred when both
-    are attested (design decision 12.15). Everything else is the standard spelling."""
+    """Spell a syllable for release: the tone mark per `style`; for a bare /i/ after a consonant
+    the per-syllable majority form (iy_table; never y after s/v); for a zero-onset bare /i/ the
+    lexicon form per tone. Everything else is the standard spelling."""
     from .syllable import spell
     std = spell(syl, style=style)
-    if syl.nucleus == "i" and not syl.glide and syl.coda == "" and syl.onset in _Y_PREFERRED_ONSETS:
-        inv = inventory or load_inventory()
-        alt = std[:-1] + U.compose_letter("y", "", syl.tone)     # keep the tone on the new letter
-        if alt in inv.syllables:
-            return alt
+    if syl.nucleus == "i" and not syl.glide and syl.coda == "":
+        if syl.onset == "":
+            return ZERO_ONSET_I[syl.tone]
+        if syl.onset in _NEVER_Y_ONSETS:
+            return std
+        if iy_table().get(spell(syl), "i") == "y":
+            return std[:-1] + U.compose_letter("y", "", syl.tone)
     return std
+
+
+def iy_form(word: str) -> str | None:
+    """'i' or 'y' for a bare-/i/ syllable as written, else None (the i_y covariate)."""
+    from .syllable import try_parse
+    p = try_parse(word, strict=False)
+    if p is None or p.syllable.nucleus != "i" or p.syllable.glide or p.syllable.coda:
+        return None
+    return "y" if U.strip_tones(word)[-1] == "y" else "i"
 
 
 def emit_phrase(sylls, style: str = "old", inventory=None) -> str:
