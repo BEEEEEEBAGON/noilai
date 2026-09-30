@@ -129,3 +129,14 @@ def test_audit_items_script(release, tmp_path):
     nfd = [r for r in rows if r["encoding"] == "nfd"]
     assert all(r["delta_tokens_vs_nfc"] >= 0 for r in nfd) and any(r["delta_tokens_vs_nfc"] > 0 for r in nfd)
     assert all(len(r["input"]["tokens_per_syllable"]) == 2 for r in rows)
+
+
+def test_count_placement_on_xcopa(tmp_path):
+    xc = ROOT / "data" / "external" / "xcopa_test_vi.jsonl"
+    if not xc.exists():
+        pytest.skip("XCOPA not downloaded")
+    out = tmp_path / "pl.json"
+    run("scripts/count_placement.py", str(xc), "--out", str(out))
+    rep = json.loads(out.read_text())
+    assert rep["affected_tokens"] > 30 and rep["old"] + rep["new"] == rep["affected_tokens"]
+    assert rep["majority"] == "old" and rep["old_share"] > 0.9

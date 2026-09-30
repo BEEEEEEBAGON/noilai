@@ -1,0 +1,19 @@
+{
+ "paths": [
+  "data/external/xcopa_test_vi.jsonl",
+  "data/external/xcopa_val_vi.jsonl"
+ ],
+ "n_texts": 2400,
+ "n_word_tokens": 12333,
+ "affected_tokens": 62,
+ "old": 60,
+ "new": 2,
+ "old_share": 0.967741935483871,
+ "by_rime": {
+  "oa|new": 2,
+  "oa|old": 46,
+  "oe|old": 1,
+  "uy|old": 13
+ },
+ "majority": "old"
+}

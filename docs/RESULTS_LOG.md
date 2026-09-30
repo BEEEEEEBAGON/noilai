@@ -65,3 +65,13 @@ plain reversal 1,789 and illegal 4,474 were dropped (the identity/plain-reversal
 mirror images across V1/V6, V2/V3, V4/V5, as the algebra requires). Attested seed: 35 rows,
 27 reproduced exactly by the engine at the declared positions (the six-way `thay đổi`
 illustration reproduces under all six variants).
+
+## 2026-09-30 — Tone-mark placement convention in XCOPA-vi (pre-registration input, no model outputs)
+
+Source: `data/audit/placement_xcopa.json`, from `scripts/count_placement.py` on the XCOPA-vi
+test and validation files (600 items, 2,400 text fields, 12,333 word tokens). Of the 62 tokens
+whose placement differs between the conventions, 60 are old style (hòa; 46 oa, 1 oe, 13 uy)
+and 2 new style (hoà): old share 96.8%. This supports the design's baseline (old style stored;
+C2 = old -> new). The count on a larger reference corpus (Vietnamese Wikipedia or a news
+corpus, not reachable from the build machine) is the author's before Gate 1; if it flips the
+majority, DEVIATIONS.md records the flip and H4's direction flips with it.
