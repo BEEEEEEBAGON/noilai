@@ -18,7 +18,16 @@ Cell conventions
   * cells that launch model runs are tagged "run" and headed "RUN CELL"; they call
     scripts/kaggle_run_plan.py, which owns the run_eval.py flag mapping;
   * secrets are read from Kaggle Secrets / Colab userdata / the environment into os.environ
-    and reported as found/not found, never printed.
+    and reported as found/not found, never printed;
+  * every Vietnamese example a cell uses is COMPUTED by the rule engine from the syllables in
+    E4_PATCH_PAIR (DESIGN_DECISIONS 9.3), never typed as a literal output; tests/test_cloud.py
+    re-derives the pair with noilai.gen.variants and checks legality;
+  * the inference engine is installed as DESIGN_DECISIONS 7.3 says (vLLM 0.30.0 pins torch 2.13
+    while Kaggle ships torch 2.10: a venv under /kaggle/tmp, or kaggle-vllm), the version
+    staying a flagged parameter until the smoke tests pin it; every run_eval.py process is
+    launched with the engine's interpreter (RUN_PYTHON);
+  * a notebook never rewrites a file under configs/: session overrides (GEMINI_RPD_OVERRIDE)
+    are applied to the in-memory models_cfg the driver receives and recorded in the ledger.
 """
 from __future__ import annotations
 
@@ -37,6 +46,15 @@ NOTEBOOKS = ("kaggle_eval_t4", "kaggle_eval_tpu", "colab_probe_gemma3", "api_run
 
 RUN_TAG = "run"
 E4_TAG = "e4"
+
+# The activation-patching pair of DESIGN_DECISIONS 9.3 (readout B): the varying syllable is the
+# SECOND input syllable, so that under V3 (swap tones) the two gold answers diverge at their
+# FIRST syllable (bí mà -> bì má vs bí mạ -> bị má; pseudo-phrases, medium, [NATIVE-CHECK]).
+# The plan's bí mật / bí mất is NOT a legal V3 pair (equal tones make V3 the identity) and is the
+# V4 pair (bí mật -> bật mí). The cell recomputes every output with noilai.gen.variants; the
+# answers below are what the test expects the engine to produce.
+E4_PATCH_PAIR = {"variant": "V3", "partner": "bí", "clean": "mà", "corrupt": "mạ",
+                 "answer_clean": "bì má", "answer_corrupt": "bị má", "source": "DESIGN_DECISIONS 9.3"}
 
 
 def md(text: str) -> nbformat.NotebookNode:
@@ -173,11 +191,15 @@ if (clone_dir / ".git").exists():
     subprocess.run(["git", "-C", str(clone_dir), "fetch", "--tags", source, "+refs/heads/*:refs/remotes/origin/*"], check=True, env=env)
 else:
     subprocess.run(["git", "clone", source, str(clone_dir)], check=True, env=env)
-for cand in (REPO_REF, f"origin/{REPO_REF}"):
+# a persisted clone may hold a STALE local branch named like REPO_REF: try the freshly fetched
+# remote-tracking ref first and the literal ref last (commit hashes and tags have no remote form)
+import re
+cands = [REPO_REF] if re.fullmatch(r"[0-9a-f]{7,40}", REPO_REF) else [f"origin/{REPO_REF}", REPO_REF]
+for cand in cands:
     if subprocess.run(["git", "-C", str(clone_dir), "checkout", "--detach", cand], env=env).returncode == 0:
         break
 else:
-    raise SystemExit(f"cannot check out {REPO_REF}")
+    raise SystemExit(f"cannot check out {REPO_REF} (tried {cands})")
 HEAD = subprocess.run(["git", "-C", str(clone_dir), "rev-parse", "HEAD"], check=True, env=env,
                       capture_output=True, text=True).stdout.strip()
 PROJECT = clone_dir / REPO_SUBDIR if (clone_dir / REPO_SUBDIR / "pyproject.toml").exists() else clone_dir
@@ -188,22 +210,43 @@ print("project", PROJECT)
 '''
 
 INSTALL_GPU = '''
-# (c) pinned install: the inference engine first so that its own requirements win, then the project
-# with its eval extra; then record pip freeze + versions next to the outputs (checklist C4).
+# (c) pinned install per DESIGN_DECISIONS 7.3. vLLM 0.30.0 pins torch 2.13 while Kaggle ships torch
+# 2.10 / CUDA 12.8, so the engine goes into its own venv under /kaggle/tmp (INSTALL_MODE "venv"),
+# or the Kaggle-built wheel is used (INSTALL_MODE "kaggle_vllm"); "system" installs into the kernel's
+# interpreter and is for a runtime that already matches. The project (eval extra) is installed into
+# the same interpreter, RUN_PYTHON, which every run_eval.py process is launched with; pip freeze and
+# the framework versions of THAT interpreter are recorded next to the outputs (checklist C4).
 import subprocess, sys
 from pathlib import Path
-pins = [f"vllm=={VLLM_VERSION}"]
+if INSTALL_MODE == "venv":
+    venv = Path(VENV_DIR)
+    if not (venv / "bin" / "python").exists():
+        subprocess.run([sys.executable, "-m", "venv", str(venv)], check=True)
+    RUN_PYTHON = str(venv / "bin" / "python")
+    subprocess.run([RUN_PYTHON, "-m", "pip", "install", "-q", "--upgrade", "pip"], check=True)
+    pins = [f"vllm=={VLLM_VERSION}"]
+elif INSTALL_MODE == "kaggle_vllm":
+    RUN_PYTHON = sys.executable
+    pins = [f"kaggle-vllm=={KAGGLE_VLLM_VERSION}"]
+elif INSTALL_MODE == "system":
+    RUN_PYTHON = sys.executable
+    pins = [f"vllm=={VLLM_VERSION}"]
+else:
+    raise SystemExit(f"INSTALL_MODE must be venv, kaggle_vllm or system, not {INSTALL_MODE!r}")
 if TRANSFORMERS_VERSION:
     pins.append(f"transformers=={TRANSFORMERS_VERSION}")
-subprocess.run([sys.executable, "-m", "pip", "install", "-q", *pins], check=True)
-subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", ".[eval]"], check=True)
+subprocess.run([RUN_PYTHON, "-m", "pip", "install", "-q", *pins], check=True)      # the engine first: its requirements win
+subprocess.run([RUN_PYTHON, "-m", "pip", "install", "-q", "-e", ".[eval]"], check=True)
+if RUN_PYTHON != sys.executable:
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", "."], check=True)   # the driver imports the project too
 os.environ["HF_HOME"] = HF_HOME
 Path(HF_HOME).mkdir(parents=True, exist_ok=True)
 _export(HF_TOKEN_SECRET)          # gated checkpoints (Gemma, Llama, Vistral); exported as HF_TOKEN when the secret has that name
 if HF_TOKEN_SECRET != "HF_TOKEN" and os.environ.get(HF_TOKEN_SECRET):
     os.environ["HF_TOKEN"] = os.environ[HF_TOKEN_SECRET]
 import colab_setup as CS
-ENV_RECORD = CS.record_environment(PROJECT / "data" / "runs" / "env")
+ENV_RECORD = CS.record_environment(PROJECT / "data" / "runs" / "env", python=RUN_PYTHON)
+print("engine interpreter:", RUN_PYTHON)
 print("environment recorded at", ENV_RECORD)
 '''
 
@@ -215,6 +258,7 @@ from pathlib import Path
 spec = f"{VLLM_TPU_PACKAGE}=={VLLM_TPU_VERSION}" if VLLM_TPU_VERSION else VLLM_TPU_PACKAGE
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", spec], check=True)
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", ".[eval]"], check=True)
+RUN_PYTHON = sys.executable          # the TPU image's interpreter carries the vLLM-TPU build [UNCERTAIN: verify]
 os.environ["HF_HOME"] = HF_HOME
 Path(HF_HOME).mkdir(parents=True, exist_ok=True)
 _export(HF_TOKEN_SECRET)
@@ -230,16 +274,21 @@ INSTALL_API = '''
 # Record pip freeze + versions next to the outputs (checklist C4).
 import subprocess, sys
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", ".[eval]"], check=True)
+RUN_PYTHON = sys.executable
 import colab_setup as CS
 ENV_RECORD = CS.record_environment(PROJECT / "data" / "runs" / "env")
 print("environment recorded at", ENV_RECORD)
 '''
 
 FETCH_VERIFY = '''
-# (d) third-party resources (SHA-256 against data/HASHES.json) and the item file(s): hash against
-# configs/run_plan.yaml, canary on every row, row count. A failure stops the notebook here.
+# (d) third-party resources (SHA-256 against data/HASHES.json) and the item file(s) of the runs this
+# notebook will execute: the keys are DERIVED from the run ids (plus the smoke run) unless
+# VERIFY_ITEM_KEYS lists them; a seeded sub-sample the plan derives from another file is written first
+# (--materialize). Each file is checked for its hash against configs/run_plan.yaml, the header record,
+# the canary on every row and its row/cell counts. A failure stops the notebook here.
 import shutil, subprocess, sys
 from pathlib import Path
+import kaggle_run_plan as KRP
 r = subprocess.run([sys.executable, "scripts/fetch_resources.py"], check=False)
 if r.returncode:
     raise SystemExit("resource fetch or hash check failed (see above)")
@@ -247,36 +296,60 @@ if ITEMS_DATASET_DIR:
     src = Path(ITEMS_DATASET_DIR)
     if not src.exists():
         raise SystemExit(f"ITEMS_DATASET_DIR {src} not found: attach the private dataset that holds data/release")
-    shutil.copytree(src, PROJECT / "data" / "release", dirs_exist_ok=True)
-    print("release copied from", src)
-for key in VERIFY_ITEM_KEYS:
-    r = subprocess.run([sys.executable, "scripts/kaggle_verify_items.py", "--key", key], check=False)
+    rel = Path(KRP.load_plan()["release"])
+    dest = PROJECT / rel if (src / rel.name).exists() is False and not (src / "manifest.json").exists() else PROJECT / rel
+    if (src / rel.name).exists():                      # the dataset holds the data/release tree
+        shutil.copytree(src / rel.name, dest, dirs_exist_ok=True)
+    else:                                              # the dataset holds one release directory
+        shutil.copytree(src, dest, dirs_exist_ok=True)
+    print("release copied from", src, "to", dest)
+_run_ids = list(globals().get("RUN_IDS") or [globals().get("RUN_ID")]) + list(globals().get("SMOKE_RUN_IDS") or [])
+KEYS = VERIFY_ITEM_KEYS or KRP.item_keys_for_runs(KRP.load_plan(), [r for r in _run_ids if r])
+print("item files to verify:", KEYS)
+for key in KEYS:
+    r = subprocess.run([sys.executable, "scripts/kaggle_verify_items.py", "--key", key, "--materialize"], check=False)
     if r.returncode:
         raise SystemExit(f"item file {key} failed verification; nothing runs on it")
 '''
 
-OUTPUTS_KAGGLE = '''
-# (g) keep the outputs: copy data/runs (+ compute log) into /kaggle/working (saved with the notebook) and
-# add a version to a private Kaggle dataset through scripts/kaggle_dataset.py (credentials from Secrets).
+PUSH_HELPER = '''
+# outputs hand-off used after EVERY model (DD 7.6: Kaggle keeps /kaggle/working only if the version
+# completes, so a session that times out must already have pushed what it finished) and once more at
+# the end: copy data/runs (+ compute log) into /kaggle/working and add a version to a private Kaggle
+# dataset through scripts/kaggle_dataset.py (credentials from Secrets, never printed).
 import os, shutil, subprocess, sys
 from pathlib import Path
-out = Path(WORK_DIR) / "noilai_runs_out"
-shutil.copytree(PROJECT / "data" / "runs", out / "runs", dirs_exist_ok=True)
-if (PROJECT / "data" / "compute_log.csv").exists():
-    shutil.copy2(PROJECT / "data" / "compute_log.csv", out / "compute_log.csv")
-print("outputs copied to", out)
-if PUSH_DATASET:
+
+def push_outputs(label):
+    out = Path(WORK_DIR) / "noilai_runs_out"
+    shutil.copytree(PROJECT / "data" / "runs", out / "runs", dirs_exist_ok=True)
+    if (PROJECT / "data" / "compute_log.csv").exists():
+        shutil.copy2(PROJECT / "data" / "compute_log.csv", out / "compute_log.csv")
+    print("outputs copied to", out)
+    if not PUSH_DATASET:
+        return
     for name in ("KAGGLE_USERNAME", "KAGGLE_KEY"):
         _export(name)
     if os.environ.get("KAGGLE_USERNAME") and os.environ.get("KAGGLE_KEY"):
         cmd = [sys.executable, "scripts/kaggle_dataset.py", "--src", str(PROJECT / "data" / "runs"),
                "--src", str(PROJECT / "data" / "compute_log.csv"), "--dest", str(Path(WORK_DIR) / "noilai_runs_dataset"),
-               "--slug", KAGGLE_DATASET_SLUG, "--message", f"{RUN_LABEL} @ {HEAD[:8]}"]
-        if CREATE_DATASET:
+               "--slug", KAGGLE_DATASET_SLUG, "--message", f"{label} @ {HEAD[:8]}"]
+        if CREATE_DATASET and not globals().get("_DATASET_CREATED"):
             cmd.append("--create")
-        subprocess.run(cmd, check=False)
+        rc = subprocess.run(cmd, check=False).returncode
+        if rc == 0:
+            globals()["_DATASET_CREATED"] = True
     else:
         print("Kaggle credentials not found: dataset push skipped (outputs are still under", out, ")")
+
+def after_each_model(res):
+    if PUSH_AFTER_EACH_MODEL:
+        push_outputs(f"{res['run']}/{res['model']} {res['status']}")
+'''
+
+OUTPUTS_KAGGLE = '''
+# (g) final hand-off: the same push as after each model, once more for the session as a whole.
+push_outputs(RUN_LABEL)
 '''
 
 COMPUTE_LOG_TAIL = '''
@@ -305,8 +378,10 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
 
         Runs one line of `configs/run_plan.yaml` (default `E1_main`) over a list of models from
         `configs/models.yaml` with `scripts/run_eval.py --resume`, on Kaggle's free 2×T4 session
-        (12 h max, ~30 GPU-h/week). Every cell is non-interactive: set the **parameters** cell,
-        then *Run all*. Attach before starting:
+        (12 h max, ~30 GPU-h/week; ≤ 9 h of work per session, outputs pushed after every model).
+        Models configured for other hardware (the TPU trio, the Modal L4) are skipped by the
+        session guard, never run on the wrong device. Every cell is non-interactive: set the
+        **parameters** cell, then *Run all*. Attach before starting:
 
         * accelerator **GPU T4 ×2**; internet on;
         * Kaggle Secrets: `GITHUB_TOKEN` (repository read, only if no bundle), `HF_TOKEN`
@@ -314,8 +389,8 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
         * a private dataset holding `noilai-main.bundle` (`git bundle create noilai-main.bundle main`)
           and one holding the frozen `data/release/` (never public: the test split is gated).
 
-        Cells: (a) environment · (b) clone · (c) pinned install · (d) resources + item hash ·
-        (e) smoke test · (f) **RUN** · (g) outputs → dataset · (h) GPU-hours log.
+        Cells: (a) environment · (b) clone · (c) pinned install (vLLM in a venv, DD 7.3) · (d) resources +
+        item-file gate · (e) smoke test · (f) **RUN** · (g) outputs → dataset · (h) GPU-hours log.
         The flag mapping to `run_eval.py` lives in `scripts/kaggle_run_plan.py`; adjust flags there
         or through `EXTRA_ARGS`. Kaggle's own environment (nvidia driver, CUDA) is recorded by (c).
         """),
@@ -331,25 +406,33 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
         CLONE_DIR = "/kaggle/working/repo"
         WORK_DIR = "/kaggle/working"                        # ~20 GB, saved with the notebook
         HF_HOME = "/kaggle/tmp/hf"                          # model cache outside the working dir [UNCERTAIN: verify the quota of /kaggle/tmp]
-        ITEMS_DATASET_DIR = "/kaggle/input/noilai-release"  # private dataset with the frozen data/release/<version>/ tree; None if the clone has it
-        VERIFY_ITEM_KEYS = ["noilai_test", "noilai_dev"]    # keys of configs/run_plan.yaml item_files checked in (d)
+        ITEMS_DATASET_DIR = "/kaggle/input/noilai-release"  # private dataset with the frozen data/release/<version>/ tree (or that tree's parent); None if the clone has it
+        VERIFY_ITEM_KEYS = None          # None = derived from RUN_ID and the smoke run by (d); or list keys of configs/run_plan.yaml item_files
 
-        VLLM_VERSION = "0.11.0"          # [UNCERTAIN: verify] pin to the version the smoke tests pass with; recorded by (c)
+        INSTALL_MODE = "venv"            # "venv": vLLM into /kaggle/tmp (DD 7.3: vLLM 0.30 pins torch 2.13, Kaggle ships 2.10); "kaggle_vllm": the Kaggle-built wheel; "system"
+        VENV_DIR = "/kaggle/tmp/vllm-venv"
+        VLLM_VERSION = "0.30.0"          # DESIGN_DECISIONS 7.3 [UNCERTAIN: verify] pin to the version the smoke tests pass with; recorded by (c)
+        KAGGLE_VLLM_VERSION = "0.2.0"    # INSTALL_MODE "kaggle_vllm" only [UNCERTAIN: verify]
         TRANSFORMERS_VERSION = None      # None = whatever the vllm wheel requires (pip freeze is recorded either way)
 
         GITHUB_TOKEN_SECRET = "GITHUB_TOKEN"
         HF_TOKEN_SECRET = "HF_TOKEN"
 
         RUN_ID = "E1_main"               # a run id from configs/run_plan.yaml (kaggle_run_plan.py --list)
-        MODELS = ["gemma-3-1b-it"]       # subset of the run's models; [] = every model of the run
-        SMOKE_MODEL = "gemma-3-1b-it"    # (e) 20 items on this model before the run
+        MODELS = ["gemma-3-1b-it"]       # subset of the run's models; [] = every model of the run that this session's hardware can run
+        SMOKE_RUN_IDS = ["smoke_20"]     # (e) the smoke line, 20 items on SMOKE_MODEL before the run
+        SMOKE_MODEL = "gemma-3-1b-it"
         EXTRA_ARGS = ""                  # extra run_eval.py flags, one shell-quoted string, e.g. "--seed 7"
         DRY_RUN = False                  # True prints the commands and runs nothing
 
         PLATFORM, GPU_TYPE, N_GPUS = "kaggle", "t4", 2
+        SESSION_HARDWARE = "2xt4"        # models.yaml hardware key of THIS session; entries for other hardware are skipped (t4 entries run here)
+        ALLOW_HARDWARE_MISMATCH = False  # True runs e.g. a TPU-configured model here as the documented 2xT4 fallback (logged as this session's device)
+        MAX_SESSION_HOURS = 9.0          # DD 7.6: launch no new model past 9 h of a 12-h session
         REQUIRE_GPU = True
         RUN_LABEL = RUN_ID
         PUSH_DATASET = True
+        PUSH_AFTER_EACH_MODEL = True     # DD 7.6: push mid-run so a timed-out session keeps what it finished
         KAGGLE_DATASET_SLUG = "noilai-runs"
         CREATE_DATASET = False           # True the first time the dataset is published
         '''),
@@ -358,38 +441,49 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
         code(CLONE),
         code(INSTALL_GPU),
         code(FETCH_VERIFY),
+        code(PUSH_HELPER),
         md("""
         ### RUN CELL (e) — smoke test
-        One small model, 20 items (`smoke_20` in `run_plan.yaml`): load, generate, log-probs. Stops the
-        notebook on failure so that no GPU hour is spent on a broken environment.
+        One small model, 20 items (`smoke_20` in `run_plan.yaml`, the only kind of line allowed a
+        `--limit`): load, generate, log-probs. Stops the notebook on failure so that no GPU hour is
+        spent on a broken environment.
         """),
         code('''
-        # RUN CELL (e): smoke test. Flags come from run_plan.yaml (smoke_20) via scripts/kaggle_run_plan.py.
+        # RUN CELL (e): smoke test. Flags come from run_plan.yaml (smoke_20) via scripts/kaggle_run_plan.py;
+        # the process runs on the engine's interpreter (RUN_PYTHON) and the session guards apply.
         import shlex
         import kaggle_run_plan as KRP
-        SMOKE_RESULTS = KRP.execute("smoke_20", models=[SMOKE_MODEL], platform=PLATFORM, dry_run=DRY_RUN,
-                                    continue_on_error=False, extra=shlex.split(EXTRA_ARGS))
+        SMOKE_RESULTS = []
+        for smoke_id in SMOKE_RUN_IDS:
+            SMOKE_RESULTS += KRP.execute(smoke_id, models=[SMOKE_MODEL], platform=PLATFORM, dry_run=DRY_RUN,
+                                         continue_on_error=False, extra=shlex.split(EXTRA_ARGS), python=RUN_PYTHON,
+                                         session_hardware=SESSION_HARDWARE, allow_hardware_mismatch=ALLOW_HARDWARE_MISMATCH,
+                                         session_t0=SESSION_T0, max_session_hours=MAX_SESSION_HOURS)
         for r in SMOKE_RESULTS:
-            print(r["model"], "->", r["status"])
-        if any(str(r["status"]).startswith("failed") for r in SMOKE_RESULTS):
-            raise SystemExit("smoke test failed: fix the environment or the model entry before the run cell")
+            print(r["run"], r["model"], "->", r["status"])
+        if any(str(r["status"]).startswith(("failed", "skipped")) for r in SMOKE_RESULTS):
+            raise SystemExit("smoke test failed or was skipped: fix the environment, the model entry or SESSION_HARDWARE before the run cell")
         ''', tags=[RUN_TAG]),
         md("""
         ### RUN CELL (f) — the run
-        Loops over `MODELS` (or every model of `RUN_ID`) calling
-        `scripts/run_eval.py --model-config <name> --items ... --tasks ... --arms ... --resume --run-id <RUN_ID>__<name> --out-root data/runs`.
-        `--resume` makes a re-run after a session timeout continue where it stopped. Each model's wall
-        time is appended to `data/compute_log.csv` with the device type from `models.yaml`.
+        Loops over `MODELS` (or every model of `RUN_ID` that `SESSION_HARDWARE` can run) calling
+        `scripts/run_eval.py --model-config <name> --items ... --tasks ... --arms ... --resume --run-id <RUN_ID>__<name> --out-root data/runs`
+        on the engine's interpreter. `--resume` makes a re-run after a session timeout continue where it
+        stopped; no new model starts past `MAX_SESSION_HOURS`; the outputs are pushed after every model.
+        Each model's wall time is appended to `data/compute_log.csv` with THIS session's device type and
+        count (2 × T4), whatever hardware the model is configured for.
         """),
         code('''
         # RUN CELL (f): the run matrix line RUN_ID over MODELS, with --resume. Adjust flags in
         # scripts/kaggle_run_plan.py (build_command) or through EXTRA_ARGS; the CLI is owned by noilai/eval.
         import json, shlex
         import kaggle_run_plan as KRP
-        RESULTS = KRP.execute(RUN_ID, models=MODELS or None, platform=PLATFORM, dry_run=DRY_RUN,
-                              continue_on_error=True, extra=shlex.split(EXTRA_ARGS))
+        RESULTS = KRP.execute(RUN_ID, models=MODELS or None, platform=PLATFORM, dry_run=DRY_RUN, continue_on_error=True,
+                              extra=shlex.split(EXTRA_ARGS), python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
+                              allow_hardware_mismatch=ALLOW_HARDWARE_MISMATCH, session_t0=SESSION_T0,
+                              max_session_hours=MAX_SESSION_HOURS, after_each=after_each_model)
         print(json.dumps([{"model": r["model"], "status": r["status"], "hours": r.get("hours"),
-                           "new_outputs": r.get("new_outputs")} for r in RESULTS], indent=1))
+                           "new_outputs": r.get("new_outputs"), "logged_device": r.get("logged_device")} for r in RESULTS], indent=1))
         ''', tags=[RUN_TAG]),
         code(OUTPUTS_KAGGLE),
         code(COMPUTE_LOG_TAIL),
@@ -406,12 +500,14 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
         # NóiLái — Kaggle TPU v5e-8 runs (vLLM-TPU)
 
         The TPU variant of the T4 notebook, same structure: the three large models (`tpu_main`:
-        Gemma 3 12B, Qwen3.8-27B, Qwen-SEA-LION-v4.5-27B-IT in bf16), the bf16 drift check
-        (`bf16_drift_200`: 200 core items per T4 model, unquantized) and the 27B reasoning
-        sub-study (`reasoning_500_tpu`). Sessions last 9 h (~20 TPU-h/week), one at a time; the
-        vLLM-TPU startup takes 6–22 minutes per model, so keep `MODELS` short per session and rely
-        on `--resume`. Attach: accelerator **TPU VM v5e-8**, internet on, the same secrets and
-        private datasets as the T4 notebook.
+        Gemma 3 12B, Qwen3.8-27B, Qwen-SEA-LION-v4.5-27B-IT in bf16, tensor parallel over the 8
+        chips), the bf16 drift check (`bf16_drift_200`: 200 core items per T4 model, unquantized;
+        `phogpt-4b-chat--bf16` is configured for the Modal L4 and skipped here by the session guard)
+        and the 27B reasoning sub-study (`reasoning_500_tpu`). Sessions last 9 h (~20 TPU-h/week),
+        one at a time; the vLLM-TPU startup takes 6–22 minutes per model, so keep `MODELS` short
+        per session and rely on `--resume`; outputs are pushed after every model. Attach:
+        accelerator **TPU VM v5e-8**, internet on, the same secrets and private datasets as the
+        T4 notebook.
 
         Every TPU-hosted model must load under vLLM-TPU and return prompt log-probabilities before its
         full run (plan §3): the smoke cell checks that.
@@ -429,7 +525,7 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
         WORK_DIR = "/kaggle/working"
         HF_HOME = "/kaggle/tmp/hf"                          # 27B bf16 weights are ~54 GB: not in the 20 GB working dir [UNCERTAIN: verify]
         ITEMS_DATASET_DIR = "/kaggle/input/noilai-release"
-        VERIFY_ITEM_KEYS = ["noilai_test"]
+        VERIFY_ITEM_KEYS = None          # None = derived from RUN_IDS and SMOKE_RUN_IDS by (d)
 
         VLLM_TPU_PACKAGE = "vllm-tpu"    # [UNCERTAIN: verify] the TPU build's package name for the pinned version (kaggle-tpu-lab documents the working recipe)
         VLLM_TPU_VERSION = None          # [UNCERTAIN: verify] pin once the smoke cell passes; None = latest (recorded by (c))
@@ -438,15 +534,20 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
         HF_TOKEN_SECRET = "HF_TOKEN"
 
         RUN_IDS = ["tpu_main"]           # any of: tpu_main, bf16_drift_200, reasoning_500_tpu
-        MODELS = ["gemma-3-12b-it"]      # subset of each run's models; [] = all
+        MODELS = ["gemma-3-12b-it"]      # subset of each run's models; [] = every model the TPU session can run
+        SMOKE_RUN_IDS = ["smoke_20_tpu"] # (e) the TPU smoke line on SMOKE_MODEL
         SMOKE_MODEL = "gemma-3-12b-it"
         EXTRA_ARGS = ""
         DRY_RUN = False
 
         PLATFORM, GPU_TYPE, N_GPUS = "kaggle", "tpu-v5e-8", 1
+        SESSION_HARDWARE = "tpu"         # entries configured for t4 / 2xt4 / l4 are skipped here
+        ALLOW_HARDWARE_MISMATCH = False
+        MAX_SESSION_HOURS = 8.0          # 9-h TPU sessions: launch no new model past 8 h
         REQUIRE_TPU = True
         RUN_LABEL = "+".join(RUN_IDS)
         PUSH_DATASET = True
+        PUSH_AFTER_EACH_MODEL = True
         KAGGLE_DATASET_SLUG = "noilai-runs"
         CREATE_DATASET = False
         '''),
@@ -455,36 +556,46 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
         code(CLONE),
         code(INSTALL_TPU),
         code(FETCH_VERIFY),
+        code(PUSH_HELPER),
         md("""
         ### RUN CELL (e) — smoke test on the TPU
-        `smoke_20` on `SMOKE_MODEL`: the model must load under vLLM-TPU, generate, and return prompt
-        log-probabilities (the T3 forced-choice scoring needs them).
+        `smoke_20_tpu` on `SMOKE_MODEL` (booked under TPU hours): the model must load under vLLM-TPU
+        with tensor parallel 8, generate, and return prompt log-probabilities (the T3 forced-choice
+        scoring needs them).
         """),
         code('''
-        # RUN CELL (e): smoke test (smoke_20) on the TPU model.
+        # RUN CELL (e): smoke test (smoke_20_tpu) on the TPU model.
         import shlex
         import kaggle_run_plan as KRP
-        SMOKE_RESULTS = KRP.execute("smoke_20", models=[SMOKE_MODEL], platform=PLATFORM, dry_run=DRY_RUN,
-                                    continue_on_error=False, extra=shlex.split(EXTRA_ARGS))
+        SMOKE_RESULTS = []
+        for smoke_id in SMOKE_RUN_IDS:
+            SMOKE_RESULTS += KRP.execute(smoke_id, models=[SMOKE_MODEL], platform=PLATFORM, dry_run=DRY_RUN,
+                                         continue_on_error=False, extra=shlex.split(EXTRA_ARGS), python=RUN_PYTHON,
+                                         session_hardware=SESSION_HARDWARE, allow_hardware_mismatch=ALLOW_HARDWARE_MISMATCH,
+                                         session_t0=SESSION_T0, max_session_hours=MAX_SESSION_HOURS)
         for r in SMOKE_RESULTS:
-            print(r["model"], "->", r["status"])
-        if any(str(r["status"]).startswith("failed") for r in SMOKE_RESULTS):
-            raise SystemExit("smoke test failed: the TPU route for this model is not ready (fallback: 2xT4 4-bit, labelled quantized)")
+            print(r["run"], r["model"], "->", r["status"])
+        if any(str(r["status"]).startswith(("failed", "skipped")) for r in SMOKE_RESULTS):
+            raise SystemExit("smoke test failed or was skipped: the TPU route for this model is not ready (fallback: 2xT4 4-bit, labelled quantized)")
         ''', tags=[RUN_TAG]),
         md("""
         ### RUN CELL (f) — the TPU runs
-        One `run_eval.py --resume` command per (run id, model); wall time per model is logged as
-        TPU device-hours.
+        One `run_eval.py --resume` command per (run id, model) that the TPU session can run; wall
+        time per model is logged as TPU device-hours; outputs are pushed after every model; no new
+        model starts past `MAX_SESSION_HOURS`.
         """),
         code('''
-        # RUN CELL (f): each run id in RUN_IDS over MODELS (or all of the run's models), --resume.
+        # RUN CELL (f): each run id in RUN_IDS over MODELS (or all of the run's TPU-runnable models), --resume.
         import json, shlex
         import kaggle_run_plan as KRP
         RESULTS = []
         for run_id in RUN_IDS:
-            RESULTS += KRP.execute(run_id, models=MODELS or None, platform=PLATFORM, dry_run=DRY_RUN,
-                                   continue_on_error=True, extra=shlex.split(EXTRA_ARGS))
-        print(json.dumps([{"run": r["run"], "model": r["model"], "status": r["status"], "hours": r.get("hours")} for r in RESULTS], indent=1))
+            RESULTS += KRP.execute(run_id, models=MODELS or None, platform=PLATFORM, dry_run=DRY_RUN, continue_on_error=True,
+                                   extra=shlex.split(EXTRA_ARGS), python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
+                                   allow_hardware_mismatch=ALLOW_HARDWARE_MISMATCH, session_t0=SESSION_T0,
+                                   max_session_hours=MAX_SESSION_HOURS, after_each=after_each_model)
+        print(json.dumps([{"run": r["run"], "model": r["model"], "status": r["status"], "hours": r.get("hours"),
+                           "logged_device": r.get("logged_device")} for r in RESULTS], indent=1))
         ''', tags=[RUN_TAG]),
         code(OUTPUTS_KAGGLE),
         code(COMPUTE_LOG_TAIL),

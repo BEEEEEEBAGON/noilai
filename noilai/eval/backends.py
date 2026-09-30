@@ -1,14 +1,24 @@
 """Model backends behind one interface.
 
-    Backend.generate(messages_batch, max_new_tokens, greedy) -> [{text, n_prompt_tokens, n_output_tokens}]
+    Backend.generate(messages_batch, max_new_tokens, greedy)
+        -> [{text, n_prompt_tokens, n_output_tokens, finish_reason, prompt_truncated?, reasoning?}]
     Backend.logprobs(prompt_text, continuations) -> [sum log P(continuation | prompt), ...]
+        (local backends record `last_prefix_violations`, one bool per continuation: the prefix
+         property ids(prompt) ⊂ ids(prompt + continuation) failed and the continuation was
+         tokenized on its own -- DESIGN_DECISIONS 7.3, item 55; the row is excluded from
+         log-probability metrics)
     Backend.chat_to_text(messages) -> the templated prompt string (for logprob prompts)
-    Backend.info() -> what the manifest records (backend, version, model id, dtype, quant, flags)
+    Backend.count_tokens(text) -> int | None (local tokenizers only; Δtokens per arm)
+    Backend.info() -> what the manifest records (backend, version, model id, dtype, quant, flags,
+        tokenizer_sha256, chat_template_sha256, thinking_knob_detected, n_prefix_property_violations,
+        n_truncated_prompts)
 
 Implementations
     HFBackend          transformers; chat template with enable_thinking=False when the template
                        knows the switch; dtype / bitsandbytes quantization / device options;
-                       left-padded batching; seeds; log-probabilities by a forward pass
+                       left-padded batching; seeds; log-probabilities by a forward pass; a prompt
+                       longer than max_model_len - max_new_tokens raises (on_long_prompt="error",
+                       default) or is left-truncated and counted (on_long_prompt="truncate_left")
     VLLMBackend        vLLM (import guarded); greedy SamplingParams; prompt_logprobs for the
                        continuations; dtype=half, max_model_len, gpu_memory_utilization,
                        enforce_eager, tensor_parallel_size, quantization as config
@@ -24,7 +34,9 @@ server through the OpenAI-compatible backend (local, so not an API for the safet
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import importlib
+import json
 import os
 import random
 import re
@@ -57,6 +69,44 @@ class BackendError(RuntimeError):
     pass
 
 
+_THINKING_KNOBS = re.compile(r"enable_thinking|reasoning_effort|thinking", re.IGNORECASE)
+_TOKENIZER_FILES = ("tokenizer.json", "tokenizer.model", "tokenizer_config.json", "vocab.json", "merges.txt",
+                    "special_tokens_map.json", "added_tokens.json")
+
+
+def _sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def tokenizer_fingerprint(tokenizer) -> dict:
+    """Identity of a tokenizer and its chat template for the manifest (DESIGN_DECISIONS 7.5,
+    12.25): `tokenizer_sha256` over the tokenizer files when they are on disk, else over the
+    sorted vocabulary (`tokenizer_sha256_source` says which); `chat_template_sha256`;
+    `thinking_knob_detected` from a template census for enable_thinking / reasoning_effort /
+    thinking."""
+    h = hashlib.sha256()
+    source = None
+    with contextlib.suppress(Exception):
+        p = Path(str(getattr(tokenizer, "name_or_path", "") or ""))
+        files = [p / n for n in _TOKENIZER_FILES if p.is_dir() and (p / n).exists()]
+        if files:
+            for f in sorted(files):
+                h.update(f.name.encode("utf-8") + b"\0" + f.read_bytes())
+            source = "files"
+    if source is None:
+        with contextlib.suppress(Exception):
+            vocab = tokenizer.get_vocab()
+            h.update(json.dumps(sorted(vocab.items()), ensure_ascii=False).encode("utf-8"))
+            source = "vocab"
+    tmpl = getattr(tokenizer, "chat_template", None) or ""
+    if isinstance(tmpl, dict):
+        tmpl = json.dumps(tmpl, sort_keys=True, ensure_ascii=False)
+    knobs = sorted({m.group(0).lower() for m in _THINKING_KNOBS.finditer(str(tmpl))})
+    return {"tokenizer_sha256": h.hexdigest() if source else None, "tokenizer_sha256_source": source,
+            "chat_template_sha256": _sha256_text(str(tmpl)) if tmpl else None,
+            "thinking_knob_detected": bool(knobs), "thinking_knobs": knobs}
+
+
 # ------------------------------------------------------------------ interface
 class Backend:
     kind: str = "base"
@@ -78,9 +128,14 @@ class Backend:
             parts.append("assistant:")
         return "\n".join(parts)
 
+    def count_tokens(self, text: str) -> int | None:
+        """Token count of a string under the model's tokenizer; None when there is none."""
+        return None
+
     def info(self) -> dict:
         return {"backend": self.kind, "backend_version": None, "model_id": self.model_id, "dtype": None,
-                "quantization": None, "engine_flags": {}}
+                "quantization": None, "engine_flags": {}, "tokenizer_sha256": None, "chat_template_sha256": None,
+                "thinking_knob_detected": False}
 
     def close(self) -> None:
         pass
@@ -177,7 +232,7 @@ class HFBackend(Backend):
                  quantization: dict | None = None, device: str = "auto", batch_size: int = 8, seed: int = 0,
                  trust_remote_code: bool = False, chat_template_kwargs: dict | None = None,
                  max_model_len: int | None = None, attn_implementation: str | None = None,
-                 model=None, tokenizer=None, name: str | None = None):
+                 model=None, tokenizer=None, name: str | None = None, on_long_prompt: str = "error"):
         import torch
 
         self.torch = torch
@@ -192,6 +247,12 @@ class HFBackend(Backend):
         self.chat_template_kwargs = dict(chat_template_kwargs or {})
         self.trust_remote_code = trust_remote_code
         self.device_requested = device
+        if on_long_prompt not in ("error", "truncate_left"):
+            raise ValueError("on_long_prompt must be 'error' or 'truncate_left'")
+        self.on_long_prompt = on_long_prompt
+        self.n_truncated_prompts = 0
+        self.n_prefix_property_violations = 0
+        self.last_prefix_violations: list[bool] = []
         self._seed_all(seed)
         if model is not None and tokenizer is not None:
             self.model, self.tokenizer = model.eval(), tokenizer
@@ -283,17 +344,39 @@ class HFBackend(Backend):
         bos = getattr(self.tokenizer, "bos_token", None)
         return not (bos and text.startswith(bos))
 
+    def count_tokens(self, text: str) -> int | None:
+        return len(self.tokenizer(text, add_special_tokens=self._add_special(text))["input_ids"])
+
+    def _check_lengths(self, texts: list[str], add_special: bool, budget: int | None) -> list[bool]:
+        """Prompts longer than the budget: raise (default) or record for left truncation. Silent
+        right truncation would cut the demonstrations' tail and the answer instruction."""
+        if budget is None:
+            return [False] * len(texts)
+        lengths = [len(self.tokenizer(t, add_special_tokens=add_special)["input_ids"]) for t in texts]
+        long = [n > budget for n in lengths]
+        if any(long):
+            if self.on_long_prompt == "error":
+                worst = max(lengths)
+                raise BackendError(f"{sum(long)} prompt(s) exceed the budget of {budget} tokens (max_model_len "
+                                   f"{self.max_model_len} - max_new_tokens; longest {worst}); raise max_model_len, "
+                                   f"lower the shots, or run with on_long_prompt='truncate_left' to left-truncate "
+                                   f"and record the count")
+            self.n_truncated_prompts += sum(long)
+        return long
+
     # ---- generation
     def generate(self, messages_batch, max_new_tokens=64, greedy=True):
         torch = self.torch
         results: list[dict] = []
+        budget = (self.max_model_len - max_new_tokens) if self.max_model_len else None
         for start in range(0, len(messages_batch), self.batch_size):
             chunk = messages_batch[start: start + self.batch_size]
             texts = [self.chat_to_text(m) for m in chunk]
             add_special = self._add_special(texts[0])
+            long = self._check_lengths(texts, add_special, budget)
+            self.tokenizer.truncation_side = "left"
             enc = self.tokenizer(texts, return_tensors="pt", padding=True, add_special_tokens=add_special,
-                                 truncation=self.max_model_len is not None,
-                                 max_length=(self.max_model_len - max_new_tokens) if self.max_model_len else None)
+                                 truncation=budget is not None, max_length=budget)
             enc = {k: v.to(self.device) for k, v in enc.items()}
             torch.manual_seed(self.seed)
             gen_kw = {"max_new_tokens": max_new_tokens, "do_sample": not greedy,
@@ -321,25 +404,33 @@ class HFBackend(Backend):
                     n_out += 1
                 text = self.tokenizer.decode(ids[:n_out], skip_special_tokens=True)
                 results.append({"text": text, "n_prompt_tokens": int(enc["attention_mask"][i].sum().item()),
-                                "n_output_tokens": n_out})
+                                "n_output_tokens": n_out,
+                                "finish_reason": "length" if n_out >= max_new_tokens else "stop",
+                                "prompt_truncated": bool(long[i])})
         return results
 
     # ---- log-probabilities
-    def _cont_ids(self, prompt: str, cont: str, add_special: bool) -> tuple[list[int], list[int]]:
+    def _cont_ids(self, prompt: str, cont: str, add_special: bool) -> tuple[list[int], list[int], bool]:
+        """(prompt ids, continuation ids, prefix_property_violation). The prefix property
+        ids(prompt) ⊂ ids(prompt + cont) is asserted per continuation; when the boundary merged
+        into one token the continuation is tokenized on its own and the violation is recorded,
+        never silently degraded (DESIGN_DECISIONS 7.3)."""
         p_ids = self.tokenizer(prompt, add_special_tokens=add_special)["input_ids"]
         f_ids = self.tokenizer(prompt + cont, add_special_tokens=add_special)["input_ids"]
         if f_ids[: len(p_ids)] == p_ids and len(f_ids) > len(p_ids):
-            return p_ids, f_ids[len(p_ids):]
-        # the boundary merged into one token: tokenize the continuation on its own
+            return p_ids, f_ids[len(p_ids):], False
         c_ids = self.tokenizer(cont, add_special_tokens=False)["input_ids"]
-        return p_ids, c_ids
+        self.n_prefix_property_violations += 1
+        return p_ids, c_ids, True
 
     def logprobs(self, prompt, continuations):
         torch = self.torch
         add_special = self._add_special(prompt)
         seqs, spans = [], []
+        self.last_prefix_violations = []
         for c in continuations:
-            p_ids, c_ids = self._cont_ids(prompt, c, add_special)
+            p_ids, c_ids, violated = self._cont_ids(prompt, c, add_special)
+            self.last_prefix_violations.append(violated)
             seqs.append(p_ids + c_ids)
             spans.append((len(p_ids), len(p_ids) + len(c_ids)))
         pad = self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else 0
@@ -363,14 +454,17 @@ class HFBackend(Backend):
 
     def info(self):
         q = self.quantization
-        return {"backend": "hf", "backend_version": _version("transformers"), "torch_version": _version("torch"),
-                "model_id": self.model_id, "revision": self.revision,
+        return {"backend": "hf", "engine": "transformers", "backend_version": _version("transformers"),
+                "torch_version": _version("torch"), "model_id": self.model_id, "revision": self.revision,
                 "dtype": str(next(self.model.parameters()).dtype).replace("torch.", ""),
                 "dtype_requested": self.dtype, "quantization": q, "device": str(self.device),
                 "engine_flags": {"batch_size": self.batch_size, "max_model_len": self.max_model_len,
                                  "chat_template_kwargs": self.chat_template_kwargs,
                                  "supports_enable_thinking": self.supports_enable_thinking,
-                                 "trust_remote_code": self.trust_remote_code}, "seed": self.seed}
+                                 "trust_remote_code": self.trust_remote_code, "on_long_prompt": self.on_long_prompt},
+                "seed": self.seed, **tokenizer_fingerprint(self.tokenizer),
+                "n_prefix_property_violations": self.n_prefix_property_violations,
+                "n_truncated_prompts": self.n_truncated_prompts}
 
 
 # ------------------------------------------------------------------ vLLM
@@ -414,12 +508,17 @@ class VLLMBackend(Backend):
         self.supports_enable_thinking = "enable_thinking" in tmpl
         if self.supports_enable_thinking and "enable_thinking" not in self.chat_template_kwargs:
             self.chat_template_kwargs["enable_thinking"] = False
+        self.n_prefix_property_violations = 0
+        self.last_prefix_violations: list[bool] = []
 
     def chat_to_text(self, messages, add_generation_prompt=True):
         if not getattr(self.tokenizer, "chat_template", None):
             return super().chat_to_text(messages, add_generation_prompt)
         return self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=add_generation_prompt,
                                                   **self.chat_template_kwargs)
+
+    def count_tokens(self, text: str) -> int | None:
+        return len(self.tokenizer(text, add_special_tokens=False)["input_ids"])
 
     def generate(self, messages_batch, max_new_tokens=64, greedy=True):
         texts = [self.chat_to_text(m) for m in messages_batch]
@@ -428,7 +527,10 @@ class VLLMBackend(Backend):
         res = []
         for o in outs:
             c = o.outputs[0]
-            res.append({"text": c.text, "n_prompt_tokens": len(o.prompt_token_ids), "n_output_tokens": len(c.token_ids)})
+            n_out = len(c.token_ids)
+            res.append({"text": c.text, "n_prompt_tokens": len(o.prompt_token_ids), "n_output_tokens": n_out,
+                        "finish_reason": getattr(c, "finish_reason", None) or ("length" if n_out >= max_new_tokens
+                                                                               else "stop")})
         return res
 
     def logprobs(self, prompt, continuations):
@@ -438,10 +540,15 @@ class VLLMBackend(Backend):
         params = self.SamplingParams(temperature=0.0, max_tokens=1, prompt_logprobs=0)
         p_ids = self.tokenizer(prompt, add_special_tokens=False)["input_ids"]
         out = []
+        self.last_prefix_violations = []
         for c in continuations:
             full = prompt + c
             f_ids = self.tokenizer(full, add_special_tokens=False)["input_ids"]
-            start = len(p_ids) if f_ids[: len(p_ids)] == p_ids else len(p_ids) - 1
+            violated = f_ids[: len(p_ids)] != p_ids
+            self.last_prefix_violations.append(violated)
+            if violated:
+                self.n_prefix_property_violations += 1     # recorded on the row, excluded from the metrics
+            start = len(p_ids) if not violated else len(p_ids) - 1
             ro = self.llm.generate([full], params, use_tqdm=False)[0]
             tot = 0.0
             for pos in range(max(start, 1), len(ro.prompt_token_ids)):
@@ -453,12 +560,13 @@ class VLLMBackend(Backend):
         return out
 
     def info(self):
-        return {"backend": "vllm", "backend_version": _version("vllm"), "torch_version": _version("torch"),
-                "model_id": self.model_id, "revision": self.revision, "dtype": self.dtype,
-                "quantization": self.quantization, "engine_flags": {**self.engine_flags,
-                                                                    "chat_template_kwargs": self.chat_template_kwargs,
-                                                                    "supports_enable_thinking": self.supports_enable_thinking},
-                "seed": self.seed}
+        return {"backend": "vllm", "engine": "vllm", "backend_version": _version("vllm"),
+                "torch_version": _version("torch"), "model_id": self.model_id, "revision": self.revision,
+                "dtype": self.dtype, "quantization": self.quantization,
+                "engine_flags": {**self.engine_flags, "chat_template_kwargs": self.chat_template_kwargs,
+                                 "supports_enable_thinking": self.supports_enable_thinking},
+                "seed": self.seed, **tokenizer_fingerprint(self.tokenizer),
+                "n_prefix_property_violations": self.n_prefix_property_violations}
 
 
 # ------------------------------------------------------------------ retry helper
@@ -579,20 +687,25 @@ class OpenAICompatBackend(Backend):
             choice = resp.choices[0]
             text = choice.message.content or ""
             usage = getattr(resp, "usage", None)
+            details = getattr(usage, "completion_tokens_details", None) if usage else None
             results.append({"text": text,
                             "n_prompt_tokens": getattr(usage, "prompt_tokens", None) if usage else None,
                             "n_output_tokens": getattr(usage, "completion_tokens", None) if usage else None,
+                            "n_thinking_tokens": getattr(details, "reasoning_tokens", None) if details else None,
                             "latency_s": latency, "finish_reason": getattr(choice, "finish_reason", None),
                             "reasoning": getattr(choice.message, "reasoning", None)
                             or getattr(choice.message, "reasoning_content", None)})
         return results
 
     def info(self):
-        return {"backend": "openai_compat", "backend_version": _version("openai"), "model_id": self.model_id,
-                "base_url": self.base_url, "dtype": None, "quantization": None,
+        return {"backend": "openai_compat", "engine": "openai_compat", "backend_version": _version("openai"),
+                "model_id": self.model_id, "base_url": self.base_url, "dtype": None, "quantization": None,
                 "engine_flags": {"generation_kwargs": self.generation_kwargs, "extra_body": self.extra_body,
                                  "requests_per_minute": self.requests_per_minute, "max_retries": self.max_retries},
-                "seed": self.seed, "n_retries": self.n_retries}
+                "seed": self.seed, "n_retries": self.n_retries, "tokenizer_sha256": None, "chat_template_sha256": None,
+                "thinking_knob_detected": any(k in self.generation_kwargs for k in ("reasoning_effort", "reasoning",
+                                                                                   "thinking")),
+                "thinking_knobs": sorted(k for k in self.generation_kwargs if _THINKING_KNOBS.search(k))}
 
 
 # ------------------------------------------------------------------ Gemini
@@ -676,18 +789,25 @@ class GeminiBackend(Backend):
             except Exception:  # noqa: BLE001  (blocked or empty candidates)
                 text = ""
             um = getattr(resp, "usage_metadata", None)
+            fr = None
+            with contextlib.suppress(Exception):
+                fr = str(resp.candidates[0].finish_reason) if resp.candidates else None
             results.append({"text": text,
                             "n_prompt_tokens": getattr(um, "prompt_token_count", None) if um else None,
                             "n_output_tokens": getattr(um, "candidates_token_count", None) if um else None,
                             "n_thinking_tokens": getattr(um, "thoughts_token_count", None) if um else None,
-                            "latency_s": latency})
+                            "latency_s": latency, "finish_reason": fr,
+                            "model_version": getattr(resp, "model_version", None)})
         return results
 
     def info(self):
-        return {"backend": "gemini", "backend_version": _version("google.genai"), "model_id": self.model_id,
-                "dtype": None, "quantization": None,
+        return {"backend": "gemini", "engine": "gemini", "backend_version": _version("google.genai"),
+                "model_id": self.model_id, "dtype": None, "quantization": None,
                 "engine_flags": {"generation_kwargs": self.generation_kwargs, "requests_per_minute": self.requests_per_minute,
-                                 "max_retries": self.max_retries}, "seed": self.seed, "n_retries": self.n_retries}
+                                 "max_retries": self.max_retries}, "seed": self.seed, "n_retries": self.n_retries,
+                "tokenizer_sha256": None, "chat_template_sha256": None,
+                "thinking_knob_detected": "thinking_budget" in self.generation_kwargs,
+                "thinking_knobs": sorted(k for k in self.generation_kwargs if _THINKING_KNOBS.search(k))}
 
 
 # ------------------------------------------------------------------ factory
@@ -731,7 +851,8 @@ def make_backend(entry: dict, backend: str | None = None, **overrides) -> Backen
                          batch_size=int(e.get("batch_size", 8)), seed=seed,
                          trust_remote_code=bool(e.get("trust_remote_code", False)),
                          chat_template_kwargs=e.get("chat_template_kwargs"), max_model_len=e.get("max_model_len"),
-                         attn_implementation=e.get("attn_implementation"), name=e.get("name"))
+                         attn_implementation=e.get("attn_implementation"), name=e.get("name"),
+                         on_long_prompt=e.get("on_long_prompt", "error"))
     if kind == "vllm":
         return VLLMBackend(model_id=e.get("hf_id") or e.get("model_id"), revision=e.get("revision"),
                            dtype=e.get("dtype") or "half", quantization=e.get("quantization"),

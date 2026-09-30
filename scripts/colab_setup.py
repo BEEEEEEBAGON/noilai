@@ -25,11 +25,13 @@ import datetime as dt
 import json
 import os
 import platform
+import re
 import stat
 import subprocess
 import sys
 from pathlib import Path
 from typing import Optional, Sequence
+from urllib.parse import urlparse
 
 DEFAULT_TOKEN_ENV = "GITHUB_TOKEN"
 DEFAULT_SUBDIR = "noilai"
@@ -105,9 +107,18 @@ def write_askpass(token_env: str = DEFAULT_TOKEN_ENV, path: Optional[Path] = Non
     return path
 
 
+def has_embedded_credentials(repo_url: str) -> bool:
+    """True for an http(s) URL with a userinfo part (https://user:token@host/...). An SSH remote
+    such as git@github.com:owner/repo.git carries no credential and is accepted."""
+    parsed = urlparse(repo_url)
+    if parsed.scheme in ("http", "https"):
+        return bool(parsed.username or parsed.password)
+    return False
+
+
 def clone_command(repo_url: str, dest: Path, bundle_path: Optional[Path] = None, depth: Optional[int] = None) -> list[str]:
     """`git clone` argv. From a bundle when one is given, else from the URL; never a token."""
-    if "@" in repo_url.split("//", 1)[-1].split("/", 1)[0]:
+    if has_embedded_credentials(repo_url):
         raise ValueError("repo_url must not embed credentials; use GIT_ASKPASS")
     cmd = ["git", "clone"]
     if depth and not bundle_path:
@@ -121,6 +132,24 @@ def fetch_command(dest: Path, bundle_path: Optional[Path] = None) -> list[str]:
     if bundle_path:
         return ["git", "-C", str(dest), "fetch", str(bundle_path), "+refs/heads/*:refs/remotes/bundle/*"]
     return ["git", "-C", str(dest), "fetch", "--all", "--tags"]
+
+
+_HEX_REF = re.compile(r"^[0-9a-f]{7,40}$")
+
+
+def is_commit_hash(ref: str) -> bool:
+    return bool(_HEX_REF.fullmatch(ref.strip().lower()))
+
+
+def checkout_candidates(ref: str, remote: str = "origin") -> list[str]:
+    """The refs to try, in order, when checking out `ref` in a clone that may hold a STALE local
+    branch of the same name: the freshly fetched remote-tracking ref first (origin/main), the
+    literal ref last (commit hashes and tags have no remote-tracking form). A persisted clone
+    (Drive, a re-used Kaggle dataset) therefore runs the fetched code, not last week's branch."""
+    ref = ref.strip()
+    if is_commit_hash(ref):
+        return [ref]
+    return [f"{remote}/{ref}", ref]
 
 
 def checkout_command(dest: Path, ref: str) -> list[str]:
@@ -143,14 +172,20 @@ def clone(repo_url: str, dest: Path, ref: Optional[str] = None, bundle_path: Opt
         print(f"[clone] bundle {bundle_path} not found; falling back to {repo_url}")
         bundle_path = None
     env = git_env(token_env)
-    if (dest / ".git").exists():
+    existing = (dest / ".git").exists()
+    if existing:
         cmd = fetch_command(dest, bundle_path)
     else:
         cmd = clone_command(repo_url, dest, bundle_path=bundle_path, depth=depth)
     print("[clone]", " ".join(cmd))
     subprocess.run(cmd, check=True, env=env)
     if ref:
-        subprocess.run(checkout_command(dest, ref), check=True, env=env)
+        remote = "bundle" if (existing and bundle_path) else "origin"
+        for cand in checkout_candidates(ref, remote):
+            if subprocess.run(checkout_command(dest, cand), env=env).returncode == 0:
+                break
+        else:
+            raise RuntimeError(f"cannot check out {ref!r} (tried {checkout_candidates(ref, remote)})")
     head = subprocess.run(["git", "-C", str(dest), "rev-parse", "HEAD"], check=True, env=env,
                           capture_output=True, text=True).stdout.strip()
     print(f"[clone] HEAD {head}")

@@ -1,36 +1,49 @@
-"""Scoring: correctness, error taxonomy, aggregation, scores.jsonl.
+"""Scoring: correctness, error taxonomy, aggregation, scores.jsonl (DESIGN_DECISIONS 5.1-5.4).
 
-T1  correct iff canonical_text(answer) == canonical_text(gold) for one of the listed golds
-    (generated items have exactly one; attested items may list the folk form next to the rule
-    output). canonical_text (from noilai.vi.reencode) normalizes encoding, tone-mark
+T1  `correct` (strict) iff canonical_text(answer) == canonical_text(gold) for one of the listed
+    golds, in the named order; `correct_lenient` (secondary) also accepts the two syllables in
+    the other order. canonical_text (noilai.vi.reencode) normalizes encoding, tone-mark
     placement, case and the lí/lý alternation but deliberately does NOT repair misspellings,
     so "mài céo" is wrong. Attested items (task "attested") are scored here; three-syllable
     attested phrases get only correct / copy / unparseable / wrong.
-    Error classes, decided in this order:
-      unparseable    no answer extracted, not two syllables, or a syllable the parser rejects
-      correct
-      copy           the answer is the input
-      spelling       the syllables parse (non-strict) to exactly the gold structures but at
-                     least one violates a spelling rule (céo for kéo, nge for nghe)
-      illegal        a syllable fails Inventory.is_legal(level='onset_rime')
-      order          the gold syllables in the wrong order
-      wrong_variant  the output of another variant on the same input (either order)
-      component      anything else; `component_errors` names the wrong components per
-                     syllable (onset / rime / tone, via noilai.gen.variants.diff)
-    A spelling violation on an otherwise wrong structure is recorded in component_errors
-    as 'spelling' while the class comes from the structure.
-T2  correct iff the canonical answer is one of the gold readings. The variant the model
-    implicitly used is identified from the structures (identify_any_order); a variant the
-    model NAMES in its completion (V1..V4 or the Vietnamese/English variant names) is
-    recorded separately.
-T3  Có/Không (yes/no) mapped to yes/no. When the run recorded log-probabilities,
-    forced-choice accuracy (P(Có) vs P(Không) for the same prompt) and BLiMP-style paired
-    accuracy (log P(correct candidate) > log P(twin candidate) under the same context, over
-    the yes/no pair sharing pair_item_id) are added.
+    Error classes (`error_class`, one per output), decided in this precedence (5.4):
+      unparseable       no answer extracted, not two syllables, or a syllable the parser rejects
+      correct           strict match
+      lenient_only      unordered match (the gold syllables in the other order)
+      copy              the answer is the input
+      reversal          the answer is the plain reversal of the input
+      wrong_variant     the output of another of the six variants on the same input (either
+                        order; `wrong_variant_labels` records which)
+      spelling          the syllables parse (non-strict) to exactly the gold structures but at
+                        least one violates a spelling rule (céo for kéo, nge for nghe)
+      homophone         differs from the gold only by a regional homophone spelling
+                        (HOMOPHONE_ONSET_PAIRS / HOMOPHONE_STRING_PAIRS, <= 12 entries, NV)
+      doublet           differs from the gold only by an ay/ây lexical doublet (DOUBLETS, NV)
+      illegal           a syllable fails Inventory.is_legal(level='onset_rime')
+      component         anything else; `component_errors` names the wrong components per
+                        syllable (onset / rime / tone, via noilai.gen.variants.diff)
+    A spelling violation on an otherwise wrong structure is recorded in component_errors as
+    'spelling' while the class comes from the structure.
+T2  correct iff the canonical answer is one of the gold readings IN EITHER ORDER (3.2: gold
+    stores the attested order and accepts either; `gold_order` records which matched). The
+    variants that produce the answer are identified from the structures (identify_any_order,
+    all six) and mapped to the three unordered classes {V1/V6}, {V2/V3}, {V4/V5}
+    (`identified_classes`); a variant the model NAMES in its completion is recorded as
+    `named_variant` (last mention by position) and scored by class (`named_variant_correct`).
+    A legal, parseable answer that is a variant reading of the input but not in the gold set
+    is `plausible_nongold` (5.2). Other classes as T1.
+T3  Có/Không (yes/no) mapped with negation precedence (extract.t3_label). When the run
+    recorded log-probabilities, forced-choice accuracy (P(Có) vs P(Không) for the same prompt)
+    and BLiMP-style paired accuracy (log P(correct candidate) > log P(twin candidate) under the
+    same context, over the yes/no pair sharing pair_item_id) are added. Cells report
+    balanced accuracy and d' next to accuracy (generated T3 has a "yes" bias) and the headline
+    excludes spelling twins (`t3_headline`).
 XCOPA  generated 1/2 against the label; log-probability choice when recorded.
 
-`score_outputs(items, outputs)` returns one row per output; `aggregate(rows)` the per-run
-summary; `write_scores` the scores.jsonl of docs/DATA_FORMAT.md.
+`score_outputs(items, outputs)` returns one row per output (header records in `items` are
+ignored); `aggregate(rows)` the per-run summary; `write_scores` the scores.jsonl of
+docs/DATA_FORMAT.md (every `strata` key is copied so that the statistics module reads only
+that file).
 """
 from __future__ import annotations
 
@@ -40,21 +53,37 @@ import re
 from collections import Counter, defaultdict
 from collections.abc import Iterable
 from pathlib import Path
+from statistics import NormalDist
 
 from ..gen import variants as V
+from ..vi import reencode as R
 from ..vi import unicode as U
 from ..vi.reencode import canonical_text
 from ..vi.syllable import Inventory, Syllable, spell, try_parse
 from .extract import extract_answer, t3_label
 
-ERROR_CLASSES = ("correct", "copy", "spelling", "illegal", "order", "wrong_variant", "component", "unparseable",
+ERROR_CLASSES = ("unparseable", "correct", "lenient_only", "copy", "reversal", "wrong_variant", "spelling",
+                 "homophone", "doublet", "illegal", "component", "plausible_nongold",
                  "wrong")   # "wrong": T3/XCOPA answers of the wrong label; attested phrases of != 2 syllables
 COMPONENTS = ("onset", "rime", "tone")
+# the documented minimum; score_output copies EVERY key of item["strata"] (c2_affected, same_onset,
+# variant_labels, ... included), this tuple is kept for readers of the format
 STRATA_KEYS = ("input_lexical", "output_lexical", "output_syllables_attested", "has_glide", "has_zero_onset",
-               "has_stop_coda", "spelling_triggers", "tone_pair", "same_tone", "same_rime", "input_freq",
-               "output_freq", "n_readings")
+               "has_stop_coda", "spelling_triggers", "tone_pair", "same_tone", "same_onset", "same_rime",
+               "variant_labels", "c2_affected", "input_freq", "output_freq", "n_readings")
+# DESIGN_DECISIONS 5.4 item 8: regional homophone spellings, canonical onsets (<= 12 entries).
+# NATIVE-CHECK: the list and its regional attribution (d/gi and r/d/gi: Northern; ch/tr, s/x: Northern;
+# quốc/cuốc: the /k/ + glide spelling).
+HOMOPHONE_ONSET_PAIRS = frozenset({frozenset({"d", "gi"}), frozenset({"ch", "tr"}), frozenset({"s", "x"}),
+                                   frozenset({"r", "d"}), frozenset({"r", "gi"})})
+HOMOPHONE_STRING_PAIRS = frozenset({frozenset({"quốc", "cuốc"})})
+# DESIGN_DECISIONS 5.4 item 9: ay/ây lexical doublets (<= 10 entries; high, NV). Scored wrong, binned.
+# NATIVE-CHECK: completeness of the list.
+DOUBLETS = frozenset({frozenset({"giày", "giầy"}), frozenset({"dày", "dầy"}), frozenset({"chày", "chầy"}),
+                      frozenset({"tày", "tầy"})})
 
-_VARIANT_TOKEN = re.compile(r"(?<![A-Za-z0-9])V([1-4])(?![0-9])")
+_VARIANT_TOKEN = re.compile(r"(?<![A-Za-z0-9])V([1-6])(?![0-9])")
+_KIND_TOKEN = re.compile(r"(?<![a-z])(?:kiểu|kieu|type|variant)\s*([1-6])(?![0-9])", re.IGNORECASE)
 
 
 def _syl(d: dict) -> Syllable:
@@ -68,10 +97,39 @@ def _inventory(inv: Inventory | None) -> Inventory:
     return L.load_inventory()
 
 
+def variant_class(v: str | None) -> str | None:
+    """The unordered class of a variant label (V1/V6, V2/V3, V4/V5)."""
+    return V.UNORDERED_CLASS.get(v) if v else None
+
+
+def _classes(labels: Iterable[str]) -> list[str]:
+    return sorted({V.UNORDERED_CLASS[v] for v in labels if v in V.UNORDERED_CLASS})
+
+
+def _swap(text: str) -> str:
+    words = text.split()
+    return " ".join(reversed(words)) if len(words) == 2 else text
+
+
 def parse_phrase(text: str) -> tuple[list[Syllable], list[bool]] | None:
     """Two syllables (non-strict) and, per syllable, whether the STRICT parse also succeeds.
     None when the text is not two parseable syllables."""
     return parse_words(text, 2)
+
+
+def parse_words(text: str, n: int) -> tuple[list[Syllable], list[bool]] | None:
+    """`n` syllables (non-strict) and, per syllable, whether the strict parse also succeeds."""
+    words = canonical_text(text).split()
+    if len(words) != n:
+        return None
+    syls, strict_ok = [], []
+    for w in words:
+        p = try_parse(w, strict=False)
+        if p is None:
+            return None
+        syls.append(p.syllable)
+        strict_ok.append(try_parse(w, strict=True) is not None and p.i_y_variant != "nonstandard")
+    return syls, strict_ok
 
 
 def _component_diff(ans: list[Syllable], gold: list[Syllable]) -> tuple[list[list[str]], dict[str, list[bool]]]:
@@ -92,29 +150,54 @@ def _component_diff(ans: list[Syllable], gold: list[Syllable]) -> tuple[list[lis
     return detail, correct
 
 
+def is_homophone_of(ans: list[Syllable], gold: list[Syllable]) -> bool:
+    """The answer differs from the gold only by a listed homophone spelling (in order)."""
+    if len(ans) != len(gold):
+        return False
+    any_diff = False
+    for x, g in zip(ans, gold):
+        if x == g:
+            continue
+        any_diff = True
+        same_rest = (x.glide, x.nucleus, x.coda, x.tone) == (g.glide, g.nucleus, g.coda, g.tone)
+        if same_rest and frozenset({x.onset, g.onset}) in HOMOPHONE_ONSET_PAIRS:
+            continue
+        if frozenset({spell(x), spell(g)}) in HOMOPHONE_STRING_PAIRS:
+            continue
+        return False
+    return any_diff
+
+
+def is_doublet_of(ans: list[Syllable], gold: list[Syllable]) -> bool:
+    """The answer differs from the gold only by a listed ay/ây doublet (in order)."""
+    if len(ans) != len(gold):
+        return False
+    any_diff = False
+    for x, g in zip(ans, gold):
+        if x == g:
+            continue
+        any_diff = True
+        if (x.onset, x.glide, x.coda, x.tone) != (g.onset, g.glide, g.coda, g.tone) or x.coda != "j":
+            return False
+        if {x.nucleus, g.nucleus} != {"ă", "â"} or frozenset({spell(x), spell(g)}) not in DOUBLETS:
+            return False
+    return any_diff
+
+
 def _base(item: dict, answer: str | None, method: str) -> dict:
     return {"item_id": item["item_id"], "task": item["task"], "variant": item["variant"], "answer": answer,
-            "extraction_method": method, "correct": False, "error_class": "unparseable",
+            "extraction_method": method, "correct": False, "correct_lenient": False, "error_class": "unparseable",
             "component_errors": [], "component_detail": None, "component_correct": None,
-            "identified_variants": [], "named_variant": None}
+            "identified_variants": [], "identified_classes": [], "wrong_variant_labels": [], "named_variant": None}
+
+
+def _item_labels(item: dict) -> set[str]:
+    labels = set(item.get("variant_labels") or [])
+    labels.add(item["variant"])
+    return labels
 
 
 # ------------------------------------------------------------------ T1
-def parse_words(text: str, n: int) -> tuple[list[Syllable], list[bool]] | None:
-    """`n` syllables (non-strict) and, per syllable, whether the strict parse also succeeds."""
-    words = canonical_text(text).split()
-    if len(words) != n:
-        return None
-    syls, strict_ok = [], []
-    for w in words:
-        p = try_parse(w, strict=False)
-        if p is None:
-            return None
-        syls.append(p.syllable)
-        strict_ok.append(try_parse(w, strict=True) is not None and p.i_y_variant != "nonstandard")
-    return syls, strict_ok
-
-
 def score_t1(item: dict, answer: str | None, method: str = "marker", inv: Inventory | None = None) -> dict:
     """T1 and attested items. `gold` may list several accepted forms (attested examples whose
     folk form bends the rule output); the answer is correct if it matches ANY of them, and the
@@ -134,7 +217,8 @@ def score_t1(item: dict, answer: str | None, method: str = "marker", inv: Invent
         gold_syls = [_syl(d) for d in item["gold_syllables"]]
     elif n == 2:
         gp = parse_words(ref, 2)
-        gold_syls = gp[0] if gp else list(V.apply(item["variant"], *inp))
+        gold_syls = gp[0] if gp else (list(V.apply(item["variant"], *inp)) if item["variant"] in V.ALL_VARIANTS
+                                      else None)
     else:
         gold_syls = None
     parsed = parse_words(answer, n)
@@ -142,11 +226,19 @@ def score_t1(item: dict, answer: str | None, method: str = "marker", inv: Invent
         # per-component view of every parseable answer (correct and copy included), so that
         # per-component accuracy is defined over all structural answers
         row["component_detail"], row["component_correct"] = _component_diff(parsed[0], gold_syls)
-    if ca in {canonical_text(g) for g in golds}:
-        row.update(correct=True, error_class="correct")
+    gold_canon = {canonical_text(g) for g in golds}
+    if ca in gold_canon:
+        row.update(correct=True, correct_lenient=True, error_class="correct")
         return row
-    if ca == canonical_text(item["input"]):
+    if n == 2 and _swap(ca) in gold_canon:
+        row.update(correct_lenient=True, error_class="lenient_only", component_errors=["order"])
+        return row
+    inp_canon = canonical_text(item["input"])
+    if ca == inp_canon:
         row["error_class"] = "copy"
+        return row
+    if n == 2 and ca == _swap(inp_canon):
+        row["error_class"] = "reversal"
         return row
     if parsed is None:
         return row
@@ -159,21 +251,32 @@ def score_t1(item: dict, answer: str | None, method: str = "marker", inv: Invent
     if spelling_bad:
         errs.append("spelling")
     row["component_errors"] = errs
+    ident = V.identify_any_order(inp[0], inp[1], syls[0], syls[1])
+    row["identified_variants"] = [v for v, _ in ident]
+    row["identified_classes"] = _classes(row["identified_variants"])
+    own = _item_labels(item)
+    if syls == gold_syls[::-1]:
+        # the gold structure in the other order but misspelled (exact spellings were lenient above)
+        row["error_class"] = "spelling"
+        row["component_errors"] = ["order", "spelling"]
+        return row
+    other = [(v, r) for v, r in ident if v not in own]
+    if other and syls != gold_syls:
+        row["error_class"] = "wrong_variant"
+        row["wrong_variant_labels"] = [v + ("r" if r else "") for v, r in other]
+        return row
     if syls == gold_syls:
         row["error_class"] = "spelling"          # right structure, wrong spelling
+        return row
+    if is_homophone_of(syls, gold_syls):
+        row["error_class"] = "homophone"
+        return row
+    if is_doublet_of(syls, gold_syls):
+        row["error_class"] = "doublet"
         return row
     inv = _inventory(inv)
     if not all(inv.is_legal(s, "onset_rime") for s in syls):
         row["error_class"] = "illegal"
-        return row
-    if syls == gold_syls[::-1]:
-        row["error_class"] = "order"
-        row["component_errors"] = ["order"] + (["spelling"] if spelling_bad else [])
-        return row
-    ident = V.identify_any_order(inp[0], inp[1], syls[0], syls[1])
-    row["identified_variants"] = [v for v, _ in ident]
-    if any(v != item["variant"] for v, _ in ident):
-        row["error_class"] = "wrong_variant"
         return row
     row["error_class"] = "component"
     return row
@@ -181,82 +284,110 @@ def score_t1(item: dict, answer: str | None, method: str = "marker", inv: Invent
 
 # ------------------------------------------------------------------ T2
 def named_variant(raw: str | None, templates: dict | None = None) -> str | None:
-    """A variant the model names in its completion: 'V3', or a variant name from the templates."""
+    """The variant the model names LAST in its completion (by position): a 'V3' / 'kiểu 3'
+    token or a variant name from the prompt templates (V1..V6; 'thanh điệu' and 'thanh' are
+    folded together so that both phrasings match)."""
     if not raw:
         return None
-    m = _VARIANT_TOKEN.findall(raw)
-    if m:
-        return f"V{m[-1]}"
-    low = U.nfc(raw).lower()
-    if templates is None:
-        from .prompts import load_templates
-        templates = load_templates()
-    hits = []
-    for v in V.VARIANTS:
-        spec = templates["variants"][v]
-        for name in (spec["name_vi"], spec["name_en"]):
-            k = low.rfind(name.lower())
+    from .prompts import variant_names
+
+    text = U.nfc(raw)
+    low = _fold_names(text)
+    hits: list[tuple[int, str]] = []
+    for m in _VARIANT_TOKEN.finditer(text):
+        hits.append((m.start(), f"V{m.group(1)}"))
+    for m in _KIND_TOKEN.finditer(text):
+        hits.append((m.start(), f"V{m.group(1)}"))
+    for v, names in variant_names(templates).items():
+        for name in names:
+            fn = _fold_names(name)
+            k = low.rfind(fn)
             if k >= 0:
                 hits.append((k, v))
     return max(hits)[1] if hits else None
+
+
+def _fold_names(text: str) -> str:
+    t = U.nfc(text).lower()
+    t = t.replace("thanh điệu", "thanh")
+    return re.sub(r"\s+", " ", t)
 
 
 def score_t2(item: dict, answer: str | None, method: str = "marker", raw: str | None = None,
              inv: Inventory | None = None) -> dict:
     row = _base(item, answer, method)
     golds = {canonical_text(g["output"]): g for g in item["gold"]}
+    golds_rev = {_swap(canonical_text(g["output"])): g for g in item["gold"]}
     row["gold"] = [g["output"] for g in item["gold"]]
     row["gold_variants"] = sorted({g["variant"] for g in item["gold"]})
+    gold_labels = set()
+    for g in item["gold"]:
+        gold_labels.add(g["variant"])
+        gold_labels.update(lbl.rstrip("r") for lbl in (g.get("variant_labels") or []))
+    row["gold_classes"] = _classes(gold_labels)
+    row["gold_order"] = None
     row["named_variant"] = named_variant(raw)
-    row["named_variant_correct"] = None
+    row["named_class"] = variant_class(row["named_variant"])
+    row["named_variant_correct"] = None if row["named_class"] is None else (row["named_class"] in row["gold_classes"])
     if answer is None:
         return row
     ca = canonical_text(answer)
     inp = [_syl(d) for d in item["input_syllables"]]
     parsed = parse_phrase(answer)
-    if ca in golds:
-        g = golds[ca]
-        row.update(correct=True, error_class="correct", identified_variants=[g["variant"]])
-        if row["named_variant"] is not None:
-            row["named_variant_correct"] = row["named_variant"] == g["variant"]
+    if parsed is not None:
+        ident = V.identify_any_order(inp[0], inp[1], parsed[0][0], parsed[0][1])
+        row["identified_variants"] = [v for v, _ in ident]
+        row["identified_classes"] = _classes(row["identified_variants"])
+    g = golds.get(ca) or golds_rev.get(ca)
+    if g is not None:
+        row.update(correct=True, correct_lenient=True, error_class="correct",
+                   gold_order="attested" if ca in golds else "reversed")
         gp = parse_phrase(g["output"])
         if parsed is not None and gp is not None:
-            row["component_detail"], row["component_correct"] = _component_diff(parsed[0], gp[0])
+            ref = gp[0] if ca in golds else gp[0][::-1]
+            row["component_detail"], row["component_correct"] = _component_diff(parsed[0], ref)
         return row
-    if ca == canonical_text(item["input"]):
+    inp_canon = canonical_text(item["input"])
+    if ca == inp_canon:
         row["error_class"] = "copy"
+        return row
+    if ca == _swap(inp_canon):
+        row["error_class"] = "reversal"
         return row
     if parsed is None:
         return row
     syls, strict_ok = parsed
     spelling_bad = not all(strict_ok)
-    ident = V.identify_any_order(inp[0], inp[1], syls[0], syls[1])
-    row["identified_variants"] = [v for v, _ in ident]
-    if row["named_variant"] is not None:
-        row["named_variant_correct"] = row["named_variant"] in row["gold_variants"]
-    # right structure of some gold reading but misspelled
+    gold_structs = []
     for g in item["gold"]:
         gp = parse_phrase(g["output"])
-        if gp and gp[0] == syls:
-            row["error_class"] = "spelling"
-            row["component_errors"] = ["spelling"]
-            return row
+        if gp:
+            gold_structs.append(gp[0])
+            gold_structs.append(gp[0][::-1])
+    # right structure of some gold reading (either order) but misspelled
+    if any(gs == syls for gs in gold_structs):
+        row["error_class"] = "spelling"
+        row["component_errors"] = ["spelling"]
+        return row
     if spelling_bad:
         row["component_errors"] = ["spelling"]
+    if any(is_homophone_of(syls, gs) for gs in gold_structs):
+        row["error_class"] = "homophone"
+        return row
+    if any(is_doublet_of(syls, gs) for gs in gold_structs):
+        row["error_class"] = "doublet"
+        return row
     inv = _inventory(inv)
     if not all(inv.is_legal(s, "onset_rime") for s in syls):
         row["error_class"] = "illegal"
         return row
-    if ident:
-        row["error_class"] = "wrong_variant"      # a legal nói lái of the input, not a lexical reading
+    if row["identified_variants"]:
+        row["error_class"] = "plausible_nongold"   # a legal nói lái reading of the input, not in the gold set
         return row
     # closest gold reading for the component diff
     best = None
-    for g in item["gold"]:
-        gp = parse_phrase(g["output"])
-        if not gp:
-            continue
-        detail, correct = _component_diff(syls, gp[0])
+    for gs in gold_structs:
+        detail, correct = _component_diff(syls, gs)
         n = sum(len(w) for w in detail)
         if best is None or n < best[0]:
             best = (n, detail, correct)
@@ -278,16 +409,19 @@ def score_t3(item: dict, answer: str | None, method: str = "marker", logprobs: d
         row["error_class"] = "unparseable"
     else:
         row["correct"] = pred == item["gold"]
+        row["correct_lenient"] = row["correct"]
         row["error_class"] = "correct" if row["correct"] else "wrong"
     row["forced_choice_pred"] = None
     row["forced_choice_correct"] = None
     row["candidate_logprob"] = None
+    row["prefix_property_violation"] = None
     if logprobs:
         lp_yes, lp_no = logprobs.get("Có"), logprobs.get("Không")
         if lp_yes is not None and lp_no is not None:
             row["forced_choice_pred"] = "yes" if lp_yes > lp_no else "no"
             row["forced_choice_correct"] = row["forced_choice_pred"] == item["gold"]
         row["candidate_logprob"] = logprobs.get("candidate")
+        row["prefix_property_violation"] = logprobs.get("prefix_property_violation")
     row["twin_type"] = item.get("twin_type")
     row["pair_item_id"] = item.get("pair_item_id")
     return row
@@ -296,7 +430,8 @@ def score_t3(item: dict, answer: str | None, method: str = "marker", logprobs: d
 def paired_t3(rows: list[dict]) -> list[dict]:
     """Add `paired_correct` (BLiMP-style: the correct candidate's string log-probability beats
     the twin's, same context, same arm and prompt) and `pair_both_correct` (both generated
-    answers right) to every T3 row that has a partner in the same run."""
+    answers right) to every T3 row that has a partner in the same run. A pair with a
+    prefix-property violation or a missing candidate log-probability gets None."""
     by_key = {}
     for r in rows:
         if r["task"] == "T3":
@@ -311,7 +446,8 @@ def paired_t3(rows: list[dict]) -> list[dict]:
             continue
         r["pair_both_correct"] = bool(r["correct"] and mate["correct"])
         yes, no = (r, mate) if r["gold"] == "yes" else (mate, r)
-        if yes.get("candidate_logprob") is not None and no.get("candidate_logprob") is not None:
+        if (yes.get("candidate_logprob") is not None and no.get("candidate_logprob") is not None
+                and not yes.get("prefix_property_violation") and not no.get("prefix_property_violation")):
             r["paired_correct"] = yes["candidate_logprob"] > no["candidate_logprob"]
     return rows
 
@@ -327,6 +463,7 @@ def score_xcopa(item: dict, answer: str | None, method: str = "marker", logprobs
         row["error_class"] = "unparseable"
     else:
         row["correct"] = pred == gold
+        row["correct_lenient"] = row["correct"]
         row["error_class"] = "correct" if row["correct"] else "wrong"
     row["logprob_pred"] = None
     row["logprob_correct"] = None
@@ -337,6 +474,14 @@ def score_xcopa(item: dict, answer: str | None, method: str = "marker", logprobs
 
 
 # ------------------------------------------------------------------ dispatch
+_COPIED_OUTPUT_KEYS = ("arm", "arm_scope", "prompt_id", "prompt_hash", "templated_prompt_hash", "n_prompt_tokens",
+                       "n_output_tokens", "n_prompt_tokens_base", "delta_prompt_tokens", "latency_s", "finish_reason",
+                       "truncated", "n_thinking_chars", "thinking_unclosed", "n_placement_changes",
+                       "demo_syllable_overlap", "hedged")
+_COPIED_ITEM_KEYS = ("base_pair_id", "source", "split", "in_core", "twin_type", "pair_item_id", "variant_labels",
+                     "gold_validated", "vulgar", "exactness", "exact", "eligible_h6", "n_syllables")
+
+
 def score_output(item: dict, out: dict, inv: Inventory | None = None) -> dict:
     """Score one outputs.jsonl row against its item. Re-extracts the answer from `raw` when
     the row has no `answer` key (older runs)."""
@@ -355,23 +500,21 @@ def score_output(item: dict, out: dict, inv: Inventory | None = None) -> dict:
         row = score_xcopa(item, answer, method, out.get("logprobs"))
     else:
         raise ValueError(f"unknown task {task!r}")
-    for k in ("arm", "prompt_id", "prompt_hash", "n_prompt_tokens", "n_output_tokens", "latency_s"):
+    for k in _COPIED_OUTPUT_KEYS:
         row[k] = out.get(k)
     row["raw_len"] = len(out.get("raw") or "")
-    for k in ("base_pair_id", "source", "split", "in_core", "twin_type", "pair_item_id"):
+    for k in _COPIED_ITEM_KEYS:
         if k in item:
             row[k] = item[k]
-    strata = item.get("strata") or {}
-    for k in STRATA_KEYS:
-        if k in strata:
-            row[k] = strata[k]
+    for k, v in (item.get("strata") or {}).items():
+        row[k] = v
     row["n_input_tokens_syll"] = None
     return row
 
 
 def score_outputs(items: Iterable[dict], outputs: Iterable[dict], inv: Inventory | None = None,
                   audit_rows: dict | None = None) -> list[dict]:
-    by_id = {it["item_id"]: it for it in items}
+    by_id = {it["item_id"]: it for it in items if "item_id" in it}      # a header record has no item_id
     rows = []
     for out in outputs:
         it = by_id.get(out["item_id"])
@@ -394,11 +537,45 @@ def load_audit_rows(path: Path) -> dict[tuple[str, str], int]:
     return out
 
 
+def _spellings(word: str, arm: str) -> list[str]:
+    """Lookup keys for a syllable: as written under the arm's placement, then the canonical
+    new-style and old-style spellings (the audit stores one convention)."""
+    w = U.nfc(word).lower()
+    keys = []
+    if arm in ("placement_old", "placement_new"):
+        keys.append(R.convert_placement(w, "old" if arm == "placement_old" else "new"))
+    keys.append(w)
+    p = try_parse(w, strict=False)
+    if p is not None:
+        keys.append(spell(p.syllable, style="new"))
+        keys.append(spell(p.syllable, style="old"))
+    seen, out = set(), []
+    for k in keys:
+        if k not in seen:
+            seen.add(k)
+            out.append(k)
+    return out
+
+
 def input_token_counts(item: dict, arm: str, audit_rows: dict) -> list[int | None] | None:
-    enc = "nfd" if arm == "nfd" else "nfc"
-    if arm not in ("nfc", "nfd"):
-        return None   # placement/strip arms change the spelling; the audit has no row for them
-    return [audit_rows.get((U.nfc(w), enc)) for w in item["input"].split()]
+    """Tokens per input syllable under the arm's encoding, from the audit rows. Placement
+    arms are looked up by their spelling and fall back to the canonical spellings; strip arms
+    have no audit rows and return None."""
+    from .prompts import normalize_arm
+
+    arm = normalize_arm(arm)
+    if arm in ("strip_tones", "strip_all"):
+        return None
+    enc = {"nfd": "nfd", "win1258": "win1258"}.get(arm, "nfc")
+    out: list[int | None] = []
+    for w in item["input"].split():
+        val = None
+        for k in _spellings(w, arm):
+            if (k, enc) in audit_rows:
+                val = audit_rows[(k, enc)]
+                break
+        out.append(val)
+    return out
 
 
 # ------------------------------------------------------------------ aggregation
@@ -407,15 +584,48 @@ def _rate(rows: list[dict], key: str) -> float | None:
     return (sum(1 for v in vals if v) / len(vals)) if vals else None
 
 
+def balanced_stats(rows: list[dict], pred_key: str = "pred") -> dict:
+    """Balanced accuracy, d' and yes-rate of a yes/no cell. Unparseable rows count as wrong
+    (5.6): a missing prediction is scored as the wrong label. d' uses the log-linear
+    correction (0.5 added to every count) so that 0% / 100% cells stay finite."""
+    yes_rows = [r for r in rows if r.get("gold") == "yes"]
+    no_rows = [r for r in rows if r.get("gold") == "no"]
+    if not yes_rows or not no_rows:
+        return {"balanced_accuracy": None, "d_prime": None, "yes_rate": _rate(rows, "_pred_yes") if rows else None}
+    hits = sum(1 for r in yes_rows if r.get(pred_key) == "yes")
+    fas = sum(1 for r in no_rows if r.get(pred_key) == "yes")
+    tpr, tnr = hits / len(yes_rows), 1 - fas / len(no_rows)
+    z = NormalDist().inv_cdf
+    h = (hits + 0.5) / (len(yes_rows) + 1)
+    f = (fas + 0.5) / (len(no_rows) + 1)
+    n_pred = sum(1 for r in rows if r.get(pred_key) is not None)
+    return {"balanced_accuracy": (tpr + tnr) / 2, "d_prime": z(h) - z(f),
+            "yes_rate": (sum(1 for r in rows if r.get(pred_key) == "yes") / n_pred) if n_pred else None,
+            "tpr": tpr, "tnr": tnr}
+
+
+def _spelling_pair_ids(rows: list[dict]) -> set[str]:
+    ids = set()
+    for r in rows:
+        if r.get("task") == "T3" and r.get("twin_type") == "spelling":
+            ids.add(r["item_id"])
+            if r.get("pair_item_id"):
+                ids.add(r["pair_item_id"])
+    return ids
+
+
 def aggregate(rows: list[dict]) -> dict:
-    """Per-run summary: accuracy per task x variant, per arm, per prompt; error-class
-    distribution; copy and unparseable rates; T3 forced-choice and paired accuracy; XCOPA
+    """Per-run summary: accuracy (strict and lenient) per task x variant, per arm, per prompt;
+    error-class distribution; copy and unparseable rates; T3 balanced accuracy / d',
+    forced-choice and paired accuracy, and the spelling-twin-excluded headline; XCOPA
     accuracy by arm."""
     def cell(sub: list[dict]) -> dict:
         d = {"n": len(sub), "accuracy": _rate(sub, "correct"),
              "error_classes": dict(Counter(r["error_class"] for r in sub)),
              "copy_rate": sum(1 for r in sub if r["error_class"] == "copy") / len(sub) if sub else None,
              "unparseable_rate": sum(1 for r in sub if r["error_class"] == "unparseable") / len(sub) if sub else None}
+        if any(r["task"] in ("T1", "attested", "T2") for r in sub):
+            d["accuracy_lenient"] = _rate(sub, "correct_lenient")
         comp = Counter(c for r in sub for c in (r.get("component_errors") or []))
         d["component_errors"] = dict(comp)
         cc = defaultdict(list)
@@ -424,15 +634,24 @@ def aggregate(rows: list[dict]) -> dict:
                 cc[c].extend(vals)
         d["component_accuracy"] = {c: sum(v) / len(v) for c, v in cc.items() if v}
         if any(r["task"] == "T3" for r in sub):
+            t3 = [r for r in sub if r["task"] == "T3"]
+            d.update(balanced_stats(t3, "pred"))
             d["forced_choice_accuracy"] = _rate(sub, "forced_choice_correct")
+            fc = [r for r in t3 if r.get("forced_choice_pred") is not None]
+            if fc:
+                d["forced_choice_balanced_accuracy"] = balanced_stats(fc, "forced_choice_pred")["balanced_accuracy"]
             d["paired_accuracy"] = _rate(sub, "paired_correct")
             d["pair_both_correct_rate"] = _rate(sub, "pair_both_correct")
+        if any(r["task"] == "T2" for r in sub):
+            d["named_variant_class_accuracy"] = _rate(sub, "named_variant_correct")
+            d["gold_order_reversed_rate"] = (sum(1 for r in sub if r.get("gold_order") == "reversed") / len(sub)
+                                             if sub else None)
         if any(r["task"] == "XCOPA" for r in sub):
             d["logprob_accuracy"] = _rate(sub, "logprob_correct")
         return d
 
     groups: dict[str, dict] = {"by_task": {}, "by_task_variant": {}, "by_task_arm": {}, "by_task_prompt": {},
-                               "by_task_twin_type": {}}
+                               "by_task_twin_type": {}, "t3_headline": {}}
     for task in sorted({r["task"] for r in rows}):
         sub = [r for r in rows if r["task"] == task]
         groups["by_task"][task] = cell(sub)
@@ -445,6 +664,13 @@ def aggregate(rows: list[dict]) -> dict:
         if task == "T3":
             for tt in sorted({str(r.get("twin_type")) for r in sub}):
                 groups["by_task_twin_type"][f"{task}-{tt}"] = cell([r for r in sub if str(r.get("twin_type")) == tt])
+            spelling_ids = _spelling_pair_ids(sub)
+            excl = [r for r in sub if r["item_id"] not in spelling_ids]
+            only = [r for r in sub if r["item_id"] in spelling_ids]
+            groups["t3_headline"]["excl_spelling"] = cell(excl)
+            groups["t3_headline"]["spelling_pairs"] = cell(only)
+            for v in sorted({r["variant"] for r in excl}):
+                groups["t3_headline"][f"excl_spelling-{v}"] = cell([r for r in excl if r["variant"] == v])
     groups["n_rows"] = len(rows)
     groups["overall"] = cell(rows) if rows else {"n": 0}
     return groups
@@ -452,21 +678,24 @@ def aggregate(rows: list[dict]) -> dict:
 
 def summary_table(agg: dict) -> str:
     """A plain-text table of accuracy per task x variant (and per arm)."""
-    lines = [f"{'cell':<22}{'n':>6}{'acc':>8}{'copy':>7}{'unpars':>8}  error classes"]
-    for key in ("by_task_variant", "by_task_arm"):
+    lines = [f"{'cell':<22}{'n':>6}{'acc':>8}{'lenient':>9}{'copy':>7}{'unpars':>8}  error classes"]
+    for key in ("by_task_variant", "by_task_arm", "t3_headline"):
         for name, c in agg.get(key, {}).items():
             acc = f"{c['accuracy']:.3f}" if c["accuracy"] is not None else "-"
+            len_ = f"{c['accuracy_lenient']:.3f}" if c.get("accuracy_lenient") is not None else "-"
             copy = f"{c['copy_rate']:.2f}" if c["copy_rate"] is not None else "-"
             unp = f"{c['unparseable_rate']:.2f}" if c["unparseable_rate"] is not None else "-"
             extra = ""
-            if "forced_choice_accuracy" in c and c["forced_choice_accuracy"] is not None:
+            if c.get("balanced_accuracy") is not None:
+                extra += f" bal={c['balanced_accuracy']:.3f} d'={c['d_prime']:.2f}"
+            if c.get("forced_choice_accuracy") is not None:
                 extra += f" fc={c['forced_choice_accuracy']:.3f}"
-            if "paired_accuracy" in c and c["paired_accuracy"] is not None:
+            if c.get("paired_accuracy") is not None:
                 extra += f" paired={c['paired_accuracy']:.3f}"
-            if "logprob_accuracy" in c and c["logprob_accuracy"] is not None:
+            if c.get("logprob_accuracy") is not None:
                 extra += f" lp={c['logprob_accuracy']:.3f}"
             ec = " ".join(f"{k}={v}" for k, v in sorted(c["error_classes"].items()))
-            lines.append(f"{name:<22}{c['n']:>6}{acc:>8}{copy:>7}{unp:>8}  {ec}{extra}")
+            lines.append(f"{name:<22}{c['n']:>6}{acc:>8}{len_:>9}{copy:>7}{unp:>8}  {ec}{extra}")
         lines.append("")
     return "\n".join(lines).rstrip()
 
@@ -481,7 +710,7 @@ def write_scores(rows: list[dict], path: Path) -> None:
 
 def read_jsonl(path: Path) -> list[dict]:
     with open(path, encoding="utf-8") as f:
-        return [json.loads(ln) for ln in f if ln.strip()]
+        return [json.loads(ln) for ln in f if ln.strip() and "_header" not in json.loads(ln)]
 
 
 def spell_pair(syls: Iterable[Syllable]) -> str:

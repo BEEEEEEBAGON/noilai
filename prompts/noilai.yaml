@@ -14,8 +14,26 @@
 # cuối), the spelling-rule sentence, and the wording of the three paraphrases.
 #
 # Examples inside the instruction text use only syllables listed under
-# `example_syllables`; together with the demonstration pairs in demos.yaml they must not
-# occur in the item file (checked by noilai.eval.prompts.demo_overlap).
+# `example_syllables`; together with the demonstration pairs in demos.yaml they should not
+# occur in the item file. noilai.eval.prompts.demo_overlap reports every shared syllable
+# (recorded in the run manifest and flagged per row); demo_phrase_overlap reports an item
+# whose input/gold/candidate EQUALS a demonstration phrase in either order (DESIGN_DECISIONS
+# 7.4), which the runner refuses.
+#
+# [NATIVE-CHECK] Open points for the validator / author (see docs/DESIGN_DECISIONS.md):
+#   1. `concepts.*.spelling` ends with a placement clause. It used to read "dấu thanh đặt
+#      trên âm chính" (the NEW-style convention) while the release text and the C2 baseline
+#      are OLD style (hòa; DD 6.3, 12.5). It now says only that the mark must be placed
+#      correctly ("đặt đúng vị trí"), without naming a convention; confirm the wording, or
+#      decide to state the baseline convention explicitly.
+#   2. `four_kinds_intro` says four common kinds (the four generated T1 cells, DD 3.3) while
+#      DD 3.1 documents six and attested V5/V6 rows exist. `six_kinds_intro` is provided for
+#      the alternative; switching the T2 prompt to it is the author's decision (it changes
+#      the pre-registered prompt text). V5/V6 blocks below are used only to render attested
+#      items filed under those labels; they are never T1 cells.
+#   3. `input_formats.components` renders "quốc" as phụ âm đầu "q" + vần "uôc" (the school
+#      analysis: âm đệm u belongs to the rime). qu- inputs are excluded from generated items
+#      (DD 3.7), so this affects attested/demo material only; confirm the analysis.
 
 version: 1
 answer_marker: "Đáp án:"
@@ -36,8 +54,9 @@ concepts:
       Khi ghép lại, hãy viết đúng chính tả tiếng Việt: âm /k/ viết là "k" trước e, ê, i, viết
       là "q" trước âm đệm u và viết là "c" trong các trường hợp còn lại (ví dụ "c" ghép với
       vần "eo" phải viết là "keo", không viết "ceo"); tương tự, "gh" và "ngh" đứng trước e, ê,
-      i (ví dụ "nghe", không viết "nge"); dấu thanh đặt trên âm chính.
+      i (ví dụ "nghe", không viết "nge"); dấu thanh đặt đúng vị trí.
     four_kinds_intro: "Có bốn kiểu nói lái thường gặp:"
+    six_kinds_intro: "Có sáu kiểu nói lái, trong đó bốn kiểu thường gặp là:"   # [NATIVE-CHECK] alternative, unused by default
   en:
     definition: >-
       Nói lái is a Vietnamese word game: the two syllables of a phrase exchange some of their
@@ -51,8 +70,9 @@ concepts:
       When reassembling, follow Vietnamese spelling: the sound /k/ is written "k" before e, ê,
       i, "q" before the glide u and "c" otherwise (so "c" + rime "eo" is written "keo", not
       "ceo"); likewise "gh" and "ngh" appear before e, ê, i ("nghe", not "nge"); the tone mark
-      sits on the main vowel.
+      must be placed correctly.
     four_kinds_intro: "There are four common kinds of nói lái:"
+    six_kinds_intro: "There are six kinds of nói lái; the four common ones are:"   # alternative, unused by default
 
 variants:
   V1:
@@ -106,6 +126,36 @@ variants:
       - "Split each syllable into onset, rime and tone."
       - "Exchange both the rime and the tone of the first syllable with those of the second."
       - "Keep each syllable's onset where it was."
+      - "Reassemble the two syllables with correct spelling."
+  # V5 and V6 (DESIGN_DECISIONS 3.1, 3.3): documented members of the six-type tradition, used to
+  # render attested items filed under those labels (V5 = V4 read in the other order, V6 = V1
+  # read in the other order). They are not T1 cells and are not listed in the T2 overview.
+  # [NATIVE-CHECK] names and steps.
+  V5:
+    name_vi: "đổi phụ âm đầu, giữ vần và thanh điệu"
+    name_en: "swap the onsets; keep the rimes and tones in place"
+    steps_vi:
+      - "Tách mỗi âm tiết thành phụ âm đầu, vần và thanh điệu."
+      - "Đổi phụ âm đầu của âm tiết thứ nhất cho phụ âm đầu của âm tiết thứ hai."
+      - "Giữ nguyên vần và thanh điệu của mỗi âm tiết ở vị trí cũ."
+      - "Ghép lại thành hai âm tiết và viết đúng chính tả."
+    steps_en:
+      - "Split each syllable into onset, rime and tone."
+      - "Exchange the onset of the first syllable with the onset of the second."
+      - "Keep each syllable's rime and tone where they were."
+      - "Reassemble the two syllables with correct spelling."
+  V6:
+    name_vi: "đổi phụ âm đầu và thanh điệu, giữ vần"
+    name_en: "swap the onsets and tones; keep the rimes in place"
+    steps_vi:
+      - "Tách mỗi âm tiết thành phụ âm đầu, vần và thanh điệu."
+      - "Đổi cả phụ âm đầu và thanh điệu của âm tiết thứ nhất cho phụ âm đầu và thanh điệu của âm tiết thứ hai."
+      - "Giữ nguyên vần của mỗi âm tiết ở vị trí cũ."
+      - "Ghép lại thành hai âm tiết và viết đúng chính tả."
+    steps_en:
+      - "Split each syllable into onset, rime and tone."
+      - "Exchange both the onset and the tone of the first syllable with those of the second."
+      - "Keep each syllable's rime where it was."
       - "Reassemble the two syllables with correct spelling."
 
 # The answer-line requirement. Every template ends with it.

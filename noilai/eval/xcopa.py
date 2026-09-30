@@ -4,9 +4,10 @@ Items come from data/external/xcopa_{test,val}_vi.jsonl (premise, choice1, choic
 in {cause, effect}, label in {0, 1}). `load_xcopa` turns them into harness items with
 task "XCOPA", `render_xcopa` renders the Vietnamese COPA framing (answer "1" or "2" on the
 "Đáp án:" line) and `completion_pair` gives the context and the two candidate continuations
-for log-probability scoring on open models. Meaning-preserving arms re-encode the whole
-message; strip arms re-encode the premise and the two alternatives (the item text) only,
-as in noilai.eval.prompts.
+for log-probability scoring on open models. Under `arm_scope="whole_prompt"` (the default)
+a meaning-preserving arm re-encodes the whole message; under `"item"` it re-encodes the
+premise and the two alternatives (the item text) only; strip arms are item-only under both
+scopes, as in noilai.eval.prompts.
 """
 from __future__ import annotations
 
@@ -18,7 +19,7 @@ import yaml
 
 from ..vi import reencode as R
 from ..vi import unicode as U
-from .prompts import STRIP_ARMS, XCOPA_FILE, _fill, _tidy
+from .prompts import DEFAULT_ARM_SCOPE, STRIP_ARMS, XCOPA_FILE, _fill, _tidy, check_arm_scope, normalize_arm
 
 XCOPA_TASK = "XCOPA"
 XCOPA_PARAPHRASES = ("p0", "p1", "p2")
@@ -60,11 +61,11 @@ def load_xcopa(path: Path, split: str | None = None) -> list[dict]:
 
 
 def render_xcopa(item: dict, paraphrase: str = "p0", arm: str = "nfc", templates: dict | None = None,
-                 system: str | None = None) -> list[dict]:
+                 system: str | None = None, arm_scope: str = DEFAULT_ARM_SCOPE) -> list[dict]:
     templates = templates or load_xcopa_templates()
-    if arm not in R.ARMS:
-        raise ValueError(f"unknown arm {arm!r}")
-    strip = arm in STRIP_ARMS
+    arm = normalize_arm(arm)
+    check_arm_scope(arm_scope)
+    strip = arm in STRIP_ARMS or arm_scope == "item"
     premise, c1, c2 = item["premise"], item["choice1"], item["choice2"]
     if strip:
         premise, c1, c2 = (R.reencode(x, arm) for x in (premise, c1, c2))
@@ -91,6 +92,7 @@ def completion_pair(item: dict, arm: str = "nfc", templates: dict | None = None)
     lower-cased. Continuations start with a space. The arm is applied to context and
     continuations alike (strip arms included: the whole completion is item text)."""
     templates = templates or load_xcopa_templates()
+    arm = normalize_arm(arm)
     premise = item["premise"].rstrip(" .")
     context = _fill(templates["completion_vi"][item["question"]], {"premise_no_period": premise})
     conts = [" " + _lower_first(item["choice1"]), " " + _lower_first(item["choice2"])]

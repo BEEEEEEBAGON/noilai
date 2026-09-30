@@ -5,31 +5,41 @@ chat messages (`[{"role": "user", "content": ...}]`; a system message only when 
 config asks for one). Everything the model sees is in the user message, so that chat
 templates without a system role (Gemma) get the same text as the others.
 
-Re-encoding arms
-----------------
-The meaning-preserving arms (nfc, nfd, win1258, placement_old, placement_new) are applied
-to the ENTIRE user message: instruction, demonstrations and item. Reasons: (1) the
-intervention is then uniform, so that the token-level change is the only difference between
-arms and the item does not stand out as the one oddly encoded span in an otherwise normal
-message, which would itself be a cue; (2) the demonstration answers are re-encoded with the
-rest, so the model is shown answers in the encoding it is reading; (3) these arms preserve
-the text's meaning, so the instruction stays intelligible.
-The strip arms (strip_tones, strip_all) are applied to the ITEM TEXT only (the item's input
-and candidate, and the inputs/candidates of the demonstrations, never the demonstration
-answers or the instruction). They destroy information; stripping the instruction would
-confound "the model cannot recover the syllable structure of a stripped item" with "the
-model cannot read a stripped instruction", and the answer-line marker must survive intact
-for extraction. Demonstration answers keep their diacritics because the model is still asked
-to produce fully spelled Vietnamese.
+Re-encoding arms and `arm_scope` (DESIGN_DECISIONS 6.1, item 48)
+----------------------------------------------------------------
+`arm_scope` is an explicit run option with two values:
+  * `whole_prompt` (PRIMARY, the default): the meaning-preserving arms (nfc, nfd, win1258/pc,
+    placement_old, placement_new) are applied to the ENTIRE user message: instruction,
+    demonstrations, demonstration answers, item and answer marker. Reasons: (1) the
+    intervention is uniform, so that the token-level change is the only difference between
+    arms and the item does not stand out as the one oddly encoded span in an otherwise normal
+    message, which would itself be a cue; (2) the model is shown demonstration answers in the
+    encoding it is reading and must produce; (3) these arms preserve meaning, so the
+    instruction stays intelligible.
+  * `item` (secondary; the 500-item two-scope agreement check): the arm is applied to the
+    item text only -- the item's input and candidate and the demonstrations' inputs,
+    candidates and answers -- never to the instruction text or the answer marker, which stay
+    NFC. `prompt_id` carries an `-item` suffix under this scope so that rows of the two
+    scopes never share a key.
+The strip arms (strip_tones, strip_all) are item-only under BOTH scopes and never touch the
+demonstration answers: they destroy information; stripping the instruction would confound
+"the model cannot recover the syllable structure of a stripped item" with "the model cannot
+read a stripped instruction", the answer-line marker must survive intact for extraction, and
+the model is still asked to produce fully spelled Vietnamese.
+Arm names: `base` is an alias of `nfc` and `pc` of `win1258` (`normalize_arm`); rows carry
+the canonical noilai.vi.reencode name.
 
 Demonstrations
 --------------
 Three fixed base pairs (prompts/demos.yaml) are expanded by the rule engine into three
 demonstrations per task x variant. T2 demonstrations are the same for every item (one
 pair per variant listed in `t2_variants`), because the T2 prompt withholds the variant and
-per-variant demonstrations would reveal it. `demo_overlap` reports every syllable of the
-demonstrations (and of the examples inside the instruction text) that occurs in an item
-file; the runner refuses such a file unless told otherwise.
+per-variant demonstrations would reveal it. Two overlap checks exist: `demo_phrase_overlap`
+finds items whose input / gold / candidate / reading EQUALS a demonstration phrase in either
+order (the DESIGN_DECISIONS 7.4 exclusion rule; the runner refuses such a file), and
+`demo_overlap` reports every syllable of the demonstrations (and of the examples inside the
+instruction text) that occurs in an item file (recorded in the manifest and flagged per row,
+or dropped, per `RunOptions.demo_overlap_policy`).
 """
 from __future__ import annotations
 
@@ -61,7 +71,25 @@ LANGUAGES = ("vi", "en")
 INSTRUCTIONS = ("explained", "name_only")
 INPUT_FORMATS = ("raw", "components", "spaced")
 STRIP_ARMS = ("strip_tones", "strip_all")
+ARM_ALIASES = {"base": "nfc", "pc": "win1258"}          # docs/DATA_FORMAT.md names -> noilai.vi.reencode names
+BASE_ARM = "nfc"
+ARM_SCOPES = ("whole_prompt", "item")
+DEFAULT_ARM_SCOPE = "whole_prompt"                       # DESIGN_DECISIONS 6.1: whole_prompt is primary
 MAX_SHOTS = 3
+
+
+def normalize_arm(arm: str) -> str:
+    """Canonical arm name (aliases resolved); raises on an unknown arm."""
+    a = ARM_ALIASES.get(arm, arm)
+    if a not in R.ARMS:
+        raise ValueError(f"unknown arm {arm!r}; choose from {R.ARMS} or the aliases {sorted(ARM_ALIASES)}")
+    return a
+
+
+def check_arm_scope(arm_scope: str) -> str:
+    if arm_scope not in ARM_SCOPES:
+        raise ValueError(f"unknown arm_scope {arm_scope!r}; choose from {ARM_SCOPES}")
+    return arm_scope
 
 _PLACEHOLDER = re.compile(r"\{([a-z_0-9]+)\}")
 
@@ -216,7 +244,7 @@ def demo_syllables(demos: dict, templates: dict | None = None) -> set[str]:
 
 
 def item_texts(item: dict) -> list[str]:
-    """Every Vietnamese phrase an item carries (input, gold outputs, candidates)."""
+    """Every Vietnamese phrase an item carries (input, gold outputs, readings, candidates)."""
     texts = [item["input"]]
     task = item.get("task")
     if task == "T1":
@@ -227,7 +255,45 @@ def item_texts(item: dict) -> list[str]:
         texts.extend(x for x in (item.get("candidate"), item.get("correct_output")) if x)
     elif task == "attested":
         texts.extend(item.get("gold", []))
-    return texts
+        texts.extend(x for x in (item.get("attested_output"), item.get("rule_output")) if x)
+    return [t for t in texts if isinstance(t, str) and t]
+
+
+def _phrase_key(text: str) -> frozenset | None:
+    """Unordered canonical key of a two-syllable phrase (nói lái is an involution, so a
+    demonstration collides in either order)."""
+    words = R.canonical_text(text).split()
+    if len(words) != 2:
+        return None
+    return frozenset(words) if words[0] != words[1] else frozenset({words[0], words[0] + "#2"})
+
+
+def demo_phrases(demos: dict) -> dict[frozenset, str]:
+    """{unordered canonical key: phrase} for every demonstration input, answer and candidate."""
+    out: dict[frozenset, str] = {}
+    for lst in demos.values():
+        for d in lst:
+            for key in ("input", "answer", "candidate"):
+                val = d.get(key)
+                if not val or val in ("Có", "Không"):
+                    continue
+                k = _phrase_key(val)
+                if k is not None:
+                    out.setdefault(k, val)
+    return out
+
+
+def demo_phrase_overlap(demos: dict, items: Iterable[dict]) -> dict[str, list[str]]:
+    """{demo phrase: [item_id, ...]} for every item whose input, gold, reading or candidate equals
+    a demonstration phrase in either order (DESIGN_DECISIONS 7.4)."""
+    phrases = demo_phrases(demos)
+    hits: dict[str, set[str]] = {}
+    for it in items:
+        for t in item_texts(it):
+            k = _phrase_key(t)
+            if k is not None and k in phrases:
+                hits.setdefault(phrases[k], set()).add(it.get("item_id", "?"))
+    return {k: sorted(v) for k, v in sorted(hits.items())}
 
 
 def demo_overlap(demos: dict, items: Iterable[dict], templates: dict | None = None) -> dict[str, list[str]]:
@@ -300,42 +366,54 @@ def _variants_overview(instruction: str, language: str, templates: dict) -> str:
 
 
 def _demo_block(task: str, variant: str, shots: int, language: str, input_format: str, item_arm: str | None,
-                templates: dict, demos: dict) -> str:
+                templates: dict, demos: dict, answer_arm: str | None = None) -> str:
+    """`item_arm` re-encodes the demonstrations' inputs and candidates; `answer_arm` (item scope
+    of a meaning-preserving arm) also their answers. Strip arms never reach the answers."""
     if shots <= 0:
         return ""
     if shots > MAX_SHOTS:
         raise ValueError(f"at most {MAX_SHOTS} fixed demonstrations exist; shots={shots}")
     fmt = templates["demo_format"][language]
+    key = (task, variant) if (task, variant) in demos else (task, "V1")
     rendered = []
-    for d in demos[(task, variant)][:shots]:
+    for d in demos[key][:shots]:
         inp = d["input"]
         cand = d.get("candidate")
+        ans = d["answer"]
         if item_arm is not None:
             inp = R.reencode(inp, item_arm)
             cand = R.reencode(cand, item_arm) if cand else cand
+        if answer_arm is not None and ans not in ("Có", "Không"):
+            ans = R.reencode(ans, answer_arm)
         rendered.append(_fill(fmt[task], {
             "input": format_input(inp, input_format, language, templates),
             "candidate": format_input(cand, input_format, language, templates) if cand else "",
-            "answer": d["answer"],
+            "answer": ans,
         }))
     return fmt["header"] + "\n" + "\n\n".join(rendered) + "\n"
 
 
 def prompt_id(paraphrase: str = "p0", shots: int = 3, instruction: str = "explained", input_format: str = "raw",
-              language: str = "vi") -> str:
-    return f"{language}-{paraphrase}-s{shots}-{instruction}-{input_format}"
+              language: str = "vi", arm_scope: str = DEFAULT_ARM_SCOPE) -> str:
+    """`<lang>-<paraphrase>-s<shots>-<instruction>-<input_format>`, plus `-item` under the
+    secondary arm scope (DESIGN_DECISIONS 6.1 adds arm_scope to prompt_id; the primary scope
+    keeps the historical id so that keys stay stable)."""
+    pid = f"{language}-{paraphrase}-s{shots}-{instruction}-{input_format}"
+    return pid if arm_scope == DEFAULT_ARM_SCOPE else f"{pid}-{arm_scope}"
 
 
 def render(item: dict, task: str | None = None, variant: str | None = None, paraphrase: str = "p0",
            shots: int = 3, arm: str = "nfc", input_format: str = "raw", instruction: str = "explained",
            language: str = "vi", templates: dict | None = None, demos: dict | None = None,
-           system: str | None = None) -> list[dict]:
+           system: str | None = None, arm_scope: str = DEFAULT_ARM_SCOPE) -> list[dict]:
     """Render one item into chat messages.
 
     task/variant default to the item's own; for T2 the variant selects nothing in the text
     (it is withheld) and only picks the demonstration set, which is the same for every
-    variant. `arm` is a noilai.vi.reencode arm; see the module docstring for how it is
-    applied. Raises if the item's canary string would appear in the prompt.
+    variant. `arm` is a noilai.vi.reencode arm (or an alias); `arm_scope` is `whole_prompt`
+    (default) or `item`; see the module docstring for how they are applied. Raises if the
+    item's canary string would appear in the prompt, and on an unknown variant (V5/V6 have
+    templates for attested items; anything else is a data error, not a KeyError).
     """
     templates = templates or load_templates()
     demos = demos or default_demos()
@@ -343,15 +421,20 @@ def render(item: dict, task: str | None = None, variant: str | None = None, para
     variant = variant or item["variant"]
     if task not in TASKS:
         raise ValueError(f"unknown task {task!r}")
+    if variant not in templates["variants"]:
+        raise ValueError(f"unknown variant {variant!r} for item {item.get('item_id')!r}; the templates know "
+                         f"{sorted(templates['variants'])}")
     if language not in LANGUAGES or instruction not in INSTRUCTIONS or input_format not in INPUT_FORMATS:
         raise ValueError(f"bad rendering options: language={language!r} instruction={instruction!r} "
                          f"input_format={input_format!r}")
-    if arm not in R.ARMS:
-        raise ValueError(f"unknown arm {arm!r}; choose from {R.ARMS}")
+    arm = normalize_arm(arm)
+    check_arm_scope(arm_scope)
     strip = arm in STRIP_ARMS
     if strip and input_format != "raw":
         raise ValueError("strip arms are defined on the raw input format only")
-    item_arm = arm if strip else None
+    item_scope = strip or arm_scope == "item"
+    item_arm = arm if item_scope else None
+    answer_arm = arm if (arm_scope == "item" and not strip) else None
 
     lang_templates = templates["tasks"][task][language]
     if paraphrase not in lang_templates:
@@ -362,7 +445,7 @@ def render(item: dict, task: str | None = None, variant: str | None = None, para
     cand = item.get("candidate") if task == "T3" else None
     if task == "T3" and not cand:
         raise ValueError("T3 items need a candidate")
-    if strip:
+    if item_scope:
         inp = R.reencode(inp, arm)
         cand = R.reencode(cand, arm) if cand else cand
     ans_key = {"T1": "phrase", "T2": "original", "T3": "yesno"}[task]
@@ -375,13 +458,13 @@ def render(item: dict, task: str | None = None, variant: str | None = None, para
         "variant_steps": _variant_steps(variant, instruction, language, templates),
         "variants_overview": _variants_overview(instruction, language, templates),
         "input_format_note": templates["input_formats"][input_format][f"note_{language}"],
-        "demos": _demo_block(task, variant, shots, language, input_format, item_arm, templates, demos),
+        "demos": _demo_block(task, variant, shots, language, input_format, item_arm, templates, demos, answer_arm),
         "input": format_input(inp, input_format, language, templates),
         "candidate": format_input(cand, input_format, language, templates) if cand else "",
         "answer_instruction": templates["answer_instruction"][language][ans_key],
     }
     content = _tidy(_fill(lang_templates[paraphrase], mapping))
-    if not strip:
+    if not item_scope:
         content = R.reencode(content, arm)
     canary = item.get("canary")
     if canary and canary in content:
@@ -404,6 +487,23 @@ def prompt_hash(messages: list[dict]) -> str:
 
 def answer_marker(templates: dict | None = None) -> str:
     return (templates or load_templates())["answer_marker"]
+
+
+def marker_for(arm: str, arm_scope: str = DEFAULT_ARM_SCOPE, templates: dict | None = None) -> str:
+    """The answer marker as it appears in a prompt under (arm, scope): re-encoded with the arm
+    under whole_prompt for a meaning-preserving arm, NFC otherwise (DESIGN_DECISIONS 6.1)."""
+    arm = normalize_arm(arm)
+    marker = answer_marker(templates)
+    if arm_scope == "whole_prompt" and R.meaning_preserving(arm):
+        return R.reencode(marker, arm)
+    return marker
+
+
+def variant_names(templates: dict | None = None) -> dict[str, list[str]]:
+    """{variant: [names the prompts use, vi and en]} for every variant block (V1..V6); the one
+    source of variant-name strings for `score.named_variant`."""
+    templates = templates or load_templates()
+    return {v: [spec["name_vi"], spec["name_en"]] for v, spec in templates["variants"].items()}
 
 
 def describe(templates: dict | None = None) -> dict:
