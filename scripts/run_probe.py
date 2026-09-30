@@ -123,7 +123,7 @@ def main(argv=None) -> int:
 
     patch_summary = None
     if not args.skip_patching:
-        cands = P.build_pairs(inv, args.n_pairs * 3, seed=0)
+        cands = P.build_pairs(inv, args.n_pairs * 3, seed=0, target_first=False)
         recs = []
         used = []
         for pr in cands:
@@ -138,7 +138,8 @@ def main(argv=None) -> int:
             groups_pos = [target, rest, [T - 1]]
             res = patching.run_patching(model, ids_c, ids_k, al["answer_pos"], al["tok_clean"], al["tok_corrupt"], groups_pos)
             recs.append(res.recovery)
-            used.append({"clean": pr.clean, "corrupt": pr.corrupt, "ld_clean": res.clean_ld, "ld_corrupt": res.corrupt_ld})
+            used.append({"clean": pr.clean, "corrupt": pr.corrupt, "ld_clean": res.clean_ld, "ld_corrupt": res.corrupt_ld,
+                         "readout_pieces": al["readout_pieces"], "readout_tone_only": al["readout_tone_only"]})
             if len(recs) >= args.n_pairs:
                 break
         if recs:
@@ -154,8 +155,10 @@ def main(argv=None) -> int:
         L_best = int(best_layer["nfc"])
         tones = np.array([e.labels["tone"] for e in exs])
         if (tones == 2).sum() > 5 and (tones == 5).sum() > 5:
-            d = patching.difference_in_means(H["last"][tones == 2, L_best + 0], H["last"][tones == 5, L_best + 0])
-            steering = {"layer_hidden_index": L_best, "direction_norm": float(np.linalg.norm(d)), "classes": ["sac", "nang"]}
+            d = patching.difference_in_means(H["last"][tones == 2, L_best], H["last"][tones == 5, L_best])
+            # hidden index L is the output of decoder block L-1: that is the hook to add the direction to
+            steering = {"layer_hidden_index": L_best, "decoder_block_index": max(L_best - 1, 0),
+                        "direction_norm": float(np.linalg.norm(d)), "classes": ["sac", "nang"]}
             np.save(args.out / "steer_direction.npy", d)
 
     manifest = {"model": args.model, "revision": args.revision, "dtype": args.dtype, "device": str(device),

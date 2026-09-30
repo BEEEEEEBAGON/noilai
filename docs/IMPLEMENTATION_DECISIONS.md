@@ -119,3 +119,23 @@ resolved there. Numbers in brackets are the plan's sections.
     that the token sequences have equal length and differ only inside the target syllable; the
     logit difference is read at the first token where the two gold answers diverge (a shared
     answer prefix is teacher-forced). Recovery is normalized by the clean–corrupt gap.
+
+## Applied from the design review (30 September 2026, evening)
+
+26. **E4 fixes (design 9.6)**: the varying syllable of a patching pair is the SECOND input
+    syllable by default (`build_pairs(target_first=False)`), the prompt has no trailing space
+    and answers are tokenized with a leading space so the readout is the word-initial piece;
+    `align_pair` reports the readout pieces and whether the readout is tone-only; pairs have
+    an NFD path (only the varying syllable re-encoded, span recomputed); `make_examples`
+    re-encodes only the target syllable unless asked to re-encode the carrier; the structural
+    baseline (one-hot token ids + coda class) and the excess over it exist in `probes.py`;
+    the steering hook index is the decoder block `hidden_index - 1`; the dead majority branch
+    is gone. Still open from 9.6: the perception readout with digit answers, batched patching,
+    the IT chat template in the patching prompt, and the `report` stage.
+27. **E2 primary fit (design 8.4)**: `noilai/stats/e2.py` codes `split`, `tps_w` (within-model
+    centred), `tps_b`, `align_w` (alignment among split syllables, 0 otherwise) and fits the
+    logit with model fixed effects and `C(model):tps_w`, `C(model):align_w` interactions with
+    two-way cluster-robust covariance (base pair, model; Cameron–Gelbach–Miller with the
+    negative eigenvalues clipped); it reports the mean per-model slopes with their SE and a
+    base-pair cluster bootstrap. Categorical terms with a single level are dropped from the
+    formula automatically. The variational Bayes mixed model stays as screening only.

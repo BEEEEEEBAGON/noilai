@@ -71,8 +71,7 @@ def run_layer_probes(H: np.ndarray, labels: Sequence, groups: Sequence, feature:
     g = np.asarray(groups)
     tr, te = group_split(g, test_frac, seed)
     yc = control_labels(g, y, seed)
-    majority = float(np.mean(y[te] == np.bincount(np.unique(y[tr], return_inverse=True)[1]).argmax() if False else
-                             (y[te] == _mode(y[tr]))))
+    majority = float(np.mean(y[te] == _mode(y[tr])))
     results = []
     layers = layers if layers is not None else range(H.shape[1])
     for L in layers:
@@ -98,3 +97,33 @@ def results_table(results: Sequence[LayerResult]):
 
 def best_layer(results: Sequence[LayerResult]) -> LayerResult:
     return max(results, key=lambda r: r.selectivity)
+
+
+def structural_baseline(token_ids: Sequence[Sequence[int]], coda_class: Sequence, labels: Sequence, groups: Sequence,
+                        test_frac: float = 0.3, seed: int = 0, C: float = 1.0) -> float:
+    """Accuracy of the same probe fitted on one-hot token ids of the syllable's span plus the
+    coda class (design 9.1, condition ii): what a probe can achieve from the token identity
+    alone, without any representation. Same syllable-disjoint split as run_layer_probes."""
+    from sklearn.feature_extraction import DictVectorizer
+
+    feats = []
+    for ids, coda in zip(token_ids, coda_class):
+        d = {f"tok:{t}": 1.0 for t in ids}
+        d[f"coda:{coda}"] = 1.0
+        d["n_tokens"] = float(len(ids))
+        feats.append(d)
+    X = DictVectorizer(sparse=False).fit_transform(feats)
+    y = np.asarray(labels)
+    tr, te = group_split(groups, test_frac, seed)
+    pred = _fit_predict(X[tr], y[tr], X[te], C=C, seed=seed)
+    return float(np.mean(pred == y[te]))
+
+
+def excess_over_structural(H_layer: np.ndarray, token_ids, coda_class, labels, groups, seed: int = 0, C: float = 1.0) -> dict:
+    """Probe accuracy at one layer minus the structural baseline on the same split."""
+    y = np.asarray(labels)
+    tr, te = group_split(groups, 0.3, seed)
+    pred = _fit_predict(H_layer[tr], y[tr], H_layer[te], C=C, seed=seed)
+    acc = float(np.mean(pred == y[te]))
+    base = structural_baseline(token_ids, coda_class, labels, groups, 0.3, seed, C)
+    return {"acc": acc, "structural_baseline": base, "excess": acc - base}

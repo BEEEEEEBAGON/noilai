@@ -124,3 +124,40 @@ def test_minimal_pairs_build_and_align(tiny):
     a = ok[0]
     assert len(a["clean_ids"]) == len(a["corrupt_ids"]) and a["tok_clean"] != a["tok_corrupt"]
     assert set(a["diff_positions"]) <= set(a["target_positions"])
+
+
+def test_pairs_target_second_nfd_and_tone_only_readout(tiny):
+    from noilai.probe import pairs as P
+    from noilai.vi import lexicon as L
+    from noilai.vi import unicode as U
+    model, tok = tiny
+    inv = L.load_inventory()
+    prs = P.build_pairs(inv, 20, seed=1)                       # target second by default
+    for pr in prs:
+        words = pr.clean.split("→")[0].split()[-2:]
+        assert words[1] == pr.target_syllable_clean and words[0] == pr.partner
+        assert not pr.clean.endswith(" ")
+    nfd = P.build_pairs(inv, 5, seed=1, encoding="nfd")
+    for pr in nfd:
+        s, e = pr.target_char_span
+        assert pr.clean[s:e] == U.nfd(pr.target_syllable_clean)
+        if U.nfd(pr.target_syllable_clean) != pr.target_syllable_clean:          # a target with diacritics
+            assert U.encoding_form(pr.clean) in ("nfd", "mixed")
+            assert U.nfc(pr.clean) != pr.clean and U.encoding_form(pr.clean[:s]) in ("nfc", "ascii")   # carrier stays NFC
+    al = [P.align_pair(tok, pr, add_special_tokens=False) for pr in prs]
+    ok = [a for a in al if a]
+    assert ok and all("readout_tone_only" in a and len(a["readout_pieces"]) == 2 for a in ok)
+
+
+def test_structural_baseline_matches_probe_when_label_is_a_token_function():
+    rng = np.random.default_rng(3)
+    n = 400
+    tones = rng.integers(0, 6, size=n)
+    token_ids = [[100 + t, 7] for t in tones]                # the token id encodes the tone exactly
+    groups = [f"g{i}" for i in range(n)]
+    coda = ["open"] * n
+    base = probes.structural_baseline(token_ids, coda, tones, groups, seed=0)
+    assert base > 0.95
+    H = rng.normal(size=(n, 8))
+    ex = probes.excess_over_structural(H, token_ids, coda, tones, groups, seed=0)
+    assert ex["structural_baseline"] > 0.95 and ex["excess"] < 0

@@ -44,22 +44,27 @@ class ProbeExample:
 
 
 def make_examples(syllables: Iterable[str], carriers: Sequence[str] = CARRIERS, encoding: str = "nfc",
-                  carrier_ids: Sequence[int] | None = None) -> list[ProbeExample]:
+                  carrier_ids: Sequence[int] | None = None, reencode_carrier: bool = False) -> list[ProbeExample]:
+    """By default only the TARGET syllable is re-encoded (design 9.2) and the carrier stays
+    NFC, so that the position after the slot is the same string under both encodings;
+    `reencode_carrier=True` re-encodes the whole sentence (what the E3 C1 arm does)."""
     out = []
     for syl in syllables:
         p = try_parse(syl, strict=False)
         if p is None:
             continue
         s = p.syllable
-        labels = {"tone": s.tone, "onset": s.onset, "rime": s.rime, "nucleus": s.nucleus, "coda": s.coda, "glide": int(s.glide)}
+        labels = {"tone": s.tone, "onset": s.onset, "rime": s.rime, "nucleus": s.nucleus, "coda": s.coda, "glide": int(s.glide),
+                  "coda_class": "stop" if s.coda in ("p", "t", "c", "ch") else ("nasal" if s.coda in ("m", "n", "ng", "nh") else "open")}
         ids = carrier_ids if carrier_ids is not None else range(len(carriers))
         for cid in ids:
             surf = U.nfc(syl) if encoding == "nfc" else U.nfd(syl)
             template = carriers[cid]
-            prefix = template.split("{}")[0]
-            prefix = U.nfc(prefix) if encoding == "nfc" else U.nfd(prefix)
-            suffix = template.split("{}")[1]
-            suffix = U.nfc(suffix) if encoding == "nfc" else U.nfd(suffix)
+            prefix, suffix = template.split("{}")
+            if reencode_carrier and encoding == "nfd":
+                prefix, suffix = U.nfd(prefix), U.nfd(suffix)
+            else:
+                prefix, suffix = U.nfc(prefix), U.nfc(suffix)
             text = prefix + surf + suffix
             out.append(ProbeExample(syllable=U.nfc(syl), carrier_id=cid, text=text, encoding=encoding,
                                     char_start=len(prefix), char_end=len(prefix) + len(surf), labels=labels))
@@ -77,13 +82,16 @@ def token_span(offsets: Sequence[tuple[int, int]], char_start: int, char_end: in
 
 def extract_hidden_states(model, tokenizer, examples: Sequence[ProbeExample], batch_size: int = 16,
                           positions: Sequence[str] = ("last", "after"), device: str | None = None,
-                          add_special_tokens: bool = True) -> dict[str, np.ndarray]:
-    """Return {position: array [n_examples, n_layers+1, hidden]} (index 0 = embeddings)."""
+                          add_special_tokens: bool = True, return_token_ids: bool = False):
+    """Return {position: array [n_examples, n_layers+1, hidden]} (index 0 = embeddings; hidden
+    index L = output of decoder block L-1). With return_token_ids, also return the list of
+    token-id spans covering each example's syllable (for the structural baseline)."""
     import torch
 
     device = device or next(model.parameters()).device
     model.eval()
     out = {p: [] for p in positions}
+    spans: list[list[int]] = []
     with torch.no_grad():
         for i in range(0, len(examples), batch_size):
             batch = examples[i:i + batch_size]
@@ -99,6 +107,7 @@ def extract_hidden_states(model, tokenizer, examples: Sequence[ProbeExample], ba
                 valid = attn[b].nonzero().flatten().tolist()
                 offs = [tuple(offsets[b][t]) for t in valid]
                 first, last = token_span(offs, ex.char_start, ex.char_end)
+                spans.append([int(enc["input_ids"][b, t]) for t in valid[first:last + 1]])
                 for p in positions:
                     if p == "last":
                         t = valid[last]
@@ -109,7 +118,8 @@ def extract_hidden_states(model, tokenizer, examples: Sequence[ProbeExample], ba
                     else:
                         raise ValueError(p)
                     out[p].append(hs[b, :, t, :].float().cpu().numpy())
-    return {p: np.stack(v) for p, v in out.items()}
+    arrays = {p: np.stack(v) for p, v in out.items()}
+    return (arrays, spans) if return_token_ids else arrays
 
 
 def syllable_token_count(tokenizer, example: ProbeExample, add_special_tokens: bool = True) -> int:
