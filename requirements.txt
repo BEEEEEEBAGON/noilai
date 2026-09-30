@@ -1,0 +1,18 @@
+# Runtime dependencies of the noilai package (see pyproject.toml for extras). The exact
+# versions used for every number in docs/RESULTS_LOG.md are in requirements-lock.txt
+# (pip freeze of the build environment, CUDA wheels omitted); model runs record pip freeze
+# in their manifests (checklist C4).
+numpy>=1.26
+pandas>=2.1
+scipy>=1.11
+statsmodels>=0.14
+scikit-learn>=1.4
+pyyaml>=6.0
+tqdm>=4.66
+sentencepiece>=0.2
+protobuf>=4
+tokenizers>=0.20
+transformers>=4.45
+torch>=2.2
+pytest>=8
+hypothesis>=6
