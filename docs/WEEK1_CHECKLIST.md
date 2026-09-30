@@ -31,4 +31,4 @@ Tick items in this file and commit; the dates are the plan's.
 - [ ] Run the 200-item pilot on three small models on Kaggle (`notebooks/kaggle_eval_t4.ipynb`, run plan `pilot` in `configs/run_plan.yaml`) and record the result in `docs/RESULTS_LOG.md`. Gate 1 (18 October) needs the pilot's effect and the novelty verdict.
 
 ## Compute log
-- [ ] From the first GPU session on, append every session to `data/compute_log.csv` (`scripts/compute_log.py add ...`); checklist item C1 asks for the total.
+- [ ] From the first GPU session on, append every session to `data/compute_log.csv` (`scripts/compute_log.py append ...`); checklist item C1 asks for the total.

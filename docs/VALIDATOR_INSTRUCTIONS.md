@@ -60,7 +60,7 @@ Các mã kiểu **không gắn với vùng miền** (tài liệu mâu thuẫn nh
 | T3 V1: *mèo cái* / "mài kéo" (hệ thống: yes) | Có | Có | Có/Có | Không | |
 | T3 V1: *mèo cái* / "mái kèo" (hệ thống: no) | Có | Có | Có/Có | Không | *mái kèo* là kết quả V4, không phải V1; là từ thật |
 | T3 V1: *mèo cái* / "mài céo" (hệ thống: no) | Có | Không | Có/Không | Không | hệ thống đúng khi nói "no" |
-| bất kỳ: *mộng mơ → mờ mông* | (theo quy tắc) | Có | Có/Có | **Có** | có cách hiểu thô tục → đánh dấu |
+| T1 V6: *trái gió → giái tró* | Có | Có | Có/Không | **Có** | dạng dân gian *dái chó* (gi→d, tr→ch); có cách hiểu thô tục → đánh dấu [NATIVE-CHECK] |
 
 ### 6. Khi nghi ngờ có lỗi hệ thống
 
@@ -68,7 +68,7 @@ Nếu bạn thấy **nhiều mục cùng một kiểu sai** (ví dụ mọi mụ
 
 ### 7. Thời gian
 
-Khoảng **30–40 giây một mục**; 700 mục ≈ **6–8 giờ**, cộng khoảng một giờ cho ba bảng phụ, chia thành nhiều buổi trong ba tuần (19/10–8/11/2026). Không cần làm hết một lần; xin nộp phần đã làm mỗi tuần.
+Khoảng **30–40 giây một mục**; 700 mục ≈ **6–8 giờ**, cộng khoảng một giờ cho ba bảng phụ — tổng cộng 6–10 giờ, như trong phiếu đồng ý [NATIVE-CHECK] — chia thành nhiều buổi trong ba tuần (19/10–8/11/2026). Không cần làm hết một lần; xin nộp phần đã làm mỗi tuần.
 
 ### 8. Xử lý bất đồng và cách chúng tôi báo cáo mức đồng thuận
 
@@ -136,7 +136,7 @@ Use **Unsure** only when you genuinely cannot decide (a dialect word you do not 
 | T3 V1: *mèo cái* / "mài kéo" (system: yes) | Yes | Yes | Yes/Yes | No | |
 | T3 V1: *mèo cái* / "mái kèo" (system: no) | Yes | Yes | Yes/Yes | No | *mái kèo* is the V4 output, not V1; it is a real word |
 | T3 V1: *mèo cái* / "mài céo" (system: no) | Yes | No | Yes/No | No | the system is right to say "no" |
-| any: *mộng mơ → mờ mông* | (by rule) | Yes | Yes/Yes | **Yes** | has a vulgar reading → flag it |
+| T1 V6: *trái gió → giái tró* | Yes | Yes | Yes/No | **Yes** | folk form *dái chó* under the gi→d and tr→ch mergers; has a vulgar reading → flag it [NATIVE-CHECK] |
 
 ### 6. If you suspect a systematic error
 
@@ -144,7 +144,7 @@ If **many items fail in the same way** (every item with *gi*, say), write `RULE?
 
 ### 7. Time
 
-About **30–40 seconds per item**; 700 items ≈ **6–8 hours**, plus about an hour for the three supplementary sheets, in sessions over three weeks (19 October – 8 November 2026). You need not finish in one go; please return what you have done each week.
+About **30–40 seconds per item**; 700 items ≈ **6–8 hours**, plus about an hour for the three supplementary sheets — 6–10 hours in all, the figure in the consent form — in sessions over three weeks (19 October – 8 November 2026). You need not finish in one go; please return what you have done each week.
 
 ### 8. How disagreements are resolved, and how agreement is reported
 

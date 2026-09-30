@@ -27,11 +27,13 @@ no identifying information, and the generator scripts reproduce the committed ta
 | `figures/fig1_tokens.tex` (+ `fig1_tokens_note.tex`, `.json`) | `gen_fig1_tokens.py` | `data/external/gemma3_tokenizer.model` through `noilai.audit.tokenizers.SentencePieceAdapter`; the note file defines `\figtokensnote`, the caption's data sentences, from the same audit rows |
 | `tables/rules_*.tex` | `gen_rule_tables.py` | `noilai.vi.syllable` constants, the engine's speller, the two Hunspell lists (69 placement pairs) |
 | `tables/prompt_examples.tex` (+ `.json`) | `gen_prompt_appendix.py` | `prompts/noilai.yaml` + `prompts/demos.yaml` rendered by `noilai.eval.prompts.render` |
-| `docs/DATA_STATEMENT.md`, the generated block of §0 | `gen_data_statement_facts.py --manifest <release>/manifest.json [--check]` | the release manifest and `attested.jsonl`: counts per split, stored placement convention, vulgar-flag counts, the attested seed's exact/mismatch/three-syllable/vulgar/low-confidence rows |
+| `docs/DATA_STATEMENT.md`, the generated block of §0; `tables/attested_facts.tex` | `gen_data_statement_facts.py --manifest <release>/manifest.json [--check]` | the release manifest and `attested.jsonl`: counts per split, stored placement convention, vulgar-flag counts, the attested seed's exact/mismatch/three-syllable/vulgar/low-confidence rows; the `.tex` file defines `\nAttested`, `\nAttestedExact`, `\nAttestedApprox`, `\nAttestedHsix`, `\nAttestedVerified`, the counts `sec_benchmark.tex` quotes (never typed) |
 
-The committed Table 1 comes from `data/release/v0.2/manifest.json` (10,000 items, plan defaults) with
-`--note` marking it as the v0.2 counts that the v0.3 rebuild at the stage-1 pre-registration commit
-replaces; regenerate it from the frozen release with `--release` at the data freeze.
+The committed Table 1 comes from `data/release/v0.2/manifest.json` (10,000 items, plan defaults; built at
+commit ee28792 on a dirty tree with the red-team generator corrections included) with `--note` marking it as
+the v0.2 counts that the v0.3 rebuild at the stage-1 pre-registration commit replaces; regenerate it from the
+frozen release with `--release` at the data freeze. Neither the table header nor the data-statement block
+prints the build seed (DESIGN_DECISIONS 4.6).
 
 Unnumbered sections (`\section*{Limitations}`, `\section*{Ethical Considerations}`) carry no
 `\label`: a `\label` after a starred section resolves to the preceding numbered section, so they

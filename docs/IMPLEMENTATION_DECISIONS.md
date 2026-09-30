@@ -1,7 +1,7 @@
 # Implementation decisions (30 September 2026)
 
 > Status: `DESIGN_DECISIONS.md` (the design review's synthesis) is binding; its section 12
-> overrides decisions 6 (i/y emission now prefers the attested `y` form after h k l m t s),
+> overrides decisions 6 (i/y emission is per syllable from the reference-corpus/Viet74K majority, never `y` after s or v, recorded as `iy_forms`; DESIGN_DECISIONS §2.2 R5(c), §12.15 as amended by §14 item 2),
 > 7's storage default (release text is stored old-style), 12 (six variants are computed;
 > V5/V6 enter the taxonomy, T2 gold and twins but are not T1 cells) and 23 (the variational
 > Bayes fit is demoted to screening). The generator of v0.2 implements those overrides.
@@ -44,7 +44,7 @@ resolved there. Numbers in brackets are the plan's sections.
    text stays `lý`), so the C2 arm changes placement and nothing else.
 9. **Stop codas (p, t, c, ch) take only sắc and nặng.** The parser accepts a toneless input
    (`bat`) as a query form; the inventory rejects entries with a level tone on a stop coda
-   (`gip`, `têt`, `xit`, `hoc`) as phonotactically impossible loan spellings.
+   (`gip`, `têt`, `xit`) as phonotactically impossible loan spellings (`hoc` is in neither Hunspell file).
 10. **Legality is attested, not generated.** A structure is legal at level `onset_rime` when its
     onset + glide + nucleus + coda occurs in the inventory with some tone and the tone respects
     rule 9. The inventory is the Hunspell vi_VN list (both placement styles) extended with
@@ -61,8 +61,10 @@ resolved there. Numbers in brackets are the plan's sections.
     each is an involution**, tested on 500 random pairs. Swapping onsets only is V4 in the
     other order, and swapping onsets and tones is V1 in the other order, so they are not
     separate variants; T2 accepts either order of any variant's output.
-13. **Base pairs** come from the two-syllable entries of the Viet74K word list (47,535 pairs;
-    the list is a lookup, never redistributed) and from pseudo-pairs of two attested syllables.
+13. **Base pairs** come from the two-syllable entries of the Viet74K word list (47,535 distinct canonical
+    pairs from 49,103 two-syllable entries; the list is consulted at build time, and about 1,500 of its
+    two-syllable entries appear verbatim in the lexical items, under the terms of DESIGN_DECISIONS 4.1/11.1)
+    and from pseudo-pairs of two attested syllables.
     Lexical base pairs must have both syllables attested (drops word-list typos and loanwords).
 14. **Items whose output equals the input (identity: equal tones under V3, equal rimes under
     V1) or contains an illegal syllable are dropped**, and the manifest records the pool size
@@ -79,8 +81,9 @@ resolved there. Numbers in brackets are the plan's sections.
 17. **Splits are by base pair** (every item derived from one underlying pair is in one split);
     the core set is a balanced 125-per-cell subset of test (T3: 62 yes/no pairs); every test item
     carries the build's canary string; a build is deterministic given its seed.
-18. **Attested examples are not all rule outputs.** Of the 22 seed rows, 16 are reproduced
-    exactly by the engine; the others bend a vowel or a tone to reach a real word (`độc hại` for
+18. **Attested examples are not all rule outputs.** The counts (rows, exact reproductions, mismatches by
+    kind) are in the generated block of `docs/DATA_STATEMENT.md` §0 (34 rows, 28 exact on 30 September 2026;
+    the seed grows until the freeze); the others bend a vowel or a tone to reach a real word (`độc hại` for
     the rule's `đọc hại`; `cũ` for `củ`, the Southern hỏi/ngã merger) or swap a non-outer
     position pair in a three-syllable phrase. The release file records the engine's output,
     the matching position pair and both forms in `gold`; the paper's memorization analysis (H6)

@@ -10,9 +10,13 @@ strings, the review version carries no identifying information, and the generato
 under paper/ run and reproduce the committed tables, figure note and data-statement block.
 The study documents are checked for the parts the plan requires, the arm-scope wording is
 checked against the harness, and the human-baseline assignment design against its arithmetic.
+The last section holds the documents to the design document and to the code (DESIGN_DECISIONS 1,
+8.8 item 47, 12.43, 4.6): hypothesis-table identity, DATA_FORMAT vs the scorer/extractor/runner,
+every quoted figure recomputed from its file, no build seed anywhere, no superseded statement.
 """
 from __future__ import annotations
 
+import csv
 import json
 import re
 import subprocess
@@ -21,6 +25,7 @@ import unicodedata
 from collections import Counter, defaultdict
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -345,7 +350,15 @@ def test_hypotheses_h1_to_h6_are_all_stated():
     assert "Pre-registered" in joined or "pre-registered" in joined
     # design-document wording that must not regress to the founding plan's
     assert "Northern style" not in joined                       # variant codes are region-neutral
-    assert "mediat" not in joined.lower() or "not estimate" in joined or "do not estimate" in joined
+    # DESIGN_DECISIONS 12.7: mediation is gone. Checked per sentence, so that a new "X% of the effect is mediated
+    # by token count" cannot hide behind a "not estimate" elsewhere in the paper (the earlier global disjunction
+    # was vacuous on the current sources: \label{fig:mediation} and "not estimate" both occurred).
+    body = re.sub(r"\\(?:label|ref)\{[^}]*\}", "", remove_placeholders(joined))
+    allowed = ("not estimate", "do not estimate", "not a mediator", "rather than a mediator", "resisted calling it mediation")
+    for sentence in re.split(r"(?<=[.!?])\s+", body):
+        if re.search(r"\bmediat", sentence, re.IGNORECASE):                 # "intermediate" is not mediation
+            assert any(a in sentence for a in allowed), f"mediation language outside the disclaimer: {sentence.strip()[:200]}"
+    assert r"\label{fig:mediation}" not in joined and r"\ref{fig:mediation}" not in joined
 
 
 def test_review_version_has_no_identifying_information():
@@ -560,6 +573,17 @@ def test_preregistration_has_the_required_parts():
         assert phrase in t, phrase
     # the Gate 1 rule is numeric (DESIGN_DECISIONS 8.5) and the E3 scope rule is stated with its test
     assert "≥ 15 points" in t and "≥ 5 points" in t and "mid-p < 0.05" in t
+    # DESIGN_DECISIONS 8.8: two stages, nothing registered yet
+    for phrase in ("Stage 1", "Stage 2", "PREREG_COMMIT_STAGE1", "PREREG_COMMIT_STAGE2", "before any test-split run", "v0.3"):
+        assert phrase in t, phrase
+    assert "Date registered:" not in t and "built at the registration commit" not in t
+    # statements the design document reversed (DD 8.1-8.4, 9.1, 9.3, 4.5, 5.7) must not be registered
+    for bad in ("digits 1–6", "two-way (base pair × model) cluster-robust SEs", "= 6 tests",
+                "decodable layer for tone is earlier", "Never cluster by base pair × model", "corpus independent of the tokenizers",
+                "standardized \\|β(align_w)\\| > \\|β(tps_w)\\|. |", "paired mid-p McNemar on aggregated outcomes",
+                "every test T1 item with `c2_affected = true`", "analysed on the 43 affected items only", "Steering is exploratory",
+                "bí mà → bì má", "5 control-label seeds", "DerSimonian–Laird or REML on the per-model paired effects"):
+        assert bad not in t, bad
 
 
 def test_data_statement_has_bender_friedman_fields():
@@ -626,7 +650,12 @@ def test_procedures_not_yet_run_are_not_written_as_results():
     """Outside \\placeholder{...}, nothing describes an unrun procedure as done."""
     joined = "\n".join(remove_placeholders(strip_comments(f.read_text(encoding="utf-8"))) for f in tex_sources())
     for phrase in ("The pilot measured", "measured design effect", "too readily", "before any model was run",
-                   "took part", "were recruited", "free tiers were used", "were pre-registered in a dated commit before any model"):
+                   "took part", "were recruited", "free tiers were used", "were pre-registered in a dated commit before any model",
+                   # DESIGN_DECISIONS 8.8 (nothing is registered yet; stage 2 follows the co-author's edits), 7.1, 11.2
+                   "were pre-registered in a dated commit", "were fixed in a dated commit", "was frozen at Gate",
+                   "on 30 September 2026 (commit", "was sent to hosted APIs", "sent only the 1,500-item core",
+                   "were queried through free tiers", "are now potentially in future training data",
+                   "treated as potentially contaminated"):
         assert phrase not in joined, phrase
     ethics = strip_comments((PAPER / "sec_ethics.tex").read_text(encoding="utf-8")).rstrip()
     assert ethics.endswith("}") and r"\placeholder{Re-read every paragraph above" in ethics.rsplit(r"\paragraph", 1)[1]
@@ -795,3 +824,443 @@ def test_data_statement_release_facts_are_generated_and_current():
     for stale in ("22-row", "v0.2 pending", "16 exact reproductions", "mộng mơ → mờ mông"):
         assert stale not in t, stale
     assert "generated block of §0" in t
+
+
+# ------------------------------------------------------------------ the design document's wording holds in the paper
+def _tex_joined() -> str:
+    return "\n".join(strip_comments(f.read_text(encoding="utf-8")) for f in tex_sources())
+
+
+def test_superseded_design_wording_is_absent_from_the_paper():
+    """Statements the design document replaced (DESIGN_DECISIONS 1, 4.2, 4.6, 8.1-8.4, 9.1-9.4, 11.1, 11.2, 11.5,
+    section 14) must not survive in any .tex source: the paper says what the design and the code do."""
+    joined = _tex_joined()
+    for bad in ("standardized difference", "standardized alignment coefficient", "two-way (base pair, model)", "two-way clustered",
+                "six intervention effects", "family of six", "base-pair-aggregated outcomes",          # DD 8.1-8.4
+                "reads a digit", "decodable at an earlier layer", "Gemma Scope~2 sparse autoencoders are optional",
+                "steering flip", "Patching and steering",                                              # DD 9.1, 9.3, 9.4
+                "every model output and score file", "shared privately", "treated as potentially contaminated",   # DD 11.1, 11.2
+                "weights that equalize",                                                               # DD 4.2
+                "canary line", r"resource hashes; the canary GUID \placeholder{printed",                 # DD 4.6 (item 44)
+                "with seed, counts", "with the seed, item counts",                                       # DD 4.6 (item 51)
+                "on inputs, outputs, readings and candidates", "to inputs, gold answers, readings and candidates",  # DD 11.5
+                "10--24 points",                                                                       # DD 14 item 45
+                "rests on 43 items", "on the 43 affected XCOPA items with the detectable effect",       # DD 5.7 / 6.3
+                "apply to any diacritic-heavy Latin script.", "the parser and re-encoder transfer",     # DD 14 item 35
+                "GUID is drawn outside the seeded generator and printed"):
+        assert bad not in joined, bad
+    # steering is named once, as future work, in the Discussion and nowhere else
+    for f in tex_sources():
+        body = strip_comments(f.read_text(encoding="utf-8")).lower()
+        if f.name != "sec_discussion.tex":
+            assert "steering" not in body, f"steering outside the future-work sentence: {f.name}"
+    assert "left to future work" in strip_comments((PAPER / "sec_discussion.tex").read_text(encoding="utf-8"))
+    # what replaced them
+    setup = strip_comments((PAPER / "sec_setup.tex").read_text(encoding="utf-8"))
+    assert "fourteen cells" in setup and "nested likelihood-ratio test" in setup and "Hartung--Knapp" in setup
+    assert "base-pair cluster bootstrap" in setup and "labelled as ignoring clustering" in setup
+    assert r"\texttt{t3\_yesno\_lp}" in setup and r"\texttt{t3\_pair\_lp}" in setup and "length-normalized per token" in setup
+    results = strip_comments((PAPER / "sec_results.tex").read_text(encoding="utf-8"))
+    assert "nested likelihood-ratio test" in results and "300 misaligned split syllables" in results
+    assert "descriptive case study, not a tested hypothesis" in results and "at least 100 native-verified exact" in results
+    tone = strip_comments((PAPER / "sec_tone.tex").read_text(encoding="utf-8"))
+    assert "reads the tone's name" in tone and "fewer than 50 pairs survive" in tone and "localization study" in tone
+    assert "No claim of earlier decodability under NFD" in tone
+    cf = strip_comments((PAPER / "sec_counterfactuals.tex").read_text(encoding="utf-8"))
+    assert cf.index(r"\hyp{4} (\emph{the rarer convention costs}) leads") < cf.index(r"\hyp{3} (\emph{a crossover})")
+    assert "distribution shift" in cf and "per-family table is primary" in cf and "fourteen cells" in cf
+    bench = strip_comments((PAPER / "sec_benchmark.tex").read_text(encoding="utf-8"))
+    assert "quota-sampled" in bench and "only when the input pair itself is a taboo phrase" in bench
+    assert "The build seed is not published" in bench and "three-valued tag" in bench
+    ethics = strip_comments((PAPER / "sec_ethics.tex").read_text(encoding="utf-8"))
+    assert "released only inside the gated repository" in ethics and "never receives test items" in ethics
+
+
+def test_canary_guid_is_printed_only_as_its_sha256():
+    """DESIGN_DECISIONS 4.6 (item 44): a sentence that says the GUID is printed must say SHA-256 in the same sentence."""
+    joined = _tex_joined()
+    hits = 0
+    for sentence in re.split(r"(?<=[.!?])\s+", joined):
+        if "GUID" in sentence and "print" in sentence:
+            hits += 1
+            assert "SHA-256" in sentence, sentence[:200]
+    assert hits >= 2                                          # sec_benchmark and appendix (non-vacuity)
+
+
+def test_numbers_attributed_to_unchecked_sources_stay_inside_placeholders():
+    r"""DESIGN_DECISIONS 14 item 45: no attributed number in prose until checked at page level. The two figures
+    docs/RELATED_WORK_VERIFICATION.md lists as unchecked (Bean et al. 16% of 445; Ghosh & Jyothi's drops) may
+    appear only inside \placeholder{...}."""
+    joined = _tex_joined()
+    outside = remove_placeholders(joined)
+    assert r"16\%" in joined and "445" in outside                   # the checked count stays, the unchecked share is wrapped
+    assert r"16\% of 445" not in outside and r"Only 16\%" not in outside
+    assert "10--24" in joined and "10--24" not in outside
+    rwv = _doc("RELATED_WORK_VERIFICATION.md")
+    assert "16.0% not checked" in rwv and "ghosh-jyothi-2026-noncanonical" in rwv
+
+
+def test_contribution_five_claims_script_generality_for_the_re_encoder_only():
+    intro = strip_comments((PAPER / "sec_intro.tex").read_text(encoding="utf-8"))
+    item = next(ln for ln in intro.splitlines() if "Reusable tooling" in ln)
+    clauses = re.split(r";", item)
+    general = [c for c in clauses if "any diacritic-heavy Latin script" in c]
+    assert len(general) == 1 and "parser" not in general[0] and "spelling-rule" not in general[0], item
+    assert "parser" in item and "not script-general" in item
+    lim = strip_comments((PAPER / "sec_limitations.tex").read_text(encoding="utf-8"))
+    assert "whereas the parser, speller and placement arms" in lim
+
+
+def test_attested_counts_in_the_prose_are_generated_macros():
+    """paper/tables/attested_facts.tex is written by gen_data_statement_facts.py from attested.jsonl; the prose
+    quotes its macros and never types 22/16 or 34/28 (DESIGN_DECISIONS 4.7, 12.43)."""
+    main = strip_comments(MAIN.read_text(encoding="utf-8"))
+    assert r"\input{tables/attested_facts}" in main
+    facts = (PAPER / "tables" / "attested_facts.tex").read_text(encoding="utf-8")
+    macros = dict(re.findall(r"\\newcommand\{\\(\w+)\}\{(\d+)\}", facts))
+    assert set(macros) == {"nAttested", "nAttestedExact", "nAttestedApprox", "nAttestedHsix", "nAttestedVerified"}
+    bench = strip_comments((PAPER / "sec_benchmark.tex").read_text(encoding="utf-8"))
+    for m in ("nAttested", "nAttestedExact", "nAttestedApprox", "nAttestedVerified"):
+        assert "\\" + m + "{}" in bench, m
+    assert r"\placeholder{22} rows" not in bench and r"\placeholder{16} reproduced" not in bench
+    attested = ROOT / "data" / "release" / "v0.2" / "attested.jsonl"
+    if attested.exists():
+        rows = [json.loads(ln) for ln in attested.read_text(encoding="utf-8").splitlines() if ln.strip()]
+        assert int(macros["nAttested"]) == len(rows) >= 20
+        assert int(macros["nAttestedExact"]) == sum(1 for r in rows if r.get("exact"))
+        assert int(macros["nAttestedApprox"]) == sum(1 for r in rows if not r.get("rule_matches_attested"))
+        assert int(macros["nAttested"]) == int(macros["nAttestedExact"]) + int(macros["nAttestedApprox"])
+
+
+# ================================================================== the study documents against the design document and the code
+# DESIGN_DECISIONS.md is the binding specification and the code is the reference for what the harness does. These tests
+# hold the documents to both: the pre-registration's hypothesis table is identical to DESIGN_DECISIONS section 1 (item 47);
+# DATA_FORMAT.md names the classes, extraction methods and arm names the code emits; every figure the documents quote from
+# a repository file reproduces from that file (DESIGN_DECISIONS 12.43); the build seed appears in no published document
+# (4.6); superseded statements the red team retired do not come back. Every check has a non-vacuity guard.
+DD = DOCS / "DESIGN_DECISIONS.md"
+PREREG = DOCS / "PREREGISTRATION.md"
+MANIFEST = ROOT / "data" / "release" / "v0.2" / "manifest.json"
+COUNTS = ROOT / "data" / "audit" / "counts.json"
+ROWS = ROOT / "data" / "audit" / "gemma3_rows.csv"
+
+
+def _read(p: Path) -> str:
+    assert p.exists(), p
+    return p.read_text(encoding="utf-8")
+
+
+def _norm(s: str) -> str:
+    return re.sub(r"\s+", " ", s).strip()
+
+
+# ------------------------------------------------------------------ hypothesis table identity (DD 1, 8.8; item 47)
+def _hyp_rows(text: str) -> dict[str, str]:
+    rows = {}
+    for ln in text.splitlines():
+        m = re.match(r"^\|\s*\*\*(H\d[a-z]?)\*\*", ln)
+        if m:
+            assert m.group(1) not in rows, f"duplicate row {m.group(1)}"
+            rows[m.group(1)] = _norm(ln)
+    return rows
+
+
+def test_hypothesis_tables_of_the_design_document_and_the_preregistration_are_identical():
+    dd, pr = _hyp_rows(_read(DD)), _hyp_rows(_read(PREREG))
+    assert set(dd) == set(pr) == {"H1", "H2", "H3", "H3b", "H4", "H5", "H6"}     # non-vacuity: all seven rows
+    diffs = {k: (dd[k], pr[k]) for k in dd if dd[k] != pr[k]}
+    assert not diffs, "PREREGISTRATION §2 differs from DESIGN_DECISIONS §1 on: " + "; ".join(
+        f"{k}: DD={a[:160]!r} PREREG={b[:160]!r}" for k, (a, b) in diffs.items())
+    # the earlier defects (item 47; the paper-docs review) cannot return
+    for stale in ("standardized \\|β(align_w)\\| > \\|β(tps_w)\\|. |", "Either inequality fails", "δ_sel = 0.10", "3,000"):
+        assert stale not in _read(PREREG).split("## 3.")[0], stale
+    assert "tests/test_paper.py" in _read(DD) and "tests/test_paper.py" in _read(PREREG)
+
+
+# ------------------------------------------------------------------ DATA_FORMAT.md says what the code emits
+def test_data_format_names_the_scorers_classes_and_the_extractors_methods():
+    from noilai.eval import extract, score
+    t = _read(DOCS / "DATA_FORMAT.md")
+    scores = t.split("## Scores")[1]
+    classes = set(re.findall(r"`([a-z_]+)`", scores.split("`error_class`")[1].split("`extraction_method`")[0]))
+    methods = set(re.findall(r"`([a-z_]+)`", scores.split("`extraction_method`")[1].split("`component_errors`")[0]))
+    assert classes == set(score.ERROR_CLASSES), (classes ^ set(score.ERROR_CLASSES))
+    assert methods == set(extract.METHODS), (methods ^ set(extract.METHODS))
+    assert len(classes) >= 12 and len(methods) == 9
+
+
+def test_data_format_arm_names_are_the_runners_names_and_the_aliases_are_the_preregistered_ones():
+    from noilai import constants
+    from noilai.eval import prompts as P
+    from noilai.vi import reencode as R
+    t = _read(DOCS / "DATA_FORMAT.md")
+    row = next(ln for ln in t.splitlines() if ln.startswith("| `arm` |"))
+    named = re.findall(r"`([a-z0-9_]+)`", row)
+    canonical = {a for a in named if a in set(R.ARMS)}
+    campaign = {P.normalize_arm(a) for a in constants.ARMS}                 # the pre-registered arms, canonical names
+    assert campaign <= canonical <= set(R.ARMS), (campaign - canonical, canonical - set(R.ARMS))
+    assert not ({"base", "pc"} & set(R.ARMS)) and {"base", "pc"} <= set(named)
+    for alias, target in P.ARM_ALIASES.items():
+        assert alias in named and target in named, (alias, target)
+    assert "never appear in rows" in row
+    pid = next(ln for ln in t.splitlines() if ln.startswith("| `prompt_id` |"))
+    assert P.prompt_id() in pid and "-item" in pid and "`p0`, `p1`, `p2`) and shot count" not in pid
+
+
+def test_data_format_documents_the_three_valued_exactness_tag_and_the_release_uses_it():
+    t = _read(DOCS / "DATA_FORMAT.md")
+    assert "approx(merger:" in t and "approx(substitution:" in t and "approx(<merger>)" not in t
+    attested = ROOT / "data" / "release" / "v0.2" / "attested.jsonl"
+    if not attested.exists():
+        pytest.skip("no v0.2 attested.jsonl")
+    values = {json.loads(ln)["exactness"] for ln in attested.read_text(encoding="utf-8").splitlines() if ln.strip()}
+    assert len(values) >= 3 and "exact" in values
+    kinds = set()
+    for v in values:
+        m = re.fullmatch(r"exact|approx\((merger|substitution): .+\)", v)
+        assert m, v
+        if m.group(1):
+            kinds.add(m.group(1))
+    assert kinds == {"merger", "substitution"}
+
+
+# ------------------------------------------------------------------ superseded statements stay out of the documents
+def test_superseded_statements_are_absent_from_the_documents():
+    absent = {
+        "DATA_FORMAT.md": ("preferred after", "never redistributed", "standard new-style spelling", "records seed,"),
+        "IMPLEMENTATION_DECISIONS.md": ("never redistributed", "prefers the attested `y` form after h k l m t s", "`xit`, `hoc`)",
+                                        "Of the 22 seed rows"),
+        "DATA_STATEMENT.md": ("predates the red-team amendments", "dev-build seed is published", "was sent to hosted APIs",
+                              "is printed in the paper's appendix. The", "*hoc*", "rejects 32 entries",
+                              "applied at generation to inputs, gold"),
+        "DESIGN_DECISIONS.md": ("built at commit 975be27", "already matches section 1 (verified", "the file is untracked",
+                                "92% longer", "clean `bí mà` → `bì má`", "49% of the time", "α = 0.84",
+                                "noilai_main4200", "GUID printed in the appendix (4.6)", "generator commit and seed",
+                                "Stage 1 (the v0.2 freeze commit)", "today 0 of 22", "the separator is required",
+                                "To implement (absent from the code today)", "lacks `lenient_only`",
+                                "rename `hiraoka-okazaki-2025-spelling`"),
+        "VALIDATOR_INSTRUCTIONS.md": ("mờ mông",),
+        "RISKS.md": ("92% longer",),
+        "RESULTS_LOG.md": ("Counts below are from the first v0.2 build and\nare superseded",),
+        "DEVIATIONS.md": ("to be frozen in a dated commit before Gate 1",),
+        "WEEK1_CHECKLIST.md": ("compute_log.py add",),
+        "CHECKLIST_DRAFT.md": ("to inputs, gold, T2 readings and T3 candidates in either order",),
+    }
+    n = 0
+    for name, phrases in absent.items():
+        t = _read(DOCS / name)
+        for ph in phrases:
+            n += 1
+            assert ph not in t, f"{name}: {ph!r}"
+    assert n >= 30
+    for name in ("DATA_FORMAT.md", "IMPLEMENTATION_DECISIONS.md", "DATA_STATEMENT.md"):
+        assert "consulted at build time" in _read(DOCS / name) or name == "DATA_FORMAT.md"
+
+
+def test_build_seed_appears_in_no_document_or_paper_source():
+    """DESIGN_DECISIONS 4.6 (item 51): the build seed is not published. The private release manifest is the
+    only place it may live (it is not covered here; redacting it is the release scripts' job)."""
+    if not MANIFEST.exists():
+        pytest.skip("no v0.2 manifest")
+    seed = str(json.load(MANIFEST.open(encoding="utf-8"))["seed"])
+    assert seed.isdigit() and len(seed) >= 6
+    files = sorted(DOCS.glob("*.md")) + sorted(PAPER.glob("*.tex")) + sorted((PAPER / "tables").glob("*.tex")) + [PAPER / "README.md"]
+    assert len(files) >= 25
+    hits = [str(f.relative_to(ROOT)) for f in files if seed in f.read_text(encoding="utf-8")]
+    assert not hits, f"the build seed is printed in {hits}"
+    ds = _read(DOCS / "DATA_STATEMENT.md")
+    assert "**The build seed is not published**" in ds and "one seeded stream" in ds.split("## 0.")[1].split("## A.")[0]
+
+
+# ------------------------------------------------------------------ figures reproduce from the named files (DD 12.43)
+def _manifest():
+    if not MANIFEST.exists():
+        pytest.skip("no v0.2 manifest")
+    return json.load(MANIFEST.open(encoding="utf-8"))
+
+
+def test_results_log_v02_entry_matches_the_committed_manifest_and_attested_file():
+    m = _manifest()
+    log = _norm(_read(DOCS / "RESULTS_LOG.md").split("[RL-2026-09-30-05]")[1].split("## ")[0])
+    split, task = defaultdict(int), defaultdict(int)
+    for k, n in m["counts"].items():
+        t, _v, s = k.split("-")
+        split[s] += n
+        task[t] += n
+    d = m["drops"]
+    identity = sum(v for k, v in d.items() if k.endswith(":identity"))
+    reversal = sum(v for k, v in d.items() if k.endswith(":plain_reversal"))
+    illegal = sum(v for k, v in d.items() if k.endswith(":illegal"))
+    expected = [f"{int(m['n_items']):,} items (T1 {task['T1']:,}, T2 {task['T2']:,}, T3 {task['T3']:,})",
+                f"dev {split['dev']:,} / test {split['test']:,}", f"core {sum(m['core_counts'].values()):,}",
+                f"Vulgar-flagged items {sum(m['vulgar_counts'].values())}", f"C2-affected items {sum(m['c2_affected_counts'].values())}",
+                f"taboo phrase {d['base:vulgar_input']} (`base:vulgar_input`)", f"identity {identity:,}, plain reversal {reversal:,}",
+                f"illegal {illegal:,}", f"excluded {m['n_marginal_rimes']} (`n_marginal_rimes`)",
+                m["content_sha256"], m["git_commit"][:7]]
+    for e in expected:
+        assert e in log, e
+    attested = MANIFEST.parent / "attested.jsonl"
+    if attested.exists():
+        rows = [json.loads(ln) for ln in attested.read_text(encoding="utf-8").splitlines() if ln.strip()]
+        exact = sum(1 for r in rows if r.get("exact"))
+        approx = [r["exactness"] for r in rows if not r.get("rule_matches_attested")]
+        subst = sum(1 for e in approx if e.startswith("approx(substitution"))
+        assert f"{len(rows)} rows, {exact} reproduced exactly, {len(approx)} approximate ({subst} substitution, {len(approx) - subst} merger)" in log
+        assert f"{sum(1 for r in rows if r.get('eligible_h6'))} H6-eligible" in log
+        assert f"{sum(1 for r in rows if r.get('n_syllables') == 3)} three-syllable" in log
+    # the superseded first-build paragraph is labelled and no longer claims the committed manifest as its source
+    entry3 = _read(DOCS / "RESULTS_LOG.md").split("[RL-2026-09-30-03]")[1].split("[RL-2026-09-30-04]")[0]
+    assert "**Superseded (first v0.2 build, not the committed release).**" in entry3
+    assert "Source: `data/release/v0.2/manifest.json`" not in entry3
+
+
+def _audit_rows():
+    if not ROWS.exists():
+        pytest.skip("no gemma3_rows.csv")
+    with ROWS.open(encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
+def _among_split(rows, enc):
+    vals = [float(r["boundary_alignment"]) for r in rows if r["encoding"] == enc and r["single_token"] not in ("True", "true", "1")]
+    assert len(vals) > 1000
+    return float(np.mean(vals)), len(vals)
+
+
+def test_alignment_among_split_syllables_is_what_the_documents_quote():
+    rows = _audit_rows()
+    nfc, n_nfc = _among_split(rows, "nfc")
+    nfd, n_nfd = _among_split(rows, "nfd")
+    c = json.load(COUNTS.open(encoding="utf-8"))["tokenizer_audit"]["gemma3"]["summary"]
+    all_nfc, all_nfd = c["nfc"]["boundary_alignment_mean"], c["nfd"]["boundary_alignment_mean"]
+    assert nfc < all_nfc and nfd < all_nfd                     # the all-syllable mean counts single tokens as 1.0
+    log = _norm(_read(DOCS / "RESULTS_LOG.md").split("[RL-2026-09-30-06]")[1])
+    assert f"NFC {nfc:.3f} over {n_nfc:,} split syllables" in log and f"NFD {nfd:.3f} over {n_nfd:,}" in log
+    assert f"{all_nfc:.2f} / {all_nfd:.2f}" in log
+    setup = (PAPER / "sec_setup.tex").read_text(encoding="utf-8")
+    assert f"alignment {nfc:.2f} among split syllables ({all_nfc:.2f} over all syllables" in setup
+    assert f"{nfd:.2f} ({all_nfd:.2f})" in setup
+    reading = _read(DOCS / "RESULTS_LOG.md").split("[RL-2026-09-30-01]")[1].split("[RL-2026-09-30-02]")[0]
+    assert f"(alignment {nfc:.2f} among split syllables; {all_nfc:.2f} over all syllables" in reading
+
+
+def test_nfd_length_figures_in_the_h3_row_reproduce():
+    g = json.load((ROOT / "data" / "audit" / "gemma3.json").open(encoding="utf-8"))
+    c = json.load(COUNTS.open(encoding="utf-8"))["tokenizer_audit"]["gemma3"]["summary"]
+    longer = g["normalization_census"]["nfd_longer_frac"]
+    ratio = c["nfd"]["tokens_per_syllable_mean"] / c["nfc"]["tokens_per_syllable_mean"] - 1
+    phrase = (f"longer for {round(longer * 100)}% of words and carries {round(ratio * 100)}% more tokens per syllable, "
+              f"{c['nfc']['tokens_per_syllable_mean']:.2f} → {c['nfd']['tokens_per_syllable_mean']:.2f}")
+    for name in ("DESIGN_DECISIONS.md", "PREREGISTRATION.md"):
+        assert phrase in _read(DOCS / name), (name, phrase)
+    assert f"longer for {round(longer * 100)}% of words" in _read(DOCS / "RISKS.md")
+    assert f"longer for {round(longer * 100)}\\% of words, carries {round(ratio * 100)}\\% more tokens" in (PAPER / "sec_counterfactuals.tex").read_text(encoding="utf-8")
+    log = _norm(_read(DOCS / "RESULTS_LOG.md").split("[RL-2026-09-30-06]")[1])
+    assert f"{longer * 100:.1f}% of the 500 census words" in log and f"{ratio * 100:.1f}% above NFC" in log
+
+
+def test_single_token_share_by_tone_reproduces_from_the_audit_rows():
+    from noilai.vi.syllable import try_parse
+    names = ["ngang", "huyền", "sắc", "hỏi", "ngã", "nặng"]
+    by_tone = defaultdict(list)
+    for r in _audit_rows():
+        if r["encoding"] != "nfc":
+            continue
+        p = try_parse(r["syllable"], strict=False)
+        if p is None:
+            continue
+        by_tone[names[p.syllable.tone]].append(r["single_token"] in ("True", "true", "1"))
+    assert set(by_tone) == set(names) and all(len(v) > 300 for v in by_tone.values())
+    share = {k: float(np.mean(v)) for k, v in by_tone.items()}
+    log = _norm(_read(DOCS / "RESULTS_LOG.md").split("[RL-2026-09-30-06]")[1])
+    for k, v in share.items():
+        assert f"{k} {v * 100:.1f}%" in log, (k, v)
+    others = [v for k, v in share.items() if k != "ngang"]
+    phrase = f"single tokens {round(share['ngang'] * 100)}% of the time vs {round(min(others) * 100)}–{round(max(others) * 100)}% for the other tones"
+    assert phrase in _read(DD), phrase
+
+
+def test_agreement_illustration_reproduces_with_the_repository_functions():
+    """DD 10.1's illustration is simulated, not typed: two coders, 96% prevalence, independent symmetric error."""
+    from noilai.stats.agreement import gwet_ac1, krippendorff_alpha_nominal, percent_agreement
+    rng = np.random.default_rng(0)
+    n = 200_000
+    got = {}
+    for err in (0.01, 0.02):
+        truth = rng.random(n) < 0.96
+        a = truth ^ (rng.random(n) < err)
+        b = truth ^ (rng.random(n) < err)
+        ratings = [(i, "A", int(a[i])) for i in range(n)] + [(i, "B", int(b[i])) for i in range(n)]
+        got[err] = (percent_agreement(ratings), krippendorff_alpha_nominal(ratings), gwet_ac1(ratings))
+    log = _norm(_read(DOCS / "RESULTS_LOG.md").split("[RL-2026-09-30-06]")[1])
+    for err, (raw, alpha, ac1) in got.items():
+        assert f"{int(err * 100)}% error each → raw agreement {raw:.3f}, Krippendorff's α {alpha:.3f}, Gwet's AC1 {ac1:.3f}" in log, (err, raw, alpha, ac1)
+    dd = _read(DD)
+    raw1, a1, ac1 = got[0.01]
+    raw2, a2, ac2 = got[0.02]
+    assert f"raw agreement {round(raw1 * 100)}% but α ≈ {a1:.2f} and AC1 ≈ {ac1:.2f}" in dd
+    assert f"raw {round(raw2 * 100)}%, α ≈ {a2:.2f}, AC1 ≈ {ac2:.2f}" in dd
+    assert got[0.02][1] < 0.7 < got[0.01][1] < 0.8                  # the point of the illustration
+
+
+def test_design_document_rime_list_covers_exactly_the_parsers_rimes():
+    """DD 2.3: 162 orthographic spellings = 154 parser rimes + 8 y-doublets, and the 8 qu-only glide rimes
+    folded into their glide-less spellings; the parser's 162 rimes are counts.json inventory.rimes."""
+    from noilai.vi.syllable import try_parse
+    rimes = set(json.load(COUNTS.open(encoding="utf-8"))["inventory"]["rimes"])
+    para = next(ln for ln in _read(DD).splitlines() if ln.startswith("**162 distinct toneless orthographic rimes**"))
+    m = re.search(r"removed here: `(.*?)`\.", para)
+    raw = re.sub(r"\([^)]*\)", "", m.group(1).split("| (w,")[0])          # the (w, ô, c) note is not a spelling
+    tokens = [t for t in raw.replace("|", " ").split() if re.fullmatch(r"[a-zăâêôơưđ]+", t)]
+    assert len(tokens) == 162
+
+    def key(s):
+        return ("w+" if s.glide else "") + s.nucleus + ("+" + s.coda if s.coda else "")
+    keys = defaultdict(list)
+    for t in tokens:
+        p = None
+        for onset in ("", "h", "t", "c"):
+            p = try_parse(onset + t, strict=False)
+            if p:
+                break
+        assert p, t
+        keys[key(p.syllable)].append(t)
+    doublets = {k: v for k, v in keys.items() if len(v) > 1}
+    assert len(doublets) == 8 and all(any(x.startswith("y") for x in v) for v in doublets.values())
+    folded = set(re.findall(r"w\+[a-zăâêôơư]+\+[a-z]+", para))
+    assert len(folded) == 8 and folded <= rimes and not (folded & set(keys))
+    assert set(keys) | folded == rimes, (sorted(rimes - set(keys) - folded), sorted(set(keys) - rimes))
+    assert f"{len(keys)} parser rimes" in para and f"{len(tokens)} spellings" in para
+
+
+def test_data_statement_names_only_hunspell_entries_the_reconciliation_script_lists():
+    c = json.load(COUNTS.open(encoding="utf-8"))["hunspell"]
+    listed = set(c["unparsed"]) | set(c["rejected_phonotactics"]) | set(c["nonstandard"])
+    ds = _read(DOCS / "DATA_STATEMENT.md")
+    sentence = ds.split("The parser leaves")[1].split("all are listed")[0]
+    named = set(re.findall(r"\*([^*]+)\*", sentence))
+    assert named, "no italic entries named"
+    assert named <= listed, named - listed
+    assert set(c["unparsed"]) <= named and set(c["rejected_phonotactics"]) <= named
+    assert f"{len(c['unparsed'])} distinct entries" in ds and f"({len(c['unparsed']) * 2} lines across the two placement files" in ds
+    block = ds.split("<!-- BEGIN GENERATED release facts")[1].split("<!-- END GENERATED")[0]
+    m = _manifest()
+    assert f"generator commit `{m['git_commit'][:7]}`" in block and ("dirty tree" in block) == bool(m.get("git_dirty"))
+    assert f"commit {m['git_commit'][:7]}" in ds.split("## H.")[1]
+
+
+# ------------------------------------------------------------------ files and CLI flags the documents name exist
+def test_design_document_sub_sample_names_are_run_plan_keys_and_the_checklist_names_real_subcommands():
+    import yaml
+    plan = yaml.safe_load((ROOT / "configs" / "run_plan.yaml").read_text(encoding="utf-8"))
+    keys = set(plan["item_files"])
+    sec45 = _read(DD).split("### 4.5")[1].split("### 4.6")[0]
+    names = set(re.findall(r"`((?:noilai|pilot)_[a-z0-9_]+)\.jsonl`", sec45))
+    assert names >= {"noilai_main", "noilai_core", "noilai_c2", "noilai_api_para300", "pilot_t1_200", "pilot_xcopa_200"}
+    missing = {n for n in names if n not in keys}
+    assert missing == {"noilai_api_dev"} and "not implemented" in sec45.split("noilai_api_dev.jsonl")[1][:200]
+    assert "noilai_main4200" not in sec45
+    help_text = subprocess.run([sys.executable, "scripts/compute_log.py", "--help"], cwd=ROOT, text=True, capture_output=True, check=True).stdout
+    subs = set(re.search(r"\{([a-z,]+)\}", help_text).group(1).split(","))
+    named = set(re.findall(r"scripts/compute_log\.py (\w+)", _read(DOCS / "WEEK1_CHECKLIST.md")))
+    assert named and named <= subs, (named, subs)

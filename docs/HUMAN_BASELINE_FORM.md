@@ -18,7 +18,7 @@ The current `scripts/make_validation_forms.py baseline` subcommand produces a di
 import csv, json, random
 from collections import defaultdict
 from pathlib import Path
-SEED, N_RESP, PER_CELL = 20261004, 20, 20
+SEED, N_RESP, PER_CELL = 20261102, 20, 20   # a public sampling seed; never the (withheld) build seed, DESIGN_DECISIONS 4.6
 rng = random.Random(SEED)
 ITEMS = "data/release/v0.2/noilai_main.jsonl"      # the run plan's open-model main sample (v0.3 at the freeze)
 rows = [json.loads(l) for l in open(ITEMS, encoding="utf-8") if l.strip()]

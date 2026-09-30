@@ -62,11 +62,11 @@ def _quotes() -> dict[str, str]:
     }
 
 
-# constants the pre-registration draft does not quote yet, or quotes with a superseded value (PREREG 8.3 "6 tests",
-# 8.9 "5 control-label seeds"; the H6 floor, the readout-B retention fallback and the minimum viable panel are absent).
-# Strict xfail: the moment the document is corrected these flip to XPASS and the marker must be removed.
-PREREG_STALE = {"HOLM_FAMILY_TABLE3_CELLS", "PROBE_SEEDS", "PATCHING_READOUT_B_MIN_RETENTION", "ATTESTED_EXACT_FLOOR_FOR_H6",
-                "MIN_VIABLE_PANEL", "H1_MISALIGNED_SPLIT_FLOOR"}
+# constants the pre-registration draft does not quote yet, or quotes with a superseded value. Strict xfail: the moment
+# the document is corrected an entry flips to XPASS and must be removed. Emptied in the paper-docs round of
+# 30 September 2026, when docs/PREREGISTRATION.md was rewritten from the design document (14-cell family, 5 x 3 seeds,
+# the H6 floor, the readout-B retention fallback, the minimum viable panel and the H1 identifiability floor).
+PREREG_STALE: set[str] = set()
 
 
 def test_constants_are_quoted_by_the_binding_documents():
