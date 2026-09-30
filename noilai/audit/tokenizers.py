@@ -22,13 +22,13 @@ from __future__ import annotations
 
 import json
 import unicodedata
+from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from statistics import mean
-from typing import Iterable, Optional, Sequence
 
 from ..vi import unicode as U
-from ..vi.syllable import Parse, spell, try_parse
+from ..vi.syllable import Parse, try_parse
 
 
 @dataclass
@@ -53,7 +53,7 @@ class TokenizerAdapter:
 
 
 class SentencePieceAdapter(TokenizerAdapter):
-    def __init__(self, model_path: str | Path, name: Optional[str] = None):
+    def __init__(self, model_path: str | Path, name: str | None = None):
         import sentencepiece as spm
 
         self.sp = spm.SentencePieceProcessor(model_file=str(model_path))
@@ -94,7 +94,7 @@ class SentencePieceAdapter(TokenizerAdapter):
 
 
 class HFAdapter(TokenizerAdapter):
-    def __init__(self, name_or_path: str, name: Optional[str] = None, **kw):
+    def __init__(self, name_or_path: str, name: str | None = None, **kw):
         from transformers import AutoTokenizer
 
         self.tok = AutoTokenizer.from_pretrained(name_or_path, **kw)
@@ -126,7 +126,7 @@ def _byte_to_char_map(text: str) -> list[int]:
 
 
 # ------------------------------------------------------------------ syllable-level metrics
-def linguistic_boundaries(parse: Parse, surface: str) -> dict[str, Optional[int]]:
+def linguistic_boundaries(parse: Parse, surface: str) -> dict[str, int | None]:
     """Character offsets (within `surface`, NFC) of the onset|rime, glide|nucleus and
     nucleus|coda boundaries, or None when the component is empty."""
     s = parse.syllable
@@ -162,7 +162,7 @@ class SyllableAudit:
     byte_fallback: bool
 
 
-def audit_syllable(adapter: TokenizerAdapter, syllable: str, encoding: str = "nfc", context: str = " ") -> Optional[SyllableAudit]:
+def audit_syllable(adapter: TokenizerAdapter, syllable: str, encoding: str = "nfc", context: str = " ") -> SyllableAudit | None:
     """Tokenize `context + syllable` (the leading space puts the syllable in word-initial
     position as it appears in running text) and measure the split of the syllable."""
     p = try_parse(syllable, strict=False)

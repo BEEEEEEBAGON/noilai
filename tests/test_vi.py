@@ -3,11 +3,11 @@ import unicodedata
 
 import pytest
 
+from noilai.gen import variants as V
 from noilai.vi import lexicon as L
 from noilai.vi import reencode as R
 from noilai.vi import unicode as U
-from noilai.vi.syllable import ParseError, parse, spell, try_parse
-from noilai.gen import variants as V
+from noilai.vi.syllable import parse, spell, try_parse
 
 
 def S(w):

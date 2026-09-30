@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import Optional, Sequence
 
 from ..gen import variants as V
 from ..vi import unicode as U
@@ -78,7 +77,7 @@ def build_pairs(inv: Inventory, n: int, seed: int = 0, target_first: bool = True
     return pairs
 
 
-def align_pair(tokenizer, pair: PatchPair, add_special_tokens: bool = True) -> Optional[dict]:
+def align_pair(tokenizer, pair: PatchPair, add_special_tokens: bool = True) -> dict | None:
     """Tokenize both prompts; keep the pair only if the token sequences have equal length and
     differ only inside the target span, and the two answers' first tokens differ.
     Returns ids, differing positions, target positions and the answer token ids."""

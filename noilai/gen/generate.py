@@ -31,9 +31,8 @@ import json
 import random
 import uuid
 from collections import Counter, defaultdict
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Optional
 
 from ..vi import lexicon as L
 from ..vi import unicode as U
@@ -99,8 +98,8 @@ def strata_for(inp: tuple[Syllable, Syllable], out: tuple[Syllable, Syllable], b
 
 
 class Generator:
-    def __init__(self, seed: int = 20261004, inventory: Optional[Inventory] = None,
-                 words: Optional[list[str]] = None, exclude_qu: bool = True):
+    def __init__(self, seed: int = 20261004, inventory: Inventory | None = None,
+                 words: list[str] | None = None, exclude_qu: bool = True):
         """exclude_qu: leave out base pairs containing a qu- syllable. The written 'qu' hides
         the glide inside the onset letters; school grammar swaps 'qu' as an onset while
         phonology (and this engine) treats the glide as part of the rime, and the two give
@@ -163,11 +162,11 @@ class Generator:
 
     @staticmethod
     def _bp_id(source: str, a: str, b: str) -> str:
-        h = hashlib.sha1(f"{source}|{a} {b}".encode("utf-8")).hexdigest()[:10]
+        h = hashlib.sha1(f"{source}|{a} {b}".encode()).hexdigest()[:10]
         return f"bp-{h}"
 
     # ------------------------------------------------------------------ T1
-    def t1(self, bp: BasePair, variant: str) -> Optional[dict]:
+    def t1(self, bp: BasePair, variant: str) -> dict | None:
         inp = (bp.a, bp.b)
         if V.is_identity(variant, *inp):
             return None
@@ -184,7 +183,7 @@ class Generator:
         }
 
     # ------------------------------------------------------------------ T2
-    def t2(self, bp: BasePair, variant: str) -> Optional[dict]:
+    def t2(self, bp: BasePair, variant: str) -> dict | None:
         """Decoding: the input is the nói lái form, the gold is every lexical reading."""
         if bp.source != "lexicon":
             return None
@@ -219,7 +218,7 @@ class Generator:
         return golds
 
     # ------------------------------------------------------------------ T3
-    def t3_pair(self, t1_item: dict, twin_type: Optional[str] = None) -> Optional[tuple[dict, dict]]:
+    def t3_pair(self, t1_item: dict, twin_type: str | None = None) -> tuple[dict, dict] | None:
         """A yes item (candidate = gold) and a no item (candidate = twin) with the same input."""
         inp = tuple(self._syl(d) for d in t1_item["input_syllables"])
         out = tuple(self._syl(d) for d in t1_item["gold_syllables"])
@@ -241,7 +240,7 @@ class Generator:
     def _syl(d: dict) -> Syllable:
         return Syllable(onset=d["onset"], glide=d["glide"], nucleus=d["nucleus"], coda=d["coda"], tone=d["tone"])
 
-    def _twin(self, tt: str, variant: str, inp, out) -> Optional[str]:
+    def _twin(self, tt: str, variant: str, inp, out) -> str | None:
         gold = f"{spell(out[0])} {spell(out[1])}"
         if tt == "other_variant":
             others = [v for v in V.VARIANTS if v != variant]
@@ -277,7 +276,7 @@ class Generator:
         return None
 
     @staticmethod
-    def _misspell(out) -> Optional[str]:
+    def _misspell(out) -> str | None:
         """Violate one c/k, g/gh or ng/ngh rule in one syllable of the gold."""
         from ..vi.syllable import _onset_spelling
         words = [spell(s) for s in out]
@@ -301,7 +300,7 @@ class Generator:
     # ------------------------------------------------------------- assembly
     def build(self, n_lexicon: int = 1500, n_pseudo: int = 1000, per_cell_t1: int = 1000,
               per_cell_t2: int = 500, per_cell_t3: int = 500, dev_frac: float = 0.2,
-              core_per_cell: int = 125, canary: Optional[str] = None) -> dict:
+              core_per_cell: int = 125, canary: str | None = None) -> dict:
         canary = canary or f"NOILAI-CANARY-{uuid.UUID(int=self.rng.getrandbits(128))}"
         pairs = self.base_pairs(n_lexicon, n_pseudo)
         # split by base pair
@@ -409,7 +408,7 @@ def resource_hashes() -> dict[str, str]:
     return out
 
 
-def write_release(build: dict, out_dir: Path, manifest_extra: Optional[dict] = None) -> dict:
+def write_release(build: dict, out_dir: Path, manifest_extra: dict | None = None) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     items = build["items"]
     files = {
@@ -420,8 +419,7 @@ def write_release(build: dict, out_dir: Path, manifest_extra: Optional[dict] = N
     for name, path in files.items():
         sel = [it for it in items if (it["in_core"] if name == "core" else it["split"] == name)]
         with open(path, "w", encoding="utf-8") as f:
-            for it in sel:
-                f.write(json.dumps(it, ensure_ascii=False) + "\n")
+            f.writelines(json.dumps(it, ensure_ascii=False) + "\n" for it in sel)
     counts = Counter((it["task"], it["variant"], it["split"]) for it in items)
     manifest = {
         "n_items": len(items),

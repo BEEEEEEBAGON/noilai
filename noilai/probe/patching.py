@@ -18,9 +18,9 @@ nn.ModuleList (found automatically); tested on a tiny random LLaMA.
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Callable, Optional, Sequence
 
 import numpy as np
 
@@ -28,7 +28,7 @@ import numpy as np
 def get_decoder_layers(model):
     """Find the ModuleList of decoder blocks (model.model.layers for LLaMA/Gemma/Qwen;
     language_model.model.layers for multimodal wrappers)."""
-    import torch.nn as nn
+    from torch import nn
 
     for path in ("model.layers", "model.language_model.layers", "language_model.model.layers", "transformer.h", "gpt_neox.layers"):
         obj = model
@@ -67,7 +67,7 @@ class ResidualCache:
 
     def __init__(self, model):
         self.layers = get_decoder_layers(model)
-        self.store: dict[int, "object"] = {}
+        self.store: dict[int, object] = {}
         self._handles = []
 
     def __enter__(self):
@@ -113,7 +113,7 @@ def patch_layer(model, layer_idx: int, positions: Sequence[int], values, batch_i
 
 
 @contextmanager
-def add_direction(model, layer_idx: int, positions: Optional[Sequence[int]], direction, alpha: float):
+def add_direction(model, layer_idx: int, positions: Sequence[int] | None, direction, alpha: float):
     """Add alpha * direction to the residual at layer_idx (at `positions`, or everywhere if None)."""
     import torch
 
@@ -150,7 +150,7 @@ class PatchResult:
 
 
 def run_patching(model, clean_ids, corrupt_ids, answer_pos: int, tok_clean: int, tok_corrupt: int,
-                 position_groups: Sequence[Sequence[int]], layers: Optional[Sequence[int]] = None) -> PatchResult:
+                 position_groups: Sequence[Sequence[int]], layers: Sequence[int] | None = None) -> PatchResult:
     """clean_ids / corrupt_ids: LongTensor [1, T] of equal length (same tokenization outside
     the patched positions). position_groups: lists of token positions to patch together."""
     import torch
@@ -184,7 +184,7 @@ def difference_in_means(H_a: np.ndarray, H_b: np.ndarray) -> np.ndarray:
 
 
 def steering_flip_rate(model, input_ids_list: Sequence, answer_pos_list: Sequence[int], tok_a: int, tok_b: int,
-                       layer_idx: int, direction: np.ndarray, alpha: float, positions_list: Optional[Sequence[Sequence[int]]] = None) -> dict:
+                       layer_idx: int, direction: np.ndarray, alpha: float, positions_list: Sequence[Sequence[int]] | None = None) -> dict:
     """Share of inputs whose preferred answer (a vs b) flips under steering, plus mean LD shift."""
     import torch
 

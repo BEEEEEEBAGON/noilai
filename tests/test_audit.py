@@ -4,8 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from noilai.audit.tokenizers import (SentencePieceAdapter, Token, TokenizerAdapter, audit_syllable,
-                                     linguistic_boundaries, normalization_census)
+from noilai.audit.tokenizers import (
+    SentencePieceAdapter,
+    Token,
+    TokenizerAdapter,
+    audit_syllable,
+    linguistic_boundaries,
+    normalization_census,
+)
 from noilai.vi.syllable import parse
 
 ROOT = Path(__file__).resolve().parents[1]

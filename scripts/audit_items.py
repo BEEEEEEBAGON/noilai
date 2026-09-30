@@ -23,8 +23,8 @@ from statistics import mean
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from noilai.audit.tokenizers import HFAdapter, SentencePieceAdapter, audit_syllable  # noqa: E402
-from noilai.gen.generate import load_items  # noqa: E402
+from noilai.audit.tokenizers import HFAdapter, SentencePieceAdapter, audit_syllable
+from noilai.gen.generate import load_items
 
 
 def phrase_stats(adapter, phrase: str, encoding: str) -> dict:

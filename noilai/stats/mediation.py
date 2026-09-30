@@ -20,8 +20,8 @@ assumptions. We therefore report two well-defined quantities instead (pre-regist
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, Sequence
 
 import numpy as np
 
@@ -35,8 +35,8 @@ class Decomposition:
     slope_per_token: CI           # β
     token_associated_part: CI     # β · mean(Δtok)
     share_token_associated: CI    # (β · mean Δtok) / mean(d); undefined when mean(d) ≈ 0
-    effect_delta_zero: Optional[CI]   # matched contrast: items with Δtok == 0
-    effect_delta_pos: Optional[CI]    # items with Δtok > 0
+    effect_delta_zero: CI | None   # matched contrast: items with Δtok == 0
+    effect_delta_pos: CI | None    # items with Δtok > 0
     n_delta_zero: int
     n_delta_pos: int
 

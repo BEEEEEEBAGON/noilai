@@ -32,9 +32,10 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from noilai.probe import extract, pairs as P, patching, probes  # noqa: E402
-from noilai.vi import lexicon as L  # noqa: E402
-from noilai.vi.syllable import spell  # noqa: E402
+from noilai.probe import extract, patching, probes
+from noilai.probe import pairs as P
+from noilai.vi import lexicon as L
+from noilai.vi.syllable import spell
 
 
 def sample_syllables(inv, n: int, seed: int) -> list[str]:

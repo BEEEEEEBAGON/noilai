@@ -8,8 +8,8 @@ model" or "every model against the best model on T1".
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, Sequence
 
 import numpy as np
 from scipy import stats as sps
@@ -27,11 +27,11 @@ class PairedTest:
     n_only_a: int          # a correct, b wrong
     n_only_b: int          # b correct, a wrong
     p_mcnemar: float
-    p_bootstrap: Optional[float]
-    ci_lo: Optional[float]
-    ci_hi: Optional[float]
-    p_adj: Optional[float] = None
-    significant: Optional[bool] = None
+    p_bootstrap: float | None
+    ci_lo: float | None
+    ci_hi: float | None
+    p_adj: float | None = None
+    significant: bool | None = None
 
     def as_dict(self) -> dict:
         return self.__dict__.copy()
@@ -51,7 +51,7 @@ def mcnemar_exact(n_only_a: int, n_only_b: int, mid_p: bool = True) -> float:
     return float(min(1.0, max(0.0, p_two)))
 
 
-def paired_test(correct_a: Sequence[bool], correct_b: Sequence[bool], clusters: Optional[Sequence] = None,
+def paired_test(correct_a: Sequence[bool], correct_b: Sequence[bool], clusters: Sequence | None = None,
                 name: str = "", bootstrap: bool = True, n_boot: int = 4000, seed: int = 0) -> PairedTest:
     a = np.asarray(correct_a, dtype=bool)
     b = np.asarray(correct_b, dtype=bool)

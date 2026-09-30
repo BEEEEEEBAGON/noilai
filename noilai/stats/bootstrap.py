@@ -8,8 +8,8 @@ e.g. NFC vs NFD, or model A vs model B) resample the same pairs for both conditi
 """
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Callable, Optional, Sequence
 
 import numpy as np
 
@@ -51,7 +51,7 @@ def cluster_bootstrap(values: Sequence[float], clusters: Sequence, stat: Callabl
     v = np.asarray(values, dtype=float)
     inv, k = _cluster_index(clusters)
     if stat is None:
-        stat = lambda x, w: float(np.average(x, weights=w)) if w.sum() else float("nan")  # noqa: E731
+        stat = lambda x, w: float(np.average(x, weights=w)) if w.sum() else float("nan")
     est = stat(v, np.ones_like(v))
     rng = np.random.default_rng(seed)
     boots = np.empty(n_boot)
@@ -95,7 +95,7 @@ def paired_bootstrap_pvalue(correct_a: Sequence[bool], correct_b: Sequence[bool]
     return float(min(1.0, p))
 
 
-def stratified_accuracy(df, by: Sequence[str], correct_col: str = "correct", cluster_col: str = "base_pair_id", **kw) -> "list[dict]":
+def stratified_accuracy(df, by: Sequence[str], correct_col: str = "correct", cluster_col: str = "base_pair_id", **kw) -> list[dict]:
     """Accuracy CI per stratum of a pandas DataFrame (e.g. by task and variant)."""
     out = []
     for keys, g in df.groupby(list(by), sort=True):

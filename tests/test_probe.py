@@ -5,7 +5,7 @@ import pytest
 torch = pytest.importorskip("torch")
 transformers = pytest.importorskip("transformers")
 
-from noilai.probe import extract, patching, probes  # noqa: E402
+from noilai.probe import extract, patching, probes
 
 VOCAB_CHARS = list("abcdeghiklmnopqrstuvxyđ ăâêôơưàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ.,ÂÊÔ") + ["Ừ", "Ừ".lower()]
 

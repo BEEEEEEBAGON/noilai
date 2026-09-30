@@ -8,8 +8,8 @@ the manuscript is produced here from scores files whose manifests name the model
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Optional, Sequence
 
 import pandas as pd
 
@@ -84,7 +84,7 @@ def to_latex_accuracy(tab: pd.DataFrame, caption: str, label: str, col: str = "t
     return "\n".join(lines)
 
 
-def to_latex_interventions(tab: pd.DataFrame, caption: str, label: str, normalizes: Optional[dict] = None) -> str:
+def to_latex_interventions(tab: pd.DataFrame, caption: str, label: str, normalizes: dict | None = None) -> str:
     arms = list(dict.fromkeys(tab["arm"]))
     lines = ["\\begin{table}[t]", "\\centering", "\\small",
              "\\begin{tabular}{ll" + "c" * len(arms) + ("c" if normalizes else "") + "}", "\\toprule",

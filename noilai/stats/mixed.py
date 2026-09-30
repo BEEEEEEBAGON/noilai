@@ -16,8 +16,8 @@ quantities H1 speaks about.
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -31,7 +31,7 @@ class FixedEffect:
     estimate: float
     sd: float
     z: float
-    p: Optional[float]
+    p: float | None
     odds_ratio: float
 
 

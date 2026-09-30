@@ -11,8 +11,8 @@ accuracy(real) − accuracy(control) and require it to exceed a pre-registered m
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
-from typing import Optional, Sequence
+from collections.abc import Sequence
+from dataclasses import asdict, dataclass
 
 import numpy as np
 
@@ -64,7 +64,7 @@ def _fit_predict(Xtr, ytr, Xte, C: float = 1.0, max_iter: int = 2000, seed: int 
     return clf.predict(Xte)
 
 
-def run_layer_probes(H: np.ndarray, labels: Sequence, groups: Sequence, feature: str, layers: Optional[Sequence[int]] = None,
+def run_layer_probes(H: np.ndarray, labels: Sequence, groups: Sequence, feature: str, layers: Sequence[int] | None = None,
                      test_frac: float = 0.3, seed: int = 0, C: float = 1.0) -> list[LayerResult]:
     """H: [n, L+1, d]. Returns one LayerResult per layer."""
     y = np.asarray(labels)
@@ -82,7 +82,7 @@ def run_layer_probes(H: np.ndarray, labels: Sequence, groups: Sequence, feature:
         predc = _fit_predict(X[tr], yc[tr], X[te], C=C, seed=seed)
         acc_c = float(np.mean(predc == yc[te]))
         results.append(LayerResult(layer=int(L), feature=feature, acc=acc, control_acc=acc_c, selectivity=acc - acc_c,
-                                   majority=majority, n_train=len(tr), n_test=len(te), n_classes=int(len(np.unique(y)))))
+                                   majority=majority, n_train=len(tr), n_test=len(te), n_classes=len(np.unique(y))))
     return results
 
 

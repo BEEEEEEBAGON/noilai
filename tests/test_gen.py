@@ -5,8 +5,7 @@ from collections import Counter
 import pytest
 
 from noilai.gen import variants as V
-from noilai.gen.generate import Generator, TWIN_TYPES, load_items, write_release
-from noilai.vi import lexicon as L
+from noilai.gen.generate import TWIN_TYPES, Generator, load_items, write_release
 from noilai.vi.reencode import canonical_text
 from noilai.vi.syllable import Syllable, spell, try_parse
 

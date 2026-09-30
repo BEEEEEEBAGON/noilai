@@ -13,9 +13,8 @@ Everything returns numpy arrays so that the probing code has no torch dependency
 """
 from __future__ import annotations
 
-import unicodedata
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import Iterable, Optional, Sequence
 
 import numpy as np
 
@@ -45,7 +44,7 @@ class ProbeExample:
 
 
 def make_examples(syllables: Iterable[str], carriers: Sequence[str] = CARRIERS, encoding: str = "nfc",
-                  carrier_ids: Optional[Sequence[int]] = None) -> list[ProbeExample]:
+                  carrier_ids: Sequence[int] | None = None) -> list[ProbeExample]:
     out = []
     for syl in syllables:
         p = try_parse(syl, strict=False)
@@ -77,7 +76,7 @@ def token_span(offsets: Sequence[tuple[int, int]], char_start: int, char_end: in
 
 
 def extract_hidden_states(model, tokenizer, examples: Sequence[ProbeExample], batch_size: int = 16,
-                          positions: Sequence[str] = ("last", "after"), device: Optional[str] = None,
+                          positions: Sequence[str] = ("last", "after"), device: str | None = None,
                           add_special_tokens: bool = True) -> dict[str, np.ndarray]:
     """Return {position: array [n_examples, n_layers+1, hidden]} (index 0 = embeddings)."""
     import torch

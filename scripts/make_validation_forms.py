@@ -37,9 +37,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from noilai.gen.generate import load_items  # noqa: E402
-from noilai.stats.agreement import alpha_bootstrap_ci, krippendorff_alpha_nominal, percent_agreement  # noqa: E402
-from noilai.stats.bootstrap import accuracy_ci  # noqa: E402
+from noilai.gen.generate import load_items
+from noilai.stats.agreement import (
+    alpha_bootstrap_ci,
+    percent_agreement,
+)
+from noilai.stats.bootstrap import accuracy_ci
 
 JUDGMENTS = ("correct", "spelling", "lexical", "offensive")
 

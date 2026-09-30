@@ -14,7 +14,6 @@ Capitalization is preserved letter by letter.
 from __future__ import annotations
 
 import re
-from typing import Callable
 
 from . import unicode as U
 from .syllable import spell, try_parse

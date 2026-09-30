@@ -36,8 +36,8 @@ never emits a syllable that fails `is_legal`.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
-from typing import Iterable, Optional
 
 from . import unicode as U
 
@@ -85,13 +85,13 @@ class Syllable:
     def rime_with_tone(self) -> str:
         return f"{self.rime}/{self.tone}"
 
-    def with_tone(self, tone: int) -> "Syllable":
+    def with_tone(self, tone: int) -> Syllable:
         return replace(self, tone=tone)
 
-    def with_onset(self, onset: str) -> "Syllable":
+    def with_onset(self, onset: str) -> Syllable:
         return replace(self, onset=onset)
 
-    def with_rime_of(self, other: "Syllable") -> "Syllable":
+    def with_rime_of(self, other: Syllable) -> Syllable:
         return replace(self, glide=other.glide, nucleus=other.nucleus, coda=other.coda)
 
     def spelled(self, style: str = "new") -> str:
@@ -110,7 +110,7 @@ class Parse:
     rime_spelling: str        # toneless rime letters as written, e.g. 'oa', 'uyên'
     tone_letter_index: int    # index (within the rime letters) of the letter bearing the tone, -1 if none
     placement: str            # 'new', 'old', 'same' (styles agree), 'none' (no tone), 'invalid'
-    i_y_variant: Optional[str]  # 'y' if a non-standard y was used for nucleus i (lý), 'i' if i used where y is standard (quí), else None
+    i_y_variant: str | None  # 'y' if a non-standard y was used for nucleus i (lý), 'i' if i used where y is standard (quí), else None
     capitalization: str       # 'lower', 'title', 'upper', 'mixed'
 
 
@@ -195,10 +195,7 @@ def parse(text: str, strict: bool = True) -> Parse:
         rest = rest[1:]
         if not rest or rest[0] not in U.VOWELS_NFC_SET:
             raise ParseError(f"qu without a vowel in {surface!r}")
-    elif len(rest) >= 2 and rest[0] == "o" and rest[1] in _GLIDE_O_NUCLEI:
-        glide = True
-        rest = rest[1:]
-    elif len(rest) >= 2 and rest[0] == "u" and rest[1] in _GLIDE_U_NEXT:
+    elif len(rest) >= 2 and rest[0] == "o" and rest[1] in _GLIDE_O_NUCLEI or len(rest) >= 2 and rest[0] == "u" and rest[1] in _GLIDE_U_NEXT:
         glide = True
         rest = rest[1:]
 
@@ -262,7 +259,7 @@ def parse(text: str, strict: bool = True) -> Parse:
                  i_y_variant=variant, capitalization=cap)
 
 
-def try_parse(text: str, strict: bool = True) -> Optional[Parse]:
+def try_parse(text: str, strict: bool = True) -> Parse | None:
     try:
         return parse(text, strict=strict)
     except ParseError:
@@ -279,7 +276,7 @@ def _capitalization(s: str) -> str:
     return "mixed"
 
 
-def _match_nucleus(rest: str, glide: bool, onset: str) -> tuple[str, str, Optional[str]]:
+def _match_nucleus(rest: str, glide: bool, onset: str) -> tuple[str, str, str | None]:
     """Return (canonical nucleus, remaining letters, i/y variant note)."""
     variant = None
     if glide:
@@ -315,7 +312,7 @@ def _match_nucleus(rest: str, glide: bool, onset: str) -> tuple[str, str, Option
     raise ParseError(f"no nucleus in {rest!r}")
 
 
-def _match_coda(rest: str, nucleus: str) -> Optional[str]:
+def _match_coda(rest: str, nucleus: str) -> str | None:
     if rest == "":
         return ""
     if rest in CONSONANT_CODAS:
@@ -521,7 +518,7 @@ class Inventory:
         return syl in self.structures
 
 
-def canonical(text: str) -> Optional[str]:
+def canonical(text: str) -> str | None:
     """Standard (new-style, NFC, lowercase) spelling of a syllable, or None if unparseable."""
     p = try_parse(text, strict=False)
     return None if p is None else spell(p.syllable, style="new")

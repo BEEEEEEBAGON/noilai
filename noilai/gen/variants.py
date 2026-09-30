@@ -26,7 +26,6 @@ input unchanged.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 from ..vi.syllable import Syllable, replace
 
@@ -73,7 +72,7 @@ def is_identity(variant: str, a: Syllable, b: Syllable) -> bool:
     return out == (a, b)
 
 
-def identify(a: Syllable, b: Syllable, x: Syllable, y: Syllable) -> Optional[str]:
+def identify(a: Syllable, b: Syllable, x: Syllable, y: Syllable) -> str | None:
     """Which variant maps (a, b) to (x, y) exactly in this order? None if none does."""
     for v in VARIANTS:
         if apply(v, a, b) == (x, y):

@@ -8,7 +8,7 @@ coincidence-matrix definition (Krippendorff 2011) so that no extra dependency is
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Hashable, Iterable, Sequence
+from collections.abc import Hashable, Iterable, Sequence
 
 import numpy as np
 
