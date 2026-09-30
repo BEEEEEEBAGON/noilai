@@ -23,14 +23,19 @@ no identifying information, and the generator scripts reproduce the committed ta
 
 | output | script | source |
 |---|---|---|
-| `tables/table1_counts.tex` | `gen_table1.py --manifest <build>/manifest.json [--attested <build>/attested.jsonl]` | a build manifest; a reduced build is marked "smoke build; regenerate" in the comment **and** in the caption |
-| `figures/fig1_tokens.tex` (+ `.json`) | `gen_fig1_tokens.py` | `data/external/gemma3_tokenizer.model` through `noilai.audit.tokenizers.SentencePieceAdapter` |
+| `tables/table1_counts.tex` | `gen_table1.py --manifest <build>/manifest.json [--attested <build>/attested.jsonl] [--release] [--note ...]` | a build manifest; a build whose generator arguments differ from the plan, or that is smaller than ~10,000 items without `--release`, is marked "smoke build; regenerate" in the comment **and** in the caption; the header records which rule decided; `--note` adds a red placeholder note to both |
+| `figures/fig1_tokens.tex` (+ `fig1_tokens_note.tex`, `.json`) | `gen_fig1_tokens.py` | `data/external/gemma3_tokenizer.model` through `noilai.audit.tokenizers.SentencePieceAdapter`; the note file defines `\figtokensnote`, the caption's data sentences, from the same audit rows |
 | `tables/rules_*.tex` | `gen_rule_tables.py` | `noilai.vi.syllable` constants, the engine's speller, the two Hunspell lists (69 placement pairs) |
 | `tables/prompt_examples.tex` (+ `.json`) | `gen_prompt_appendix.py` | `prompts/noilai.yaml` + `prompts/demos.yaml` rendered by `noilai.eval.prompts.render` |
+| `docs/DATA_STATEMENT.md`, the generated block of §0 | `gen_data_statement_facts.py --manifest <release>/manifest.json [--check]` | the release manifest and `attested.jsonl`: counts per split, stored placement convention, vulgar-flag counts, the attested seed's exact/mismatch/three-syllable/vulgar/low-confidence rows |
 
-The committed Table 1 comes from the smoke build
-`scripts/build_data.py --n-lexicon 300 --n-pseudo 200 --per-cell-t1 150 --per-cell-t2 80 --per-cell-t3 60 --core-per-cell 20`
-(1,400 items) and must be regenerated from the frozen release at the data freeze.
+The committed Table 1 comes from `data/release/v0.2/manifest.json` (10,000 items, plan defaults) with
+`--note` marking it as the v0.2 counts that the v0.3 rebuild at the stage-1 pre-registration commit
+replaces; regenerate it from the frozen release with `--release` at the data freeze.
+
+Unnumbered sections (`\section*{Limitations}`, `\section*{Ethical Considerations}`) carry no
+`\label`: a `\label` after a starred section resolves to the preceding numbered section, so they
+are referred to by name, and `tests/test_paper.py` refuses a `\label` that follows a `\section*`.
 
 ## Bibliography
 
@@ -41,5 +46,6 @@ entries the verified file lacks (grammars, the Hunspell resource, the nói lái 
 XCOPA, model reports, statistics classics, patching methods, and the closest-work items
 `docs/DESIGN_DECISIONS.md` §12.27 says must be cited). Every placeholder entry is marked
 `UNVERIFIED`; as each is confirmed by hand it moves into `references.bib` and is deleted here.
-`tests/test_paper.py` checks that every `\cite` key resolves and that every placeholder entry
-still carries its mark.
+`tests/test_paper.py` checks that every `\cite` key resolves, that no key occurs in both files
+(BibTeX's "Repeated entry"), that every placeholder entry still carries its mark, and that the
+Vietnamese accent macros of the placeholder file re-render to the intended NFC strings.

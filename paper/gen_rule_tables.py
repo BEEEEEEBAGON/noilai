@@ -8,14 +8,20 @@ Writes
                          from noilai.vi.syllable / noilai.vi.unicode constants
   rules_onsets.tex       surface spelling of every canonical onset, with the c/k/q, g/gh,
                          ng/ngh triggers and the gi contraction, each example SPELLED BY
-                         THE ENGINE (noilai.vi.syllable.spell)
+                         THE ENGINE (noilai.vi.syllable.spell); the plain rows take their
+                         two examples from the ATTESTED inventory (noilai.vi.lexicon.
+                         load_inventory), so that no row shows an engine-legal non-word
   rules_spelling.tex     the remaining spelling rules (glide letter, i/y, short a, coda
-                         letters, stop-coda tones, open/closed nuclei), with engine examples
+                         letters, stop-coda tones, open/closed nuclei, tone-mark placement)
+                         with engine examples, plus the i/y EMISSION rule of the release
+                         (noilai.vi.lexicon.emit), whose examples are computed by emit()
+                         next to the speller's default so that the two cannot be confused
   rules_placement.tex    the 69 syllables whose tone-mark letter differs between the old
                          and the new placement convention: the set difference of the two
                          Hunspell lists, each pair checked against the engine's rule
-  rules_variants.tex     the four noi lai variants with the components they move and an
-                         engine-computed example per variant
+  rules_variants.tex     the six noi lai variants (V1-V4 generated cells, V5-V6 taxonomy
+                         rows) with the components they move and an engine-computed
+                         example per variant
 
 Every example is computed, never typed, so the tables cannot drift from the code. The
 placement table needs data/external/vi-DauMoi.dic and vi-DauCu.dic (scripts/fetch_resources.py).
@@ -107,6 +113,30 @@ def _ex(onset: str, glide: bool, nucleus: str, coda: str = "", tone: int = 0) ->
     return spell(Syllable(onset=onset, glide=glide, nucleus=nucleus, coda=coda, tone=tone))
 
 
+# (glide, nucleus, coda, tone) templates tried in order for the attested onset examples
+ONSET_EXAMPLE_TEMPLATES = [
+    (False, "a", "", 0), (False, "ô", "ng", 1), (False, "a", "ng", 0), (False, "i", "n", 0), (False, "ê", "n", 0),
+    (False, "o", "n", 0), (False, "u", "ng", 0), (False, "a", "m", 0), (False, "i", "nh", 0), (False, "ư", "", 0),
+    (False, "e", "", 0), (False, "ô", "", 0), (False, "â", "n", 2), (False, "a", "n", 2), (False, "i", "", 0),
+    (False, "i", "p", 2), (False, "e", "p", 2), (False, "o", "", 2), (False, "u", "", 0), (False, "ê", "", 0),
+]
+
+
+def attested_examples(onset: str, n: int = 2) -> list[str]:
+    """The first `n` ONSET_EXAMPLE_TEMPLATES that are attested syllables (exact syllable,
+    tone included, in the release inventory), spelled by the engine. Fails loudly when
+    the templates do not cover an onset, so that no table row falls back to a non-word."""
+    inv = L.load_inventory()
+    out = []
+    for glide, nucleus, coda, tone in ONSET_EXAMPLE_TEMPLATES:
+        syl = Syllable(onset=onset, glide=glide, nucleus=nucleus, coda=coda, tone=tone)
+        if inv.is_attested(syl):
+            out.append(spell(syl))
+        if len(out) == n:
+            return out
+    raise SystemExit(f"fewer than {n} attested example syllables for onset {onset!r}; extend ONSET_EXAMPLE_TEMPLATES")
+
+
 def onsets_table(now: str) -> str:
     # surface spellings per canonical onset, from the parser's spelling map
     surfaces: dict[str, list[str]] = {}
@@ -132,27 +162,45 @@ def onsets_table(now: str) -> str:
         elif o == "gi":
             ex = f"{_ex('gi', False, 'a')} / {_ex('gi', False, 'i', '', 1)} / {_ex('gi', False, 'iê', 'ng')} (the rime's initial i is absorbed)"
         else:
-            ex = f"{_ex(o, False, 'a')}, {_ex(o, False, 'ô', 'ng', 1)}"
+            ex = ", ".join(attested_examples(o))
         lines.append(rf"{_sym(o)} & \texttt{{{_tex(written)}}} & {ex} \\")
     lines.append(r"\bottomrule")
     lines.append(r"\end{tabular}")
     lines.append(r"\caption{Surface spelling of the canonical onsets. The k/gh/ngh spellings are triggered by the first "
                  r"\emph{written} letter after the onset (e, \^{e}, i), so a glide switches them off (\texttt{ngoe}, "
-                 r"\texttt{nguy}); every example is produced by \texttt{noilai.vi.syllable.spell}.}")
+                 r"\texttt{nguy}); every example is produced by \texttt{noilai.vi.syllable.spell}, and the examples of "
+                 r"the plain rows are attested syllables of the release inventory.}")
     lines.append(r"\label{tab:onsets}")
     lines.append(r"\end{table}")
     return "\n".join(lines) + "\n"
 
 
 # ------------------------------------------------------------------ spelling rules
+IY_EXAMPLE_WORDS = ("lí", "kĩ", "mĩ", "sĩ", "tỉ")
+
+
+def _iy_emission_examples() -> str:
+    """`emit(x)` next to `spell(x)` for the i/y example syllables, both computed, so that the
+    released form and the speller's default are shown side by side and cannot be confused."""
+    sylls = [try_parse(w, strict=False).syllable for w in IY_EXAMPLE_WORDS]
+    emitted = ", ".join(L.emit(x) for x in sylls)
+    default = ", ".join(spell(x) for x in sylls)
+    return f"{emitted} (speller: {default})"
+
+
 def spelling_table(now: str) -> str:
     rows = [
         ("Glide letter", "\\texttt{u} after q and before \\^{a} \\^{e} \\horn{o} \\^{o} i ia i\\^{e}; \\texttt{o} before a \\u{a} e",
          f"{_ex('h', True, 'a')}, {_ex('h', True, 'e')}, {_ex('h', True, 'ê')}, {_ex('t', True, 'â', 'n')}, {_ex('c', True, 'a')}"),
-        ("Nucleus i", "written \\texttt{y} after the glide and in the bare syllable; \\texttt{i} elsewhere",
+        ("Nucleus i (speller default)", "written \\texttt{y} after the glide and in the bare syllable; \\texttt{i} elsewhere; "
+         "the canonical form for parsing and scoring, where i and y are equivalent in these contexts",
          f"{_ex('c', True, 'i')}, {_ex('', False, 'i', '', 2)}, {_ex('l', False, 'i', '', 2)}, {_ex('m', False, 'i', 'nh')}"),
+        ("i/y emission (release)", "a bare /i/ after a consonant onset is released in the syllable's majority spelling "
+         "in the reference corpus (fallback: the word list), never \\texttt{y} after s or v; a zero-onset bare /i/ takes "
+         "the lexicon form per tone (\\texttt{noilai.vi.lexicon.emit})",
+         _iy_emission_examples()),
         ("Nucleus ia / i\\^{e}", "ya / y\\^{e} after the glide; y\\^{e} with a zero onset",
-         f"{_ex('c', True, 'ia')}, {_ex('c', True, 'iê', 'n')}, {_ex('', False, 'iê', 'w')}, {_ex('t', False, 'iê', 'ng', 2)}"),
+         f"{_ex('kh', True, 'ia')}, {_ex('c', True, 'iê', 'n')}, {_ex('', False, 'iê', 'w')}, {_ex('t', False, 'iê', 'ng', 2)}"),
         ("Short \\u{a}", "written \\texttt{a} before the semivowel codas",
          f"{_ex('t', False, 'ă', 'j')} vs.\\ {_ex('t', False, 'a', 'j')}; {_ex('t', False, 'ă', 'w')} vs.\\ {_ex('t', False, 'a', 'w')}"),
         ("Coda /j/", "\\texttt{y} after \\u{a} \\^{a}, \\texttt{i} elsewhere",
@@ -180,10 +228,12 @@ def spelling_table(now: str) -> str:
         lines.append(rf"{name} & {stmt} & {ex} \\")
     lines.append(r"\bottomrule")
     lines.append(r"\end{tabular}")
-    lines.append(r"\caption{Spelling rules the generator applies when it reassembles a syllable, with examples spelled by the "
-                 r"engine. The same rules, run in reverse, are the parser's spelling round-trip: a syllable whose standard "
-                 r"spelling does not reproduce the input is rejected in strict mode (so \vi{c\'{e}o} for \vi{k\'{e}o} scores as a "
-                 r"spelling error, never as correct).}")
+    lines.append(r"\caption{Spelling rules of the speller (\texttt{noilai.vi.syllable.spell}), with examples spelled by the "
+                 r"engine. Released items are written through \texttt{noilai.vi.lexicon.emit}, which applies the same rules "
+                 r"and then the i/y emission row, so the released i/y form can differ from the speller's default. The same "
+                 r"rules, run in reverse, are the parser's spelling round-trip: a syllable whose standard spelling does not "
+                 r"reproduce the input is rejected in strict mode (so \vi{c\'{e}o} for \vi{k\'{e}o} scores as a spelling error, "
+                 r"never as correct).}")
     lines.append(r"\label{tab:spelling}")
     lines.append(r"\end{table*}")
     return "\n".join(lines) + "\n"

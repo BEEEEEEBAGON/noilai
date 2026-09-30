@@ -1,8 +1,8 @@
 % Limitations -- mandatory, outside the page count, may not introduce new results (ARR CFP).
 % Complete prose from the founding plan (section 2.7) and docs/DESIGN_DECISIONS.md 11.7;
 % items that depend on results are marked and must be re-read against the final numbers.
+% Unnumbered: no \label (it would resolve to the preceding numbered section); refer to it by name.
 \section*{Limitations}
-\label{sec:limitations}
 
 \paragraph{Generated items are not natural usage.}
 \noilai{} items are produced by a rule engine from real and pseudo base pairs. A generated output is, by design, often a phrase that no Vietnamese speaker would say; the benchmark measures whether a model can execute a component permutation and spell the result, not whether it appreciates wordplay. The attested subset is the only natural-usage data, and it is small and, as we note below, contaminated. Human validation checks that the gold is correct, not that the items are typical.

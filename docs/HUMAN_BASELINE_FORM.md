@@ -4,9 +4,9 @@ Purpose: a human level of performance on the same items, scored by the same code
 
 ## 1. Item sampling and assignment
 
-- **Source:** the open-model main sample (`data/release/<version>/` test items selected by the run plan's seeded 4,200-item stratification), restricted to items with `vulgar = false` and excluding spelling twins (they leave the T3 headline as well). If the main sample does not yet exist when forms are built, use the core; record which.
+- **Source:** the open-model main sample (`data/release/<version>/noilai_main.jsonl`, the run plan's seeded 4,200-item stratification of the test split; `v0.2` today, the v0.3 rebuild at the freeze), restricted to items with `vulgar = false` and excluding spelling twins (they leave the T3 headline as well). The file opens with a canary header record, which the snippet skips. If the main sample does not yet exist when forms are built, use the core; record which.
 - **Anchors (6):** one T1 item per generated variant (V1–V4), one T2 item, one T3 item; seen by every respondent; they measure between-person agreement on identical material.
-- **Double-judged items (240):** 20 per cell (T1 × 4, T2 × 4, T3 × 4 = 12 cells; T3 as yes/no items, half yes and half no, never both members of a twin pair); each assigned to exactly two respondents. With 20 respondents × 24 slots = 480 slots = 240 × 2. Assignment: a balanced incomplete block: shuffle the 240 items (seeded), deal them round-robin to the 20 respondents twice with an offset of 10 so that no respondent sees an item twice and every pair of raters shares 24/19 ≈ 1.3 items on average.
+- **Double-judged items (240):** 20 per cell (T1 × 4, T2 × 4, T3 × 4 = 12 cells; T3 as yes/no items, half yes and half no, never both members of a twin pair, and never the twin of an anchor); each assigned to exactly two respondents. With 20 respondents × 24 slots = 480 slots = 240 × 2. **Assignment: a cyclic double-coverage design.** Shuffle the 240 items (seeded) and read them as 12 blocks of 20. The first copy of item `k` goes to respondent `k % 20` (round robin); the second copy goes to respondent `(k % 20 + offset) % 20` with a **block-specific offset** `offset = 1 + (k // 20) % 19`, which runs 1, 2, …, 12 over the 12 blocks. Consequences, checked by the snippet's coverage printout and by `tests/test_paper.py`: no respondent sees an item twice; every respondent judges exactly 24 distinct items; and every one of the 190 rater pairs shares at least one non-anchor item (140 pairs share one, 50 pairs share two; 240/190 ≈ 1.3 on average), so the rater graph is complete. A fixed offset (say 10 for every block) would instead produce 10 disjoint dyads each sharing all 24 of their items, with 180 rater pairs sharing nothing; the nominal α over the 240 double-judged items and the two-way (person, item) bootstrap would then rest on a disconnected design. The design is not a balanced incomplete block in the strict sense (pairs share one *or* two items), which is why it is called double-coverage here.
 - **Order:** each form's 30 items in a seeded random order (T1, T2, T3 interleaved), one **instruction-check item** inserted (an anchor-style item whose answer is given in the instructions; a wrong answer excludes the form).
 - **Coverage check:** the builder prints, per item, the number of respondents (must be 20 for anchors, 2 for the rest) and, per cell, the number of items (20).
 
@@ -20,7 +20,9 @@ from collections import defaultdict
 from pathlib import Path
 SEED, N_RESP, PER_CELL = 20261004, 20, 20
 rng = random.Random(SEED)
-items = [json.loads(l) for l in open("data/release/v0.1/noilai_core.jsonl", encoding="utf-8")]
+ITEMS = "data/release/v0.2/noilai_main.jsonl"      # the run plan's open-model main sample (v0.3 at the freeze)
+rows = [json.loads(l) for l in open(ITEMS, encoding="utf-8") if l.strip()]
+items = [it for it in rows if "task" in it]        # skip the canary header record
 items = [it for it in items if not it.get("vulgar") and it.get("twin_type") != "spelling"]
 by_cell = defaultdict(list)
 for it in items: by_cell[(it["task"], it["variant"])].append(it)
@@ -29,6 +31,7 @@ for cell in sorted(by_cell):
     c = by_cell[cell]; rng.shuffle(c)
     if cell[0] == "T1" or cell in (("T2", "V1"), ("T3", "V1")):
         anchors.append(c.pop())
+        c = [x for x in c if x.get("pair_item_id") != anchors[-1]["item_id"]]   # never the twin of an anchor
     if cell[0] == "T3":  # 10 yes + 10 no
         yes = [x for x in c if x["gold"] == "yes"][:PER_CELL // 2]
         no = [x for x in c if x["gold"] == "no" and x["pair_item_id"] not in {y["item_id"] for y in yes}][:PER_CELL // 2]
@@ -38,10 +41,11 @@ for cell in sorted(by_cell):
 assert len(anchors) == 6 and len(pool) == 240, (len(anchors), len(pool))
 rng.shuffle(pool)
 forms = [list(anchors) for _ in range(N_RESP)]
-for k, it in enumerate(pool):                       # first copy
+for k, it in enumerate(pool):                       # first copy: round robin
     forms[k % N_RESP].append(it)
-for k, it in enumerate(pool):                       # second copy, offset 10 -> never the same person
-    forms[(k + 10) % N_RESP].append(it)
+for k, it in enumerate(pool):                       # second copy: block-specific cyclic offset 1..12
+    offset = 1 + (k // N_RESP) % (N_RESP - 1)       # never 0 (same person) and never a fixed dyad
+    forms[(k % N_RESP + offset) % N_RESP].append(it)
 out = Path("data/human"); out.mkdir(parents=True, exist_ok=True)
 def q(it):
     if it["task"] == "T1": return f"Nói lái kiểu {it['variant']} của “{it['input']}” là gì?"
@@ -56,8 +60,16 @@ for i, fm in enumerate(forms, 1):
 cover = defaultdict(int)
 for fm in forms:
     for it in fm: cover[it["item_id"]] += 1
+anchor_ids = {a["item_id"] for a in anchors}
+seen = [{x["item_id"] for x in fm} - anchor_ids for fm in forms]
+shared = defaultdict(int)                            # coverage printout: non-anchor items shared per rater pair
+for i in range(N_RESP):
+    for j in range(i + 1, N_RESP):
+        shared[len(seen[i] & seen[j])] += 1
+assert 0 not in shared, "a rater pair shares no item: the rater graph is disconnected"
 print({"forms": N_RESP, "items": len(cover), "anchors_seen_by": min(cover[a["item_id"]] for a in anchors),
-       "others": sorted(set(v for k, v in cover.items() if k not in {a["item_id"] for a in anchors}))})
+       "others": sorted(set(v for k, v in cover.items() if k not in anchor_ids)),
+       "shared_items_per_rater_pair": dict(sorted(shared.items()))})     # expected {1: 140, 2: 50}
 (out / "human_items.json").write_text(json.dumps(sorted(cover), ensure_ascii=False))   # the 246 ids every model is scored on
 EOF
 ```
@@ -82,7 +94,7 @@ EOF
 ## 4. Scoring
 
 - Export each form to CSV (`item_id, task, variant, prompt_vi, answer`, one row per item, plus the form number). Convert to output rows `{item_id, task, variant, arm: "base", prompt_id: "human-form-<nn>", raw: answer, answer: answer}` and score with `noilai.eval.score.score_outputs(items, outputs)` — the **same function** that scores the models: strict T1 (structures in order; either placement and *lí/lý* accepted; misspellings and regional homophones not repaired, but binned), T2 membership in the gold set, T3 Có/Không against the gold. A blank answer counts as wrong.
-- **Aggregates (pre-registered, `docs/PREREGISTRATION.md` §8.11):** item-level human accuracy = mean of the item's two judgments; **mean-human accuracy** per task and variant is the comparator, with a 95% interval from a two-way (person, item) cluster bootstrap; "any human correct" is a ceiling reported separately; results by output lexicality and by region (hỏi/ngã V3 items and -n/-ng items separately for Southern speakers); nominal Krippendorff's α between the two raters over the 240 double-judged items on the produced answer and on correctness; the human error taxonomy from the same scorer.
+- **Aggregates (pre-registered, `docs/PREREGISTRATION.md` §8.11):** item-level human accuracy = mean of the item's two judgments; **mean-human accuracy** per task and variant is the comparator, with a 95% interval from a two-way (person, item) cluster bootstrap; "any human correct" is a ceiling reported separately; results by output lexicality and by region (hỏi/ngã V3 items and -n/-ng items separately for Southern speakers); nominal Krippendorff's α between the two raters over the 240 double-judged items on the produced answer and on correctness; the human error taxonomy from the same scorer. Both α and the two-way bootstrap assume a connected rater–item design, which the cyclic double-coverage assignment of §1 guarantees (every rater pair shares one or two items); the coverage printout that documents it is kept with the forms' manifest.
 - **Exclusions (pre-registered, §5.7):** a form with fewer than 15 of 30 items answered; a respondent who reports using a dictionary, search engine or AI assistant; a failed instruction-check item. All counts reported.
 - **What is compared with the models:** every model is scored on exactly the 246 human items (`data/human/human_items.json`); the human row of Table 2 is the mean-human accuracy with n raters and 246 items; at ±4–5 points it is a reference band and no cell-level human comparison is claimed (Limitations). If more volunteers materialize, items get a third rater before the item set widens.
 

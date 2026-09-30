@@ -38,7 +38,6 @@ import json
 import sys
 from collections import Counter
 from pathlib import Path
-from typing import Optional
 
 ROOT = Path(__file__).resolve().parents[1]
 RUN_PLAN = ROOT / "configs" / "run_plan.yaml"
@@ -95,10 +94,10 @@ def _is_item(d, kind: str) -> bool:
     return "item_id" in d and "task" in d
 
 
-def verify_items(path: Path, expected_sha256: Optional[str] = None, canary_required: bool = False,
-                 manifest_canary: Optional[str] = None, header_required: Optional[bool] = None,
-                 kind: str = "noilai", expected_counts: Optional[dict] = None,
-                 sample_sha256: Optional[str] = None) -> dict:
+def verify_items(path: Path, expected_sha256: str | None = None, canary_required: bool = False,
+                 manifest_canary: str | None = None, header_required: bool | None = None,
+                 kind: str = "noilai", expected_counts: dict | None = None,
+                 sample_sha256: str | None = None) -> dict:
     """Return a summary dict with an `ok` flag and a list of `problems` (empty when ok).
 
     `header_required` defaults to `canary_required` (DD 4.6: every file with a canary begins
@@ -128,7 +127,7 @@ def verify_items(path: Path, expected_sha256: Optional[str] = None, canary_requi
     tasks: Counter = Counter()
     cells: Counter = Counter()
     canaries: set = set()
-    header: Optional[dict] = None
+    header: dict | None = None
     n = 0
     first_record = True
     with open(path, encoding="utf-8") as f:
@@ -216,7 +215,7 @@ def verify_items(path: Path, expected_sha256: Optional[str] = None, canary_requi
     return out
 
 
-def manifest_canary_for(path: Path) -> Optional[str]:
+def manifest_canary_for(path: Path) -> str | None:
     m = Path(path).parent / "manifest.json"
     if m.exists():
         try:
@@ -226,7 +225,7 @@ def manifest_canary_for(path: Path) -> Optional[str]:
     return None
 
 
-def sample_sha256_for(path: Path, sample_name: Optional[str]) -> Optional[str]:
+def sample_sha256_for(path: Path, sample_name: str | None) -> str | None:
     """The hash scripts/sample_items.py recorded under `samples.<name>` in the release manifest."""
     if not sample_name:
         return None
@@ -239,7 +238,7 @@ def sample_sha256_for(path: Path, sample_name: Optional[str]) -> Optional[str]:
         return None
 
 
-def verify_spec(spec: dict, root: Path = ROOT, expected_sha256: Optional[str] = None, expect_canary: bool = False) -> dict:
+def verify_spec(spec: dict, root: Path = ROOT, expected_sha256: str | None = None, expect_canary: bool = False) -> dict:
     """verify_items() driven by an item-file spec of run_plan.yaml (path already resolved)."""
     path = Path(spec["path"])
     if not path.is_absolute():
@@ -252,7 +251,7 @@ def verify_spec(spec: dict, root: Path = ROOT, expected_sha256: Optional[str] = 
                         sample_sha256=sample_sha256_for(path, spec.get("manifest_sample")))
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--key", help="item file key in configs/run_plan.yaml")
@@ -271,7 +270,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         if args.kind:
             spec = dict(spec, kind=args.kind)
         if args.materialize and spec.get("derive"):
-            import kaggle_run_plan as KRP  # noqa: E402  (same directory)
+            import kaggle_run_plan as KRP
 
             plan = KRP.load_plan(args.plan)
             info = KRP.derive_item_file(args.key, plan, project_root=args.root, force=False)

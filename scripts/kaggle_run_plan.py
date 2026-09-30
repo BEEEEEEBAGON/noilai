@@ -15,7 +15,7 @@ For each (run, model) the command is
 
     <python> scripts/run_eval.py --model-config <name> --items <path> --tasks ... --variants ...
         --paraphrases ... --shots N --arms ... [--input-format F] [--instruction I] [--language L]
-        [--limit N] [--in-core-only] --resume --run-id <run_id>__<name> --out-root data/runs [extra args]
+        [--smoke --limit N] [--in-core-only] --resume --run-id <run_id>__<name> --out-root data/runs [extra args]
 
 The output flags follow `run_eval_out_style` in run_plan.yaml: "run_id_root" (default; the CLI
 as landed writes data/runs/<run-id>/) or "out" (the first specification's `--out <dir>`).
@@ -62,13 +62,13 @@ import sys
 import threading
 import time
 from collections import Counter, defaultdict
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Callable, Optional, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-import compute_log as CL  # noqa: E402
-import kaggle_verify_items as KVI  # noqa: E402
+import compute_log as CL
+import kaggle_verify_items as KVI
 
 CONFIGS = ROOT / "configs"
 API_BACKENDS = {"openai_compat", "gemini"}
@@ -111,7 +111,7 @@ def find_run(plan: dict, run_id: str) -> dict:
     raise KeyError(f"no run {run_id!r}; have {[r['id'] for r in plan['runs']]}")
 
 
-def item_path(plan: dict, key: str, project_root: Optional[Path] = None) -> Path:
+def item_path(plan: dict, key: str, project_root: Path | None = None) -> Path:
     spec = plan["item_files"][key]
     p = Path(spec["path"])
     if project_root is not None and not p.is_absolute():
@@ -130,7 +130,7 @@ def item_keys_for_runs(plan: dict, run_ids: Sequence[str]) -> list[str]:
 
 
 # ------------------------------------------------------------------ model sets
-def expand_set(name: str, plan: dict, models_cfg: dict, _seen: Optional[set] = None) -> list[str]:
+def expand_set(name: str, plan: dict, models_cfg: dict, _seen: set | None = None) -> list[str]:
     """A model set is a list of names, {union: [sets]} or {group: <models.yaml group>}."""
     _seen = _seen or set()
     if name in _seen:
@@ -207,7 +207,7 @@ def build_command(run: dict, model: str, plan: dict, models_cfg: dict, project_r
         if run.get(key):
             cmd += [flag, str(run[key])]
     if run.get("limit"):
-        cmd += ["--limit", str(run["limit"])]
+        cmd += ["--smoke", "--limit", str(run["limit"])]      # run_eval.py refuses --limit without --smoke (DD 12.32)
     if run.get("in_core_only"):
         cmd.append("--in-core-only")
     cmd.append("--resume")
@@ -235,7 +235,7 @@ def session_device(session_hardware: str) -> tuple[str, int]:
     return (dev or session_hardware, 1 if n is None else n)
 
 
-def hardware_compatible(entry: dict, session_hardware: Optional[str]) -> bool:
+def hardware_compatible(entry: dict, session_hardware: str | None) -> bool:
     """Can a model configured for `entry['hardware']` run in a session on `session_hardware`?"""
     if session_hardware is None:
         return True
@@ -246,7 +246,7 @@ def hardware_compatible(entry: dict, session_hardware: Optional[str]) -> bool:
 
 
 # ------------------------------------------------------------------ derived item files
-def _read_rows(path: Path) -> tuple[Optional[dict], list[dict]]:
+def _read_rows(path: Path) -> tuple[dict | None, list[dict]]:
     header, rows = None, []
     with open(path, encoding="utf-8") as f:
         for ln in f:
@@ -260,14 +260,13 @@ def _read_rows(path: Path) -> tuple[Optional[dict], list[dict]]:
     return header, rows
 
 
-def _write_rows(path: Path, header: Optional[dict], rows: list[dict]) -> None:
+def _write_rows(path: Path, header: dict | None, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
         if header:
             f.write(json.dumps(header, ensure_ascii=False) + "\n")
-        for r in rows:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        f.writelines(json.dumps(r, ensure_ascii=False) + "\n" for r in rows)
     tmp.replace(path)
 
 
@@ -325,12 +324,11 @@ def sample_noilai(rows: list[dict], derive: dict) -> tuple[list[dict], dict]:
                 n_pairs = n_cell // 2
                 core = [it for it in pool if it.get("in_core")]
                 rest = [it for it in pool if not it.get("in_core")]
-                sel = core[:n_pairs] if len(core) >= n_pairs else core + _balanced_draw(
-                    rng, rest, n_pairs - len(core), key=lambda it: (it.get("source"), by_id[it["pair_item_id"]].get("twin_type")))
-                if len(core) > n_pairs:      # a core larger than the cell: a seeded subset of the core pairs
-                    core.sort(key=lambda it: it["item_id"])
-                    rng.shuffle(core)
-                    sel = core[:n_pairs]
+                key = lambda it: (it.get("source"), by_id[it["pair_item_id"]].get("twin_type"))
+                if len(core) >= n_pairs:     # a core larger than the cell (a core-derived subset): a seeded, balanced draw from it
+                    sel = _balanced_draw(rng, core, n_pairs, key)
+                else:                        # the core kept whole, the rest drawn balanced
+                    sel = core + _balanced_draw(rng, rest, n_pairs - len(core), key)
                 for it in sel:
                     mate = by_id[it["pair_item_id"]]
                     chosen[it["item_id"]] = it
@@ -340,13 +338,11 @@ def sample_noilai(rows: list[dict], derive: dict) -> tuple[list[dict], dict]:
                 pool = [it for it in rows if it["task"] == task and it["variant"] == v and eligible(it)]
                 core = [it for it in pool if it.get("in_core")]
                 rest = [it for it in pool if not it.get("in_core")]
+                key = lambda it: (it.get("source"), (it.get("strata") or {}).get("output_lexical"))
                 if len(core) >= n_cell:
-                    core.sort(key=lambda it: it["item_id"])
-                    rng.shuffle(core)
-                    sel = core[:n_cell]
+                    sel = _balanced_draw(rng, core, n_cell, key)
                 else:
-                    sel = core + _balanced_draw(rng, rest, n_cell - len(core),
-                                                key=lambda it: (it.get("source"), (it.get("strata") or {}).get("output_lexical")))
+                    sel = core + _balanced_draw(rng, rest, n_cell - len(core), key)
                 for it in sel:
                     chosen[it["item_id"]] = it
                 counts[f"{task}-{v}"] = len(sel)
@@ -398,7 +394,7 @@ def derive_item_file(key: str, plan: dict, project_root: Path = ROOT, force: boo
     return {"key": key, "path": str(dst), "status": status, "sha256": KVI.sha256_file(dst), "n_items": len(rows), "counts": counts}
 
 
-def materialize(plan: dict, project_root: Path = ROOT, keys: Optional[Sequence[str]] = None, force: bool = False) -> list[dict]:
+def materialize(plan: dict, project_root: Path = ROOT, keys: Sequence[str] | None = None, force: bool = False) -> list[dict]:
     """Derive every item file with a `derive` block (or the given keys); skips sources that are absent."""
     out = []
     for key, spec in plan["item_files"].items():
@@ -461,7 +457,7 @@ def _day_entry(ledger: dict, model: str, day: str) -> dict:
     return cur
 
 
-def ledger_add(ledger: dict, model: str, n_calls: int, n_tokens: int = 0, day: Optional[str] = None) -> dict:
+def ledger_add(ledger: dict, model: str, n_calls: int, n_tokens: int = 0, day: str | None = None) -> dict:
     day = day or utc_day()
     if model.startswith("_"):
         raise ValueError("model names starting with '_' are reserved for ledger metadata")
@@ -471,20 +467,20 @@ def ledger_add(ledger: dict, model: str, n_calls: int, n_tokens: int = 0, day: O
     return ledger
 
 
-def ledger_used(ledger: dict, model: str, day: Optional[str] = None) -> int:
+def ledger_used(ledger: dict, model: str, day: str | None = None) -> int:
     """Requests recorded for (model, day)."""
     day = day or utc_day()
     cur = ledger.get(model, {}).get(day, 0)
     return int(cur["requests"]) if isinstance(cur, dict) else int(cur or 0)
 
 
-def ledger_tokens_used(ledger: dict, model: str, day: Optional[str] = None) -> int:
+def ledger_tokens_used(ledger: dict, model: str, day: str | None = None) -> int:
     day = day or utc_day()
     cur = ledger.get(model, {}).get(day, 0)
     return int(cur.get("tokens", 0)) if isinstance(cur, dict) else 0
 
 
-def daily_budget(entry: dict, models_cfg: dict) -> Optional[dict]:
+def daily_budget(entry: dict, models_cfg: dict) -> dict | None:
     """The free-tier daily caps for an API entry: {'requests_per_day', 'tokens_per_day', 'scope', 'provider'}
     (None when the entry is not served by a provider). Either cap may be None (unknown)."""
     prov = entry.get("provider")
@@ -503,8 +499,8 @@ def _budget_models(entry: dict, budget: dict, models_cfg: dict) -> list[str]:
     return [entry["name"]]
 
 
-def budget_status(entry: dict, models_cfg: dict, ledger: dict, day: Optional[str] = None,
-                  threshold: float = 1.0) -> Optional[dict]:
+def budget_status(entry: dict, models_cfg: dict, ledger: dict, day: str | None = None,
+                  threshold: float = 1.0) -> dict | None:
     """Usage against the daily caps; `spent` when requests or tokens reach threshold x cap."""
     budget = daily_budget(entry, models_cfg)
     if budget is None:
@@ -597,7 +593,7 @@ class BudgetWatchdog:
         self.reason = ""
         self._stop = threading.Event()
 
-    def check(self) -> Optional[str]:
+    def check(self) -> str | None:
         u = outputs_usage(self.out_dir, self.skip_rows, self.assumed)
         rpd, tpd = self.budget.get("requests_per_day"), self.budget.get("tokens_per_day")
         if rpd and self.requests_before + u["rows"] >= rpd:
@@ -632,12 +628,12 @@ class BudgetWatchdog:
 
 
 # ------------------------------------------------------------------ execution
-def execute(run_id: str, models: Optional[Sequence[str]] = None, platform: str = "kaggle", dry_run: bool = False,
-            continue_on_error: bool = True, extra: Sequence[str] = (), plan: Optional[dict] = None,
-            models_cfg: Optional[dict] = None, project_root: Path = ROOT, log_path: Optional[Path] = None,
-            python: str = sys.executable, session_hardware: Optional[str] = None, allow_hardware_mismatch: bool = False,
-            session_t0: Optional[float] = None, max_session_hours: Optional[float] = None,
-            after_each: Optional[Callable[[dict], None]] = None, verify: bool = True, poll_s: float = 5.0) -> list[dict]:
+def execute(run_id: str, models: Sequence[str] | None = None, platform: str = "kaggle", dry_run: bool = False,
+            continue_on_error: bool = True, extra: Sequence[str] = (), plan: dict | None = None,
+            models_cfg: dict | None = None, project_root: Path = ROOT, log_path: Path | None = None,
+            python: str = sys.executable, session_hardware: str | None = None, allow_hardware_mismatch: bool = False,
+            session_t0: float | None = None, max_session_hours: float | None = None,
+            after_each: Callable[[dict], None] | None = None, verify: bool = True, poll_s: float = 5.0) -> list[dict]:
     """Run every (run, model) command in order; return one result dict per model.
 
     Statuses: 'dry-run', 'ok', 'failed (<rc>)', 'parked: ...' (an API day's cap reached; resume
@@ -750,7 +746,7 @@ def execute(run_id: str, models: Optional[Sequence[str]] = None, platform: str =
     return results
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--plan", type=Path, default=CONFIGS / "run_plan.yaml")
     ap.add_argument("--models-config", type=Path, default=CONFIGS / "models.yaml")

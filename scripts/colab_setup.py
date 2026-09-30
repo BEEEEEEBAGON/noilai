@@ -29,8 +29,8 @@ import re
 import stat
 import subprocess
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Optional, Sequence
 from urllib.parse import urlparse
 
 DEFAULT_TOKEN_ENV = "GITHUB_TOKEN"
@@ -38,7 +38,7 @@ DEFAULT_SUBDIR = "noilai"
 
 
 # ------------------------------------------------------------------ secrets
-def get_secret(name: str) -> Optional[str]:
+def get_secret(name: str) -> str | None:
     """Look a secret up in the environment, then Colab's userdata, then Kaggle Secrets.
 
     Returns None when absent. Never prints the value; callers put it in os.environ for the
@@ -87,7 +87,7 @@ def export_secret(name: str, required: bool = False) -> bool:
 
 
 # ------------------------------------------------------------------ Drive
-def mount_drive(mountpoint: str = "/content/drive") -> Optional[Path]:
+def mount_drive(mountpoint: str = "/content/drive") -> Path | None:
     """Mount Google Drive on Colab; return the mountpoint, or None outside Colab."""
     try:
         from google.colab import drive  # type: ignore
@@ -99,7 +99,7 @@ def mount_drive(mountpoint: str = "/content/drive") -> Optional[Path]:
 
 
 # ------------------------------------------------------------------ clone
-def write_askpass(token_env: str = DEFAULT_TOKEN_ENV, path: Optional[Path] = None) -> Path:
+def write_askpass(token_env: str = DEFAULT_TOKEN_ENV, path: Path | None = None) -> Path:
     """Write the GIT_ASKPASS helper: it prints the token from the environment when git asks."""
     path = Path(path or Path.home() / ".noilai_askpass.sh")
     path.write_text(f"#!/bin/sh\necho \"${token_env}\"\n", encoding="utf-8")
@@ -116,7 +116,7 @@ def has_embedded_credentials(repo_url: str) -> bool:
     return False
 
 
-def clone_command(repo_url: str, dest: Path, bundle_path: Optional[Path] = None, depth: Optional[int] = None) -> list[str]:
+def clone_command(repo_url: str, dest: Path, bundle_path: Path | None = None, depth: int | None = None) -> list[str]:
     """`git clone` argv. From a bundle when one is given, else from the URL; never a token."""
     if has_embedded_credentials(repo_url):
         raise ValueError("repo_url must not embed credentials; use GIT_ASKPASS")
@@ -127,7 +127,7 @@ def clone_command(repo_url: str, dest: Path, bundle_path: Optional[Path] = None,
     return cmd + [src, str(dest)]
 
 
-def fetch_command(dest: Path, bundle_path: Optional[Path] = None) -> list[str]:
+def fetch_command(dest: Path, bundle_path: Path | None = None) -> list[str]:
     """Refresh an existing clone: fetch from the bundle (as a remote path) or from origin."""
     if bundle_path:
         return ["git", "-C", str(dest), "fetch", str(bundle_path), "+refs/heads/*:refs/remotes/bundle/*"]
@@ -156,7 +156,7 @@ def checkout_command(dest: Path, ref: str) -> list[str]:
     return ["git", "-C", str(dest), "checkout", "--detach", ref]
 
 
-def git_env(token_env: str = DEFAULT_TOKEN_ENV, askpass: Optional[Path] = None) -> dict:
+def git_env(token_env: str = DEFAULT_TOKEN_ENV, askpass: Path | None = None) -> dict:
     env = dict(os.environ)
     env["GIT_TERMINAL_PROMPT"] = "0"
     if env.get(token_env):
@@ -164,8 +164,8 @@ def git_env(token_env: str = DEFAULT_TOKEN_ENV, askpass: Optional[Path] = None) 
     return env
 
 
-def clone(repo_url: str, dest: Path, ref: Optional[str] = None, bundle_path: Optional[Path] = None,
-          token_env: str = DEFAULT_TOKEN_ENV, depth: Optional[int] = None) -> Path:
+def clone(repo_url: str, dest: Path, ref: str | None = None, bundle_path: Path | None = None,
+          token_env: str = DEFAULT_TOKEN_ENV, depth: int | None = None) -> Path:
     """Clone (or refresh) the repository at `dest` and check out `ref` when given."""
     dest = Path(dest)
     if bundle_path is not None and not Path(bundle_path).exists():
@@ -182,7 +182,7 @@ def clone(repo_url: str, dest: Path, ref: Optional[str] = None, bundle_path: Opt
     if ref:
         remote = "bundle" if (existing and bundle_path) else "origin"
         for cand in checkout_candidates(ref, remote):
-            if subprocess.run(checkout_command(dest, cand), env=env).returncode == 0:
+            if subprocess.run(checkout_command(dest, cand), env=env, check=False).returncode == 0:
                 break
         else:
             raise RuntimeError(f"cannot check out {ref!r} (tried {checkout_candidates(ref, remote)})")
@@ -214,7 +214,7 @@ def git_head(project: Path) -> dict:
 
 
 # ------------------------------------------------------------------ install
-def pip_install_command(project: Path, extras: Sequence[str] = ("eval",), pins: Optional[dict] = None,
+def pip_install_command(project: Path, extras: Sequence[str] = ("eval",), pins: dict | None = None,
                         python: str = sys.executable) -> list[list[str]]:
     """Pinned packages first (so that e.g. vllm's own requirements win), then the project.
 
@@ -229,7 +229,7 @@ def pip_install_command(project: Path, extras: Sequence[str] = ("eval",), pins: 
     return cmds
 
 
-def pip_install(project: Path, extras: Sequence[str] = ("eval",), pins: Optional[dict] = None) -> None:
+def pip_install(project: Path, extras: Sequence[str] = ("eval",), pins: dict | None = None) -> None:
     for cmd in pip_install_command(project, extras, pins):
         print("[pip  ]", " ".join(cmd))
         subprocess.run(cmd, check=True)

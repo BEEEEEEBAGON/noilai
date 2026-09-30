@@ -195,8 +195,7 @@ def write_sample_file(sample: Sample, path: Path, header: dict | None = None, so
     with open(path, "w", encoding="utf-8") as f:
         if header:
             f.write(json.dumps(header, ensure_ascii=False) + "\n")
-        for it in sample.items:
-            f.write(json.dumps(it, ensure_ascii=False) + "\n")
+        f.writelines(json.dumps(it, ensure_ascii=False) + "\n" for it in sample.items)
     side = sample.describe()
     side["file"] = path.name
     side["file_sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()

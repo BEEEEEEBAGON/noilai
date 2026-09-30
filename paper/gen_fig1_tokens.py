@@ -8,8 +8,12 @@ Tokens come from noilai.audit.tokenizers.SentencePieceAdapter on the Gemma 3 Sen
 model file (google/gemma_pytorch; SHA-256 in data/HASHES.json), each syllable tokenized in
 running-text position (preceded by a space, the audit's convention), under NFC and NFD.
 The .tex file holds only the tabular body; sec_intro.tex wraps it in the figure and writes
-the caption. The .json sidecar records the raw pieces, ids and offsets so that the drawn
-boundaries can be checked against the audit rows.
+the caption. A second file, fig1_tokens_note.tex, defines \\figtokensnote: the two caption
+sentences that state what the numbers show (which syllables are cut where under NFC; the
+alignment each syllable falls to under NFD and whether its tone mark becomes a token of its
+own), composed from the same audit rows, so that the caption cannot contradict the figure.
+The .json sidecar records the raw pieces, ids, offsets, aligned seams and the note text so
+that the drawn boundaries can be checked against the audit rows.
 
 Rendering: the SentencePiece space marker becomes \\tokspace{} (a visible space); an
 isolated combining mark is drawn with the T5 accent macro over an empty group
@@ -28,7 +32,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from noilai.audit.tokenizers import SentencePieceAdapter, audit_syllable  # noqa: E402
+from noilai.audit.tokenizers import SentencePieceAdapter, audit_syllable, linguistic_boundaries  # noqa: E402
 from noilai.gen import variants as V  # noqa: E402
 from noilai.vi import unicode as U  # noqa: E402
 from noilai.vi.syllable import spell, try_parse  # noqa: E402
@@ -48,6 +52,7 @@ COMBINING_TEX = {
     "̛": r"\horn{}",  # horn -- T5 (vntex)
 }
 SPACE_MARKER = "▁"
+SEAM_NAME = {"onset_rime": "onset$|$rime", "glide_nucleus": "glide$|$nucleus", "nucleus_coda": "nucleus$|$coda"}
 
 
 def piece_to_tex(piece: str) -> str:
@@ -78,10 +83,72 @@ def phrase_tokens(adapter: SentencePieceAdapter, syllables: tuple[str, ...], enc
         # ids of the same pieces, for the record
         text = " " + (U.nfd(syl) if encoding == "nfd" else U.nfc(syl))
         ids = [t.id for t in adapter.encode(text) if t.end > 1]
+        # which linguistic seams (offsets in the NFC surface) the internal boundaries hit
+        ling = linguistic_boundaries(try_parse(syl, strict=False), U.nfc(syl))
+        seams = [name for name, off in ling.items() if off is not None and off in a.boundaries]
         rows.append({"syllable": syl, "encoding": encoding, "pieces": a.tokens, "ids": ids, "n_tokens": a.n_tokens,
                      "boundaries": a.boundaries, "boundary_alignment": a.boundary_alignment,
-                     "onset_rime_split": a.onset_rime_split, "tone_isolated": a.tone_isolated})
+                     "onset_rime_split": a.onset_rime_split, "tone_isolated": a.tone_isolated,
+                     "aligned_seams": seams})
     return rows
+
+
+def _join(parts: list[str]) -> str:
+    parts = list(parts)
+    if len(parts) <= 1:
+        return "".join(parts)
+    return ", ".join(parts[:-1]) + " and " + parts[-1]
+
+
+def _join_clauses(clauses: list[str]) -> str:
+    if len(clauses) <= 1:
+        return "".join(clauses)
+    if len(clauses) == 2:
+        return clauses[0] + ", and " + clauses[1]
+    return "; ".join(clauses[:-1]) + "; and " + clauses[-1]
+
+
+def note_sentences(rows: dict[str, dict[str, list[dict]]]) -> str:
+    """The caption's two data sentences, composed from the audit rows (never typed).
+
+    Sentence 1 (NFC): which syllables are single tokens and where the split ones are cut.
+    Sentence 2 (NFD): the alignment each group of syllables falls to, whether its tone mark
+    becomes a token of its own, and which seam the remaining aligned boundary sits on."""
+    def vi(s: str) -> str:
+        return rf"\vi{{{s}}}"
+
+    nfc = rows["input"]["nfc"] + rows["output"]["nfc"]
+    nfd = rows["input"]["nfd"] + rows["output"]["nfd"]
+    parts = []
+    singles = [r["syllable"] for r in nfc if r["n_tokens"] == 1]
+    if singles:
+        parts.append(f"{_join([vi(x) for x in singles])} {'is a single token' if len(singles) == 1 else 'are single tokens'}")
+    for r in nfc:
+        if r["n_tokens"] == 1:
+            continue
+        where = (f"the {_join([SEAM_NAME[x] for x in r['aligned_seams']])} seam" if r["aligned_seams"]
+                 else "a boundary inside a component")
+        parts.append(f"{vi(r['syllable'])} is cut at {where} (alignment {r['boundary_alignment']:.2f})")
+    s1 = "Under NFC " + _join(parts) + "."
+    groups: dict[tuple, list[str]] = {}
+    for r in nfd:
+        groups.setdefault((r["boundary_alignment"], r["tone_isolated"], tuple(r["aligned_seams"])), []).append(r["syllable"])
+    clauses = []
+    for (al, iso, seams), names in sorted(groups.items(), key=lambda kv: (-kv[0][0], kv[0][1])):
+        mark = ("whose tone mark becomes a token of its own" if iso
+                else "whose tone mark stays attached to the following letter")
+        rest = f", leaving one aligned boundary at the {_join([SEAM_NAME[x] for x in seams])} seam" if seams else ""
+        clauses.append(f"to {al:.2f} for {_join([vi(x) for x in names])}, {mark}{rest}")
+    s2 = ("Under NFD every syllable gains a boundary between a base letter and its combining tone mark, which is never "
+          "linguistic, so alignment falls " + _join_clauses(clauses) + ".")
+    return s1 + " " + s2
+
+
+def render_note(note: str, now: str, spm: str) -> str:
+    header = f"% GENERATED by paper/gen_fig1_tokens.py from {spm} on {now}; do not edit by hand."
+    what = "% \\figtokensnote: the caption sentences of Figure 1 that state what the token table shows,"
+    why = "% composed from the audit rows so that the caption cannot contradict the figure."
+    return "\n".join([header, what, why, f"\\newcommand{{\\figtokensnote}}{{{note}}}"]) + "\n"
 
 
 def render(input_syls: tuple[str, ...], output_syls: tuple[str, ...], rows: dict[str, dict[str, list[dict]]],
@@ -122,6 +189,8 @@ def main(argv=None) -> int:
     ap.add_argument("--name", default="gemma3")
     ap.add_argument("--out", type=Path, default=ROOT / "paper" / "figures" / "fig1_tokens.tex")
     ap.add_argument("--json", type=Path, default=None, help="sidecar with pieces, ids and offsets (default: next to --out)")
+    ap.add_argument("--note", type=Path, default=None,
+                    help="the \\figtokensnote definition (default: fig1_tokens_note.tex next to --out)")
     args = ap.parse_args(argv)
     if not args.spm.exists():
         raise SystemExit(f"tokenizer model not found: {args.spm} (run scripts/fetch_resources.py)")
@@ -137,11 +206,16 @@ def main(argv=None) -> int:
     now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%MZ")
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(render(INPUT, output, rows, info, now, str(args.spm)), encoding="utf-8")
+    note = note_sentences(rows)
+    note_path = args.note or args.out.parent / "fig1_tokens_note.tex"
+    note_path.write_text(render_note(note, now, str(args.spm)), encoding="utf-8")
     side = args.json or args.out.with_suffix(".json")
     side.write_text(json.dumps({"tokenizer": args.name, "model_file": str(args.spm), "normalizer_info": info,
                                 "variant": VARIANT, "input": " ".join(INPUT), "output": " ".join(output),
-                                "rows": rows, "generated": now}, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(json.dumps({"out": str(args.out), "json": str(side), "input": " ".join(INPUT), "output": " ".join(output),
+                                "rows": rows, "note": note, "generated": now}, ensure_ascii=False, indent=1),
+                    encoding="utf-8")
+    print(json.dumps({"out": str(args.out), "note": str(note_path), "json": str(side), "input": " ".join(INPUT),
+                      "output": " ".join(output),
                       "nfc_tokens": [r["pieces"] for r in rows["input"]["nfc"] + rows["output"]["nfc"]]},
                      ensure_ascii=False))
     return 0

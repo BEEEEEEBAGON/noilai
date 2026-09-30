@@ -7,7 +7,7 @@
 #
 #   run_eval.py --model-config <name> --items <path> --tasks ... --variants ... --paraphrases ...
 #               --shots N --arms ... [--input-format F] [--instruction I] [--language L]
-#               [--limit N (smoke runs only)] [--in-core-only] --resume --run-id <id>__<name> --out-root data/runs
+#               [--smoke --limit N (smoke runs only)] [--in-core-only] --resume --run-id <id>__<name> --out-root data/runs
 #
 # (`run_eval_out_style` chooses between the CLI's `--run-id/--out-root` pair, as landed, and the
 # `--out <dir>` flag of the first specification; the run directory is data/runs/<id>__<name> either way.)
@@ -62,9 +62,8 @@ item_files:
   noilai_core:
     path: "{release}/noilai_core.jsonl"
     sha256: null
-    description: "balanced core: 125 per T1/T2 cell, 62 yes/no pairs per T3 cell (1,496 items in v0.2); the only NóiLái items an API may see; the E3 open-model set; the source of the derived core subsets"
+    description: "balanced core: 125 per T1/T2 cell, 62 yes/no pairs per T3 cell (1,496 items in v0.2; DD 4.5 allows 1,496-1,500); the only NóiLái items an API may see; the E3 open-model set; the source of the derived core subsets"
     canary_required: true
-    expected_counts: {n_items: 1496}
   noilai_dev:
     path: "{release}/noilai_dev.jsonl"
     sha256: null
@@ -73,7 +72,7 @@ item_files:
   noilai_c2:
     path: "{release}/noilai_c2.jsonl"
     sha256: null
-    description: "C2-enriched T1 set for H4 (DD 4.5 / 12.6): a separate seeded build from an independent pseudo pool, every item C2-affected, excluded from E1/E2; written by scripts/sample_items.py c2 (empty in the working-tree build: the verify gate refuses it until it holds items)"
+    description: "C2-enriched T1 set for H4 (DD 4.5 / 12.6): a separate seeded build from an independent pseudo pool, every item C2-affected, excluded from E1/E2; written by scripts/sample_items.py c2 (the verify gate refuses the file while it holds no items)"
     canary_required: true
     produced_by: "scripts/sample_items.py c2 --release {release} --n 500 --seed 20261005"
     manifest_sample: c2
@@ -297,7 +296,7 @@ runs:
     estimate: {unit: gpu_hours, low: 1, high: 2}
     counts_toward: noilai_main
     week: "Nov 9-15"
-    note: "V5/V6-labelled attested rows (DD 12.1) are NOT run: prompts/noilai.yaml carries templates for V1-V4 only, so run_eval cannot render them; listing V5 V6 here would crash the run, omitting --variants would still drop them (the CLI default is V1-V4). They enter H6 only when the eval owner adds V5/V6 templates (open question). Demonstration syllables that occur in attested items need --allow-demo-overlap (EXTRA_ARGS) or a demos.yaml that reserves them"
+    note: "attested rows are selected by run_eval's --attested-policy (default exact2: exact two-syllable rows, the H6-eligible set; DD 4.7 / 12.16), not by --variants, which filters the T1/T2/T3 cells only. prompts/noilai.yaml carries templates for V1-V4, so a V5/V6-labelled exact row (DD 12.1) can be rendered only once the eval owner adds those templates (open question). Items sharing a syllable with a demonstration are flagged per row (--demo-overlap-policy flag, the default); an item EQUAL to a demonstration phrase is refused unless EXTRA_ARGS carries --allow-demo-overlap"
 
   - id: E1_abl_zero_shot
     experiment: E1_ablation
@@ -437,7 +436,7 @@ runs:
     estimate: {unit: gpu_hours, low: 1, high: 3}
     counts_toward: counterfactuals
     week: "Oct 26-Nov 1"
-    note: "noilai_c2.jsonl is empty in the working-tree build (scripts/sample_items.py c2 yielded 0 items); the verify gate refuses an empty file, so this line runs only once the data owner's C2 build holds items"
+    note: "the verify gate refuses an empty noilai_c2.jsonl (an early working-tree build held 0 items), so this line runs only once the data owner's C2 build holds items"
 
   - id: E3_xcopa
     experiment: E3
@@ -595,7 +594,7 @@ plan_lines:
   reruns_and_debugging:  {where: "Kaggle",           unit: gpu_hours, low: 25, high: 55, cash_usd: 0, note: "the plan's 100% buffer (35-75) minus the re-budgeted lines above"}
   tpu_models_and_bf16:   {where: "Kaggle TPU",       unit: tpu_hours, low: 10, high: 20, cash_usd: 0}
   bf16_reruns_fallback:  {where: "Modal L4",         unit: l4_hours,  low: 5,  high: 15, cash_usd: 0, note: "card on file; ~37 free L4-h/month"}
-  api_runs:              {where: "Gemini, Groq free tiers", unit: api_calls, low: 12000, high: 12300, tokens: 6000000, cash_usd: 0, note: "plan: ~12,000 calls (4 models x up to ~3,000); the matrix above sums to 12,300"}
+  api_runs:              {where: "Gemini, Groq free tiers", unit: api_calls, low: 12300, high: 12300, tokens: 6000000, cash_usd: 0, note: "plan: ~12,000 calls (4 models x up to ~3,000); the matrix above sums to 12,300 exactly (each API line is a fixed count)"}
   optional_fifth_api:    {where: "OpenRouter free models", unit: api_calls, low: 3000, high: 3000, cash_usd: 10}
 gpu_subtotal: {low: 70, high: 150, note: "2.5-5 weeks of Kaggle's ~30 free GPU-hours a week"}
 quota:

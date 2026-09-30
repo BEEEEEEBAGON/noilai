@@ -27,9 +27,9 @@ import csv
 import datetime as dt
 import sys
 import time
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterable, Optional
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_LOG = ROOT / "data" / "compute_log.csv"
@@ -159,7 +159,7 @@ def format_totals(t: dict) -> str:
     return "\n".join(lines)
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--log", type=Path, default=DEFAULT_LOG)
     sub = ap.add_subparsers(dest="cmd", required=True)

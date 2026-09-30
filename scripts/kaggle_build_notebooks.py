@@ -35,7 +35,6 @@ import argparse
 import sys
 from pathlib import Path
 from textwrap import dedent
-from typing import Optional
 
 import nbformat
 from nbformat.v4 import new_code_cell, new_markdown_cell, new_notebook
@@ -61,7 +60,7 @@ def md(text: str) -> nbformat.NotebookNode:
     return new_markdown_cell(dedent(text).strip("\n"))
 
 
-def code(text: str, tags: Optional[list[str]] = None) -> nbformat.NotebookNode:
+def code(text: str, tags: list[str] | None = None) -> nbformat.NotebookNode:
     cell = new_code_cell(dedent(text).strip("\n"))
     if tags:
         cell.metadata["tags"] = list(tags)
@@ -296,12 +295,14 @@ if ITEMS_DATASET_DIR:
     src = Path(ITEMS_DATASET_DIR)
     if not src.exists():
         raise SystemExit(f"ITEMS_DATASET_DIR {src} not found: attach the private dataset that holds data/release")
-    rel = Path(KRP.load_plan()["release"])
-    dest = PROJECT / rel if (src / rel.name).exists() is False and not (src / "manifest.json").exists() else PROJECT / rel
-    if (src / rel.name).exists():                      # the dataset holds the data/release tree
+    rel = Path(KRP.load_plan()["release"])            # e.g. data/release/v0.2: the plan's `release` key decides where the files go
+    dest = PROJECT / rel
+    if (src / rel.name).exists():                      # the dataset holds the data/release tree (one directory per version)
         shutil.copytree(src / rel.name, dest, dirs_exist_ok=True)
-    else:                                              # the dataset holds one release directory
+    elif (src / "manifest.json").exists():             # the dataset holds ONE release directory
         shutil.copytree(src, dest, dirs_exist_ok=True)
+    else:
+        raise SystemExit(f"{src} holds neither {rel.name}/ nor a release manifest.json: attach the frozen release")
     print("release copied from", src, "to", dest)
 _run_ids = list(globals().get("RUN_IDS") or [globals().get("RUN_ID")]) + list(globals().get("SMOKE_RUN_IDS") or [])
 KEYS = VERIFY_ITEM_KEYS or KRP.item_keys_for_runs(KRP.load_plan(), [r for r in _run_ids if r])
@@ -609,14 +610,18 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
 def build_colab_probe() -> nbformat.NotebookNode:
     cells = [
         md("""
-        # NóiLái — E4 skeleton: tone/onset/rime probes and patching in Gemma 3 (Colab)
+        # NóiLái — E4 skeleton: tone/onset/rime probes and patching in Gemma 3 (Colab / Kaggle 2×T4)
 
-        Loads **Gemma 3 1B (IT)** in float32 (bf16 only on a bf16-capable GPU: L4/A100; a T4 has
-        none, and Gemma 3 must never run in fp16), extracts residual-stream states at each
-        syllable's last sub-token under NFC and NFD with `noilai.probe.extract`, fits layer-wise
-        probes with control tasks (`noilai.probe.probes`), and holds a patching skeleton
-        (`noilai.probe.patching`) for the P pair *bí mật* (clean) vs *bí mất* (corrupt). Results
-        are written to Drive. Colab secrets: `HF_TOKEN` (gated Gemma), `GITHUB_TOKEN` if no bundle.
+        Loads **Gemma 3 1B (IT)** in float32 on one T4 (fp32 ≈ 4 GB), or **Gemma 3 4B (IT)** as the
+        text-only `Gemma3ForCausalLM` (skips the SigLIP tower) **sharded over 2×T4** with
+        `device_map="auto"` (fp32 ≈ 15.5 GB does not fit one T4; DESIGN_DECISIONS 9.5). Gemma 3 must
+        never run in fp16; bf16 only on a bf16-capable GPU (L4/A100) and then with the 200-pair drift
+        check. The notebook extracts residual-stream states at each syllable's last sub-token under
+        NFC and NFD with `noilai.probe.extract`, fits layer-wise probes with control tasks
+        (`noilai.probe.probes`), and holds the patching skeleton (`noilai.probe.patching`) for the
+        DESIGN_DECISIONS 9.3 pair *bí mà* (clean) vs *bí mạ* (corrupt) under V3 with E1's frozen
+        prompt. Results go to Drive (Colab) or the working directory (Kaggle). Secrets: `HF_TOKEN`
+        (gated Gemma), `GITHUB_TOKEN` if no bundle.
 
         The two cells tagged `e4` are the experiment and are meant to be edited as E4 takes shape
         (plan §2.6, weeks of Nov 23 – Dec 6; Gate 4 keeps probing only if patching is clean).
@@ -643,8 +648,9 @@ def build_colab_probe() -> nbformat.NotebookNode:
         GITHUB_TOKEN_SECRET = "GITHUB_TOKEN"
         HF_TOKEN_SECRET = "HF_TOKEN"
 
-        MODEL_CONFIG = "gemma-3-1b-it"    # entry of configs/models.yaml (hf_id read from it); gemma-3-4b-it needs an L4/A100 for fp32
+        MODEL_CONFIG = "gemma-3-1b-it"    # entry of configs/models.yaml (hf_id read from it); "gemma-3-4b-it" needs N_GPUS = 2 (Kaggle 2xT4, fp32 sharded)
         DTYPE = "float32"                 # "bfloat16" only on a bf16-capable GPU; never "float16" for Gemma 3
+        TEXT_ONLY = True                  # multimodal checkpoints (4B/12B): load Gemma3ForCausalLM, the text tower only (DD 9.5)
         N_SYLLABLES = 600                 # tone-bearing syllables sampled from the inventory (train/test split by syllable)
         ENCODINGS = ["nfc", "nfd"]
         FEATURES = ["tone", "onset", "rime"]
@@ -652,7 +658,7 @@ def build_colab_probe() -> nbformat.NotebookNode:
         SEED = 20261004
         BATCH_SIZE = 8
 
-        PLATFORM, GPU_TYPE, N_GPUS = "colab", "t4", 1
+        PLATFORM, GPU_TYPE, N_GPUS = "colab", "t4", 1    # Kaggle 2xT4 for the 4B: PLATFORM "kaggle", N_GPUS 2, DRIVE_DIR -> /kaggle/working/noilai
         REQUIRE_GPU = True
         RUN_LABEL = "E4_probe"
         '''),
@@ -686,19 +692,35 @@ def build_colab_probe() -> nbformat.NotebookNode:
         '''),
         code(FETCH_VERIFY),
         code('''
-        # load the model named by MODEL_CONFIG in DTYPE (fp32 by default: Gemma 3 overflows in fp16)
-        import torch, yaml
+        # load the model named by MODEL_CONFIG in DTYPE (fp32 by default: Gemma 3 overflows in fp16). The 4B/12B
+        # checkpoints are multimodal: TEXT_ONLY loads Gemma3ForCausalLM (the text tower, no SigLIP), and N_GPUS > 1
+        # shards it over the session's GPUs with device_map="auto" (accelerate); DESIGN_DECISIONS 9.5.
+        import re, torch, yaml
         from transformers import AutoModelForCausalLM, AutoTokenizer
         entry = next(m for m in yaml.safe_load(open("configs/models.yaml", encoding="utf-8"))["models"] if m["name"] == MODEL_CONFIG)
-        if entry.get("family") == "gemma3" and DTYPE == "float16":
+        is_gemma3 = entry.get("family") == "gemma3" or bool(re.match(r"google/gemma-3-", entry.get("hf_id") or ""))
+        if is_gemma3 and DTYPE == "float16":
             raise SystemExit("Gemma 3 must not run in float16 (transformers PR #36832)")
         if DTYPE == "bfloat16" and torch.cuda.is_available() and torch.cuda.get_device_capability(0) < (8, 0):
             raise SystemExit("this GPU has no bfloat16 units; use float32 (or an L4/A100 runtime)")
+        n_visible = torch.cuda.device_count() if torch.cuda.is_available() else 0
+        if n_visible < N_GPUS:
+            raise SystemExit(f"N_GPUS = {N_GPUS} but {n_visible} CUDA device(s) are visible: the 4B in fp32 needs Kaggle's 2xT4")
         HF_ID = entry["hf_id"]
-        print("loading", HF_ID, "in", DTYPE, "| hf_id_status:", entry.get("hf_id_status"))
-        tok = AutoTokenizer.from_pretrained(HF_ID)
-        model = AutoModelForCausalLM.from_pretrained(HF_ID, torch_dtype=getattr(torch, DTYPE), device_map="cuda" if torch.cuda.is_available() else "cpu").eval()
-        print("layers:", model.config.num_hidden_layers, "| hidden:", model.config.hidden_size)
+        REVISION = entry.get("revision")        # a full commit hash before a paper run (DD 7.1); None = the hub's default branch
+        print("loading", HF_ID, "in", DTYPE, "| hf_id_status:", entry.get("hf_id_status"), "| revision:", REVISION, "| gpus:", N_GPUS)
+        tok = AutoTokenizer.from_pretrained(HF_ID, revision=REVISION)
+        device_map = "auto" if N_GPUS > 1 else ("cuda" if torch.cuda.is_available() else "cpu")
+        load_kw = {"dtype": getattr(torch, DTYPE), "device_map": device_map, "revision": REVISION}   # transformers 5.x: `dtype`, not torch_dtype
+        multimodal = is_gemma3 and float(entry.get("params_b") or 0) > 1.5
+        if multimodal and TEXT_ONLY:
+            from transformers import Gemma3ForCausalLM
+            model = Gemma3ForCausalLM.from_pretrained(HF_ID, **load_kw).eval()
+        else:
+            model = AutoModelForCausalLM.from_pretrained(HF_ID, **load_kw).eval()
+        cfg = getattr(model.config, "text_config", model.config)
+        print("class:", type(model).__name__, "| layers:", cfg.num_hidden_layers, "| hidden:", cfg.hidden_size,
+              "| devices:", sorted({str(p.device) for p in model.parameters()}))
         '''),
         md("""
         ### E4 CELL — layer-wise probes with control tasks
@@ -741,47 +763,77 @@ def build_colab_probe() -> nbformat.NotebookNode:
                    "position": POSITION, "seed": SEED, "head": HEAD}, open(Path(OUT_DIR) / f"probe_{MODEL_CONFIG}_manifest.json", "w"), indent=2)
         ''', tags=[E4_TAG]),
         md("""
-        ### E4 CELL — activation patching skeleton (P pair *bí mật* / *bí mất*)
-        V3 (swap tones) maps the clean input *bí mật* to *bị mất* and leaves the corrupt input *bí mất*
-        unchanged, so the first answer token differs (*bị* vs *bí*). The cell caches the clean run,
-        patches the corrupt run layer by layer at the second syllable's positions and reports recovery
-        of the logit difference. The prompt below is a placeholder until the prompt file is frozen
-        (NATIVE-CHECK its wording); token spans must match between clean and corrupt runs.
+        ### E4 CELL — activation patching (DESIGN_DECISIONS 9.3 pair *bí mà* / *bí mạ*, readout B)
+        The varying syllable is the SECOND input syllable, so under V3 (swap tones) the two gold
+        answers diverge at their FIRST syllable: *bí mà* → *bì má* (clean) and *bí mạ* → *bị má*
+        (corrupt), read at the pieces `▁bì` vs `▁bị`. Every output is recomputed by the rule engine
+        (`noilai.gen.variants`) and checked for legality; the prompt is E1's frozen V3 template with
+        its three rule-engine demonstrations and the IT chat template, the answer teacher-forced from
+        the `Đáp án:` line. (The plan's *bí mật* / *bí mất* is not a legal V3 pair — equal tones make V3
+        the identity — and belongs to V4 patching: *bí mật* → *bật mí*.) The cell caches the clean run,
+        patches the corrupt run layer by layer at the varying syllable's positions and reports recovery
+        of the logit difference; it refuses a pair whose token spans differ outside that syllable.
         """),
-        code('''
-        # E4 CELL: patching skeleton. Adjust PROMPT to the frozen prompt file; the answer position is the
-        # last prompt token, the patched positions are the tokens of the second syllable.
-        import torch
+        code(f'''
+        # E4 CELL: activation patching on the {E4_PATCH_PAIR["source"]} pair with E1's exact {E4_PATCH_PAIR["variant"]} prompt (frozen
+        # template p0, three rule-engine demonstrations, the IT chat template): readout B. The pair, its outputs
+        # and their legality come from the rule engine; nothing below is a typed-out example. [NATIVE-CHECK] the
+        # three syllables are ordinary (bí "gourd/secret", mà "but", mạ "rice seedling"); the outputs are pseudo-phrases.
+        import json, torch
+        from pathlib import Path
+        from noilai.eval import prompts as P
+        from noilai.gen import variants as V
         from noilai.probe import patching
+        from noilai.vi import lexicon as L
+        from noilai.vi.syllable import parse, spell
 
-        # NATIVE-CHECK: instruction wording (variant V3 = swap the tones, keep onsets and rimes)
-        PROMPT = "Nói lái kiểu đổi thanh, giữ phụ âm đầu và vần. Ví dụ: hiện đại -> hiền đậi. Câu: {phrase}. Đáp án:"
-        CLEAN, CORRUPT = "bí mật", "bí mất"
-        ANSWER_CLEAN, ANSWER_CORRUPT = "bị", "bí"
+        VARIANT = "{E4_PATCH_PAIR["variant"]}"
+        PARTNER, CLEAN_SYL, CORRUPT_SYL = "{E4_PATCH_PAIR["partner"]}", "{E4_PATCH_PAIR["clean"]}", "{E4_PATCH_PAIR["corrupt"]}"   # the varying syllable is the SECOND one
+        inv = L.load_inventory()
 
-        def _encode(phrase):
-            text = PROMPT.format(phrase=phrase)
-            enc = tok(text, return_offsets_mapping=True, return_tensors="pt", add_special_tokens=True)
-            start = text.index(phrase) + len(phrase.split()[0]) + 1          # second syllable
+        def _pair(second):
+            a, b = parse(PARTNER).syllable, parse(second).syllable
+            if V.is_identity(VARIANT, a, b):
+                raise SystemExit(f"{{PARTNER}} {{second}} is an identity under {{VARIANT}}: not a legal patching pair (DD 3.4)")
+            out = V.apply(VARIANT, a, b)
+            if not all(inv.is_legal(x, "onset_rime") for x in out):
+                raise SystemExit(f"{{VARIANT}} on {{PARTNER}} {{second}} gives an illegal syllable")
+            return f"{{PARTNER}} {{second}}", f"{{spell(out[0])}} {{spell(out[1])}}"
+
+        CLEAN, ANSWER_CLEAN = _pair(CLEAN_SYL)
+        CORRUPT, ANSWER_CORRUPT = _pair(CORRUPT_SYL)
+        first_clean, first_corrupt = ANSWER_CLEAN.split()[0], ANSWER_CORRUPT.split()[0]
+        assert first_clean != first_corrupt, "the two gold answers must diverge at their first syllable"
+        print(f"clean {{CLEAN}} -> {{ANSWER_CLEAN}} | corrupt {{CORRUPT}} -> {{ANSWER_CORRUPT}} | readout {{first_clean}} vs {{first_corrupt}}")
+
+        def _prompt(phrase):
+            item = {{"task": "T1", "variant": VARIANT, "input": phrase, "item_id": "P-" + phrase.replace(" ", "_"), "gold": [""]}}
+            msgs = P.render(item, paraphrase="p0", shots=3, arm="nfc")          # E1's frozen template + rule-engine demonstrations
+            text = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True) + P.answer_marker()   # teacher-forced answer line
+            enc = tok(text, return_offsets_mapping=True, return_tensors="pt", add_special_tokens=False)          # the template carries <bos>: no double BOS
+            start = text.rindex(phrase) + len(PARTNER) + 1                        # the ITEM's varying syllable (the demonstrations come earlier)
             end = start + len(phrase.split()[1])
             positions = [i for i, (a, b) in enumerate(enc["offset_mapping"][0].tolist()) if b > start and a < end]
-            return enc["input_ids"], positions
+            return enc["input_ids"], positions, text
 
-        clean_ids, clean_pos = _encode(CLEAN)
-        corrupt_ids, corrupt_pos = _encode(CORRUPT)
-        if clean_ids.shape != corrupt_ids.shape or clean_pos != corrupt_pos:
-            print("token spans differ between clean and corrupt runs; pick a pair whose second syllables tokenize alike",
-                  clean_ids.shape, corrupt_ids.shape, clean_pos, corrupt_pos)
+        clean_ids, clean_pos, clean_text = _prompt(CLEAN)
+        corrupt_ids, corrupt_pos, _ = _prompt(CORRUPT)
+        tok_clean = tok(" " + first_clean, add_special_tokens=False)["input_ids"]       # one word-initial piece each (DD 9.3)
+        tok_corrupt = tok(" " + first_corrupt, add_special_tokens=False)["input_ids"]
+        if clean_ids.shape != corrupt_ids.shape or clean_pos != corrupt_pos or len(tok_clean) != 1 or len(tok_corrupt) != 1:
+            print("pair not aligned for this tokenizer: token spans or answer pieces differ; pick another DD 9.3 pair",
+                  clean_ids.shape, corrupt_ids.shape, clean_pos, corrupt_pos, tok_clean, tok_corrupt)
         else:
-            tok_clean = tok(" " + ANSWER_CLEAN, add_special_tokens=False)["input_ids"][0]
-            tok_corrupt = tok(" " + ANSWER_CORRUPT, add_special_tokens=False)["input_ids"][0]
+            diff = (clean_ids[0] != corrupt_ids[0]).nonzero().flatten().tolist()
+            assert set(diff) <= set(clean_pos), f"clean/corrupt prompts differ outside the varying syllable: {{diff}} vs {{clean_pos}}"
             device = next(model.parameters()).device
             result = patching.run_patching(model, clean_ids.to(device), corrupt_ids.to(device), answer_pos=clean_ids.shape[1] - 1,
-                                           tok_clean=tok_clean, tok_corrupt=tok_corrupt, position_groups=[clean_pos])
+                                           tok_clean=tok_clean[0], tok_corrupt=tok_corrupt[0], position_groups=[clean_pos])
             print(result)
-            import json
-            json.dump({"clean": CLEAN, "corrupt": CORRUPT, "positions": clean_pos, "result": str(result), "head": HEAD},
-                      open(Path(OUT_DIR) / f"patching_{MODEL_CONFIG}_bi_mat.json", "w"), ensure_ascii=False, indent=2)
+            json.dump({{"variant": VARIANT, "clean": CLEAN, "corrupt": CORRUPT, "answer_clean": ANSWER_CLEAN, "answer_corrupt": ANSWER_CORRUPT,
+                       "positions": clean_pos, "prompt_hash": P.prompt_hash([{{"role": "user", "content": clean_text}}]),
+                       "result": str(result), "head": HEAD, "model": HF_ID, "dtype": DTYPE}},
+                      open(Path(OUT_DIR) / f"patching_{{MODEL_CONFIG}}_{{VARIANT}}_{{PARTNER}}_{{CLEAN_SYL}}_{{CORRUPT_SYL}}.json", "w"), ensure_ascii=False, indent=2)
         ''', tags=[E4_TAG]),
         code('''
         # GPU-hours log (checklist C1): this session as one E4 row; totals printed and copied to Drive
@@ -795,7 +847,7 @@ def build_colab_probe() -> nbformat.NotebookNode:
         '''),
     ]
     nb = new_notebook(cells=cells)
-    nb.metadata.update(_metadata("colab", "T4 (fp32) or L4/A100 (bf16)"))
+    nb.metadata.update(_metadata("colab_or_kaggle", "T4 (1B, fp32) / 2xT4 (4B, fp32 sharded) / L4-A100 (bf16)"))
     return nb
 
 
@@ -811,12 +863,16 @@ def build_api_runs() -> nbformat.NotebookNode:
         split. Keys come from the environment / Colab userdata / Kaggle Secrets (`GEMINI_API_KEY`,
         `GROQ_API_KEY`) and are never printed.
 
-        **Daily-quota loop.** Groq's free plan allows 1,000 requests and 200K tokens a day per model,
-        so the 1,500-item core takes about four days per model. The driver keeps
-        `data/runs/api_ledger.json` (calls per model per UTC day, counted from new rows in
-        `outputs.jsonl`) and skips a model whose daily request budget is spent; run this notebook
-        once a day with `--resume` until every run is complete. Gemini's free-tier limits are shown
-        only in AI Studio: read them and set `GEMINI_RPD_OVERRIDE` if the run must stop earlier.
+        **Daily-quota loop.** Groq's free plan allows 1,000 requests and 200K tokens a day; at
+        ~500 tokens a call the TOKEN cap binds first (~400 calls), so the core takes about four days
+        per model. The driver keeps `data/runs/api_ledger.json` (requests AND tokens per model per
+        UTC day, counted from the new rows of `outputs.jsonl`), skips a model whose daily request or
+        token budget is spent, and stops a running command (SIGINT, rows kept) the moment the day's
+        cap is reached — reported as *parked*, not failed; the backend paces itself at the entry's
+        `requests_per_minute`. Run this notebook once a day with `--resume` until every run is
+        complete. Gemini's free-tier limits are shown only in AI Studio: read them and set
+        `GEMINI_RPD_OVERRIDE`; the override is applied to the in-memory config and recorded in the
+        ledger — no file under `configs/` is ever rewritten by a notebook.
 
         Terms: Gemini's free tier trains on inputs and requires users to be 18+; only the core reaches
         an API, never annotator data, never the sealed split (plan §2.3, §3).
@@ -833,11 +889,12 @@ def build_api_runs() -> nbformat.NotebookNode:
         CLONE_DIR = "/content/repo"
         WORK_DIR = "/content"
         ITEMS_DATASET_DIR = "/content/drive/MyDrive/noilai/release"        # the frozen data/release tree; None if the clone has it
-        VERIFY_ITEM_KEYS = ["noilai_test"]
+        VERIFY_ITEM_KEYS = None          # None = derived from RUN_IDS by (d)
 
         GITHUB_TOKEN_SECRET = "GITHUB_TOKEN"
         API_KEY_SECRETS = ["GEMINI_API_KEY", "GROQ_API_KEY"]   # names only; values stay in the secret store
-        GEMINI_RPD_OVERRIDE = None       # requests/day read in AI Studio; None = no ledger cap for Gemini [UNCERTAIN: verify]
+        GEMINI_RPD_OVERRIDE = None       # requests/day read in AI Studio; None = no ledger cap for Gemini [UNCERTAIN: verify]; applied in memory, recorded in the ledger
+        GEMINI_TPD_OVERRIDE = None       # tokens/day read in AI Studio, same handling [UNCERTAIN: verify]
 
         RUN_IDS = ["E1_api_core", "E1_api_paraphrase", "E3_api_core"]   # add "reasoning_500_api" for the cost curve
         MODELS = []                      # subset of the run's models; [] = all four
@@ -845,6 +902,8 @@ def build_api_runs() -> nbformat.NotebookNode:
         DRY_RUN = False
 
         PLATFORM, GPU_TYPE, N_GPUS = "api", "api", 0
+        SESSION_HARDWARE = "api"
+        MAX_SESSION_HOURS = None         # the API loop is bounded by the daily caps, not by a session
         REQUIRE_GPU = False
         RUN_LABEL = "+".join(RUN_IDS)
         MOUNT_DRIVE = True
@@ -864,48 +923,61 @@ def build_api_runs() -> nbformat.NotebookNode:
         code(CLONE),
         code(INSTALL_API),
         code('''
-        # API keys into the environment (names from configs/models.yaml providers.*.api_key_env); found / not found only
-        import yaml
-        cfg = yaml.safe_load(open("configs/models.yaml", encoding="utf-8"))
-        wanted = sorted({p["api_key_env"] for p in cfg["providers"].values()} & set(API_KEY_SECRETS))
+        # API keys into the environment (names from configs/models.yaml providers.*.api_key_env); found / not found only.
+        # Session overrides of the Gemini caps are applied to the IN-MEMORY config the driver receives (MODELS_CFG),
+        # never written to configs/models.yaml (that would strip its comments and dirty every manifest's git state).
+        import kaggle_run_plan as KRP
+        PLAN, MODELS_CFG = KRP.load_plan(), KRP.load_models()
+        wanted = sorted({p["api_key_env"] for p in MODELS_CFG["providers"].values()} & set(API_KEY_SECRETS))
         FOUND = {name: _export(name) for name in wanted}
         if not any(FOUND.values()):
             raise SystemExit("no API key found: add GEMINI_API_KEY / GROQ_API_KEY to the secret store")
+        OVERRIDES = {}
         if GEMINI_RPD_OVERRIDE:
-            cfg["providers"]["gemini"]["free_tier"]["requests_per_day"] = int(GEMINI_RPD_OVERRIDE)
-            yaml.safe_dump(cfg, open("configs/models.yaml", "w", encoding="utf-8"), allow_unicode=True, sort_keys=False)
-            print("Gemini requests/day set to", GEMINI_RPD_OVERRIDE, "for this session's ledger (local edit, not committed)")
+            MODELS_CFG["providers"]["gemini"]["free_tier"]["requests_per_day"] = int(GEMINI_RPD_OVERRIDE)
+            OVERRIDES["gemini.requests_per_day"] = int(GEMINI_RPD_OVERRIDE)
+        if GEMINI_TPD_OVERRIDE:
+            MODELS_CFG["providers"]["gemini"]["free_tier"]["tokens_per_day"] = int(GEMINI_TPD_OVERRIDE)
+            OVERRIDES["gemini.tokens_per_day"] = int(GEMINI_TPD_OVERRIDE)
+        if OVERRIDES:
+            lpath = KRP.ledger_path(PLAN)
+            ledger = KRP.ledger_load(lpath)
+            ledger.setdefault("_overrides", {})[KRP.utc_day()] = OVERRIDES
+            KRP.ledger_save(lpath, ledger)
+            print("session overrides (in memory, recorded in the ledger):", OVERRIDES)
         '''),
         code(FETCH_VERIFY),
         md("""
         ### RUN CELL — daily API loop
-        For each run id and model: skip if today's ledger says the daily request budget is spent, else
-        `run_eval.py ... --in-core-only --resume`. Models whose key is missing are skipped with a
-        message. Re-run tomorrow; `--resume` continues.
+        For each run id and model: skip if today's ledger says the daily request OR token budget is
+        spent, else `run_eval.py ... --in-core-only --resume` under the budget watchdog (the command
+        is interrupted at the cap and reported as *parked*). Models whose key is missing are skipped
+        with a message. Re-run tomorrow; `--resume` continues.
         """),
         code('''
-        # RUN CELL: quota-aware loop over RUN_IDS x MODELS through scripts/kaggle_run_plan.py (in-core-only enforced there).
+        # RUN CELL: quota-aware loop over RUN_IDS x MODELS through scripts/kaggle_run_plan.py (in-core-only enforced there);
+        # the in-memory MODELS_CFG carries the session overrides.
         import json, shlex
         import kaggle_run_plan as KRP
-        plan, models_cfg = KRP.load_plan(), KRP.load_models()
         RESULTS = []
         for run_id in RUN_IDS:
-            run = KRP.find_run(plan, run_id)
-            names = MODELS or KRP.expand_models(run, plan, models_cfg)
+            run = KRP.find_run(PLAN, run_id)
+            names = MODELS or KRP.expand_models(run, PLAN, MODELS_CFG)
             runnable = []
             for name in names:
-                prov = models_cfg["by_name"][name].get("provider")
-                key_env = models_cfg["providers"][prov]["api_key_env"] if prov else None
+                prov = MODELS_CFG["by_name"][name].get("provider")
+                key_env = MODELS_CFG["providers"][prov]["api_key_env"] if prov else None
                 if key_env and not os.environ.get(key_env):
                     print(f"skip {name}: {key_env} not set")
                 else:
                     runnable.append(name)
             RESULTS += KRP.execute(run_id, models=runnable, platform=PLATFORM, dry_run=DRY_RUN, continue_on_error=True,
-                                   extra=shlex.split(EXTRA_ARGS), plan=plan, models_cfg=models_cfg)
+                                   extra=shlex.split(EXTRA_ARGS), plan=PLAN, models_cfg=MODELS_CFG, python=RUN_PYTHON,
+                                   session_hardware=SESSION_HARDWARE)
         print(json.dumps([{"run": r["run"], "model": r["model"], "status": r["status"], "new_outputs": r.get("new_outputs"),
-                           "budget": r.get("api_budget_today")} for r in RESULTS], indent=1))
-        ledger = KRP.ledger_load(KRP.ledger_path(plan))
-        print("ledger (calls per model per UTC day):", json.dumps(ledger, indent=1))
+                           "new_tokens": r.get("new_tokens"), "budget": r.get("api_budget_today")} for r in RESULTS], indent=1))
+        ledger = KRP.ledger_load(KRP.ledger_path(PLAN))
+        print("ledger (requests and tokens per model per UTC day):", json.dumps(ledger, indent=1))
         ''', tags=[RUN_TAG]),
         code('''
         # keep the outputs: copy data/runs, the ledger and the compute log to Drive (Colab) or the working dir
@@ -983,7 +1055,7 @@ def check(out_dir: Path = NOTEBOOK_DIR) -> list[str]:
     return drifted
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--write", action="store_true")

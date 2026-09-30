@@ -439,8 +439,8 @@ def paired_t3(rows: list[dict]) -> list[dict]:
     for r in rows:
         if r["task"] != "T3":
             continue
-        r.setdefault("paired_correct", None)
-        r.setdefault("pair_both_correct", None)
+        r["paired_correct"] = None          # recomputed, never inherited from an earlier pass over the same rows
+        r["pair_both_correct"] = None
         mate = by_key.get((r.get("pair_item_id"), r.get("arm"), r.get("prompt_id")))
         if mate is None:
             continue
@@ -590,8 +590,10 @@ def balanced_stats(rows: list[dict], pred_key: str = "pred") -> dict:
     correction (0.5 added to every count) so that 0% / 100% cells stay finite."""
     yes_rows = [r for r in rows if r.get("gold") == "yes"]
     no_rows = [r for r in rows if r.get("gold") == "no"]
+    n_pred_all = sum(1 for r in rows if r.get(pred_key) is not None)
     if not yes_rows or not no_rows:
-        return {"balanced_accuracy": None, "d_prime": None, "yes_rate": _rate(rows, "_pred_yes") if rows else None}
+        return {"balanced_accuracy": None, "d_prime": None,
+                "yes_rate": (sum(1 for r in rows if r.get(pred_key) == "yes") / n_pred_all) if n_pred_all else None}
     hits = sum(1 for r in yes_rows if r.get(pred_key) == "yes")
     fas = sum(1 for r in no_rows if r.get(pred_key) == "yes")
     tpr, tnr = hits / len(yes_rows), 1 - fas / len(no_rows)

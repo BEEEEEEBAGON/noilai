@@ -25,8 +25,8 @@ import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Iterable, Optional, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 SKIP_DIR_NAMES = {"__pycache__", ".ipynb_checkpoints", ".git"}
@@ -98,7 +98,7 @@ def push(dest: Path, message: str, create: bool = False, public: bool = False, d
     return r.returncode
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--src", type=Path, action="append", default=None,
                     help="file or directory to stage (repeatable); default data/runs and data/compute_log.csv")
