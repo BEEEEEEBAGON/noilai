@@ -226,10 +226,15 @@
     },
     "c2": {
       "file": "noilai_c2.jsonl",
-      "sha256": "2c0a51845414b685c056b1bb1146a69b16ade52ff5b8c3a8b1403f888c6e56b0",
+      "sha256": "7404eceb6375935de83dd378b67368ff3697334cd94cbac1f838e9f0a692995d",
       "seed": 20261005,
-      "n_items": 0,
-      "counts": {},
+      "n_items": 500,
+      "counts": {
+        "V1": 113,
+        "V2": 149,
+        "V3": 161,
+        "V4": 77
+      },
       "all_c2_affected": true,
       "disjoint_from_release": true
     }

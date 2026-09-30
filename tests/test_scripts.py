@@ -51,7 +51,8 @@ def test_build_attested(tmp_path):
     assert r_["exactness"].startswith("approx") and not r_["eligible_h6"]
     # three-syllable rows use their declared positions; the reproducing labels record every match
     assert by_in[("chà đồ nhôm", "V4")]["rule_output"] == "chôm đồ nhà" and by_in[("chà đồ nhôm", "V4")]["positions"] == "0-2"
-    assert by_in[("khoái ăn sang", "V3")]["rule_matches_attested"] is True and "V3@0-2 reversed" in by_in[("khoái ăn sang", "V3")]["reproducing_labels"]
+    k = by_in[("khoái ăn sang", "V2")]
+    assert k["rule_matches_attested"] is True and "V2@0-2" in k["reproducing_labels"] and "V3@0-2 reversed" in k["reproducing_labels"]
     assert by_in[("con cá đối", "V1")]["rule_matches_attested"] is True and by_in[("con cá đối", "V1")]["positions"] == "1-2"
     # the six-way textbook illustration: every variant reproduces its row
     for v in ("V1", "V2", "V3", "V4", "V5", "V6"):

@@ -298,7 +298,8 @@ class Generator:
                 self.drops["base:vulgar_input"] += 1
                 continue
             pairs.append(BasePair(_sha_id("bp", "pseudo", *key), sa, sb, "pseudo", self.freqs.get(key[0], 0), self.freqs.get(key[1], 0)))
-            quotas[qk] -= 1
+            if target:
+                quotas[qk] -= 1
             achieved[qk] += 1
             n_ps += 1
         if n_ps < n_pseudo:
