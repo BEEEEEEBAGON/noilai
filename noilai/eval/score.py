@@ -23,7 +23,11 @@ T1  `correct` (strict) iff canonical_text(answer) == canonical_text(gold) for on
       component         anything else; `component_errors` names the wrong components per
                         syllable (onset / rime / tone, via noilai.gen.variants.diff)
     A spelling violation on an otherwise wrong structure is recorded in component_errors as
-    'spelling' while the class comes from the structure.
+    'spelling' while the class comes from the structure; a misspelled answer whose structure
+    is the gold in the other order is therefore `wrong_variant` (the reverse variant's output,
+    6 before 7) unless that variant is one of the item's own labels (then `spelling` with
+    'order' listed). `placement_variant` records the tone-mark convention the answer uses
+    (old / new / mixed / same; 5.4 item 7).
 T2  correct iff the canonical answer is one of the gold readings IN EITHER ORDER (3.2: gold
     stores the attested order and accepts either; `gold_order` records which matched). The
     variants that produce the answer are identified from the structures (identify_any_order,
@@ -35,10 +39,15 @@ T2  correct iff the canonical answer is one of the gold readings IN EITHER ORDER
 T3  Có/Không (yes/no) mapped with negation precedence (extract.t3_label). When the run
     recorded log-probabilities, forced-choice accuracy (P(Có) vs P(Không) for the same prompt)
     and BLiMP-style paired accuracy (log P(correct candidate) > log P(twin candidate) under the
-    same context, over the yes/no pair sharing pair_item_id) are added. Cells report
-    balanced accuracy and d' next to accuracy (generated T3 has a "yes" bias) and the headline
-    excludes spelling twins (`t3_headline`).
-XCOPA  generated 1/2 against the label; log-probability choice when recorded.
+    same context, over the yes/no pair sharing pair_item_id; raw sum and per-token mean,
+    `paired_correct` / `paired_correct_norm`) are added. A row whose log-probabilities carry a
+    prefix-property violation gets None in every log-probability field (7.3). Cells report
+    balanced accuracy and d' next to accuracy (generated T3 has a "yes" bias; an unparseable
+    row is the wrong label, so it lowers tpr or tnr) and the headline excludes spelling twins
+    (`t3_headline`).
+XCOPA  generated 1/2 against the label; log-probability choice when recorded, on the summed
+    log-probability (`logprob_pred`, primary) and on the per-token mean (`logprob_pred_norm`,
+    secondary, 5.7); `delta_n_tokens` = n_tokens_1 - n_tokens_2 is the 8.6 covariate.
 
 `score_outputs(items, outputs)` returns one row per output (header records in `items` are
 ignored); `aggregate(rows)` the per-run summary; `write_scores` the scores.jsonl of
@@ -188,7 +197,27 @@ def _base(item: dict, answer: str | None, method: str) -> dict:
     return {"item_id": item["item_id"], "task": item["task"], "variant": item["variant"], "answer": answer,
             "extraction_method": method, "correct": False, "correct_lenient": False, "error_class": "unparseable",
             "component_errors": [], "component_detail": None, "component_correct": None,
-            "identified_variants": [], "identified_classes": [], "wrong_variant_labels": [], "named_variant": None}
+            "identified_variants": [], "identified_classes": [], "wrong_variant_labels": [], "named_variant": None,
+            "placement_variant": None}
+
+
+def placement_variant(text: str | None) -> str | None:
+    """The tone-mark placement convention the answer actually uses (DESIGN_DECISIONS 5.4 item 7 /
+    item 64): 'old', 'new', 'mixed' (both across its syllables), 'same' (no syllable
+    distinguishes the conventions), or None when a syllable does not parse. Read from the text
+    as written (canonical_text would normalize the placement away)."""
+    if not text:
+        return None
+    seen = set()
+    for w in U.nfc(text).lower().split():
+        p = try_parse(w, strict=False)
+        if p is None:
+            return None
+        if p.placement in ("old", "new"):
+            seen.add(p.placement)
+    if not seen:
+        return "same"
+    return seen.pop() if len(seen) == 1 else "mixed"
 
 
 def _item_labels(item: dict) -> set[str]:
@@ -222,6 +251,7 @@ def score_t1(item: dict, answer: str | None, method: str = "marker", inv: Invent
     else:
         gold_syls = None
     parsed = parse_words(answer, n)
+    row["placement_variant"] = placement_variant(answer) if parsed is not None else None
     if parsed is not None and gold_syls is not None:
         # per-component view of every parseable answer (correct and copy included), so that
         # per-component accuracy is defined over all structural answers
@@ -255,15 +285,19 @@ def score_t1(item: dict, answer: str | None, method: str = "marker", inv: Invent
     row["identified_variants"] = [v for v, _ in ident]
     row["identified_classes"] = _classes(row["identified_variants"])
     own = _item_labels(item)
+    other = [(v, r) for v, r in ident if v not in own]
+    if other and syls != gold_syls:
+        # 5.4 precedence: wrong_variant (6) before spelling (7). A misspelled answer whose structure
+        # is the gold in the other order is another variant's output (the reverse variant) and is
+        # binned here with its labels; only when that reverse variant is among the item's own labels
+        # does it fall through to spelling + order below.
+        row["error_class"] = "wrong_variant"
+        row["wrong_variant_labels"] = [v + ("r" if r else "") for v, r in other]
+        return row
     if syls == gold_syls[::-1]:
         # the gold structure in the other order but misspelled (exact spellings were lenient above)
         row["error_class"] = "spelling"
         row["component_errors"] = ["order", "spelling"]
-        return row
-    other = [(v, r) for v, r in ident if v not in own]
-    if other and syls != gold_syls:
-        row["error_class"] = "wrong_variant"
-        row["wrong_variant_labels"] = [v + ("r" if r else "") for v, r in other]
         return row
     if syls == gold_syls:
         row["error_class"] = "spelling"          # right structure, wrong spelling
@@ -334,6 +368,7 @@ def score_t2(item: dict, answer: str | None, method: str = "marker", raw: str | 
     ca = canonical_text(answer)
     inp = [_syl(d) for d in item["input_syllables"]]
     parsed = parse_phrase(answer)
+    row["placement_variant"] = placement_variant(answer) if parsed is not None else None
     if parsed is not None:
         ident = V.identify_any_order(inp[0], inp[1], parsed[0][0], parsed[0][1])
         row["identified_variants"] = [v for v, _ in ident]
@@ -414,13 +449,17 @@ def score_t3(item: dict, answer: str | None, method: str = "marker", logprobs: d
     row["forced_choice_pred"] = None
     row["forced_choice_correct"] = None
     row["candidate_logprob"] = None
+    row["candidate_n_tokens"] = None
     row["prefix_property_violation"] = None
     if logprobs:
         lp_yes, lp_no = logprobs.get("Có"), logprobs.get("Không")
-        if lp_yes is not None and lp_no is not None:
+        # a row with a prefix-property violation is excluded from every log-probability metric
+        # (DESIGN_DECISIONS 7.3, item 55): the log-probabilities are recorded, the predictions are not
+        if not logprobs.get("prefix_property_violation") and lp_yes is not None and lp_no is not None:
             row["forced_choice_pred"] = "yes" if lp_yes > lp_no else "no"
             row["forced_choice_correct"] = row["forced_choice_pred"] == item["gold"]
         row["candidate_logprob"] = logprobs.get("candidate")
+        row["candidate_n_tokens"] = logprobs.get("candidate_n_tokens")
         row["prefix_property_violation"] = logprobs.get("prefix_property_violation")
     row["twin_type"] = item.get("twin_type")
     row["pair_item_id"] = item.get("pair_item_id")
@@ -429,9 +468,11 @@ def score_t3(item: dict, answer: str | None, method: str = "marker", logprobs: d
 
 def paired_t3(rows: list[dict]) -> list[dict]:
     """Add `paired_correct` (BLiMP-style: the correct candidate's string log-probability beats
-    the twin's, same context, same arm and prompt) and `pair_both_correct` (both generated
-    answers right) to every T3 row that has a partner in the same run. A pair with a
-    prefix-property violation or a missing candidate log-probability gets None."""
+    the twin's, same context, same arm and prompt), `paired_correct_norm` (the same on the
+    per-token mean, DESIGN_DECISIONS 5.3 item 40: raw and length-normalized are both reported)
+    and `pair_both_correct` (both generated answers right) to every T3 row that has a partner
+    in the same run. A pair with a prefix-property violation or a missing candidate
+    log-probability gets None; the normalized field also needs both token counts."""
     by_key = {}
     for r in rows:
         if r["task"] == "T3":
@@ -440,6 +481,7 @@ def paired_t3(rows: list[dict]) -> list[dict]:
         if r["task"] != "T3":
             continue
         r["paired_correct"] = None          # recomputed, never inherited from an earlier pass over the same rows
+        r["paired_correct_norm"] = None
         r["pair_both_correct"] = None
         mate = by_key.get((r.get("pair_item_id"), r.get("arm"), r.get("prompt_id")))
         if mate is None:
@@ -449,6 +491,9 @@ def paired_t3(rows: list[dict]) -> list[dict]:
         if (yes.get("candidate_logprob") is not None and no.get("candidate_logprob") is not None
                 and not yes.get("prefix_property_violation") and not no.get("prefix_property_violation")):
             r["paired_correct"] = yes["candidate_logprob"] > no["candidate_logprob"]
+            ny, nn = yes.get("candidate_n_tokens"), no.get("candidate_n_tokens")
+            if ny and nn:
+                r["paired_correct_norm"] = yes["candidate_logprob"] / ny > no["candidate_logprob"] / nn
     return rows
 
 
@@ -467,9 +512,22 @@ def score_xcopa(item: dict, answer: str | None, method: str = "marker", logprobs
         row["error_class"] = "correct" if row["correct"] else "wrong"
     row["logprob_pred"] = None
     row["logprob_correct"] = None
-    if logprobs and logprobs.get("1") is not None and logprobs.get("2") is not None:
+    row["logprob_pred_norm"] = None          # per-token mean, the pre-registered secondary (5.7, item 68)
+    row["logprob_correct_norm"] = None
+    row["n_tokens_1"] = row["n_tokens_2"] = None
+    row["delta_n_tokens"] = None             # n_tokens_1 - n_tokens_2: the 8.6 covariate
+    row["prefix_property_violation"] = (logprobs or {}).get("prefix_property_violation")
+    # a violated row is excluded from every log-probability metric (DESIGN_DECISIONS 7.3, item 55)
+    if logprobs and not logprobs.get("prefix_property_violation") and logprobs.get("1") is not None \
+            and logprobs.get("2") is not None:
         row["logprob_pred"] = "1" if logprobs["1"] > logprobs["2"] else "2"
         row["logprob_correct"] = row["logprob_pred"] == gold
+        n1, n2 = logprobs.get("n_tokens_1"), logprobs.get("n_tokens_2")
+        row["n_tokens_1"], row["n_tokens_2"] = n1, n2
+        if n1 and n2:
+            row["delta_n_tokens"] = n1 - n2
+            row["logprob_pred_norm"] = "1" if logprobs["1"] / n1 > logprobs["2"] / n2 else "2"
+            row["logprob_correct_norm"] = row["logprob_pred_norm"] == gold
     return row
 
 
@@ -595,7 +653,9 @@ def balanced_stats(rows: list[dict], pred_key: str = "pred") -> dict:
         return {"balanced_accuracy": None, "d_prime": None,
                 "yes_rate": (sum(1 for r in rows if r.get(pred_key) == "yes") / n_pred_all) if n_pred_all else None}
     hits = sum(1 for r in yes_rows if r.get(pred_key) == "yes")
-    fas = sum(1 for r in no_rows if r.get(pred_key) == "yes")
+    # a missing prediction on a 'no' row is scored as the wrong label 'yes' (a false alarm), exactly as
+    # a missing prediction on a 'yes' row is a miss: unparseable is wrong, never a correct rejection (5.6)
+    fas = sum(1 for r in no_rows if r.get(pred_key) != "no")
     tpr, tnr = hits / len(yes_rows), 1 - fas / len(no_rows)
     z = NormalDist().inv_cdf
     h = (hits + 0.5) / (len(yes_rows) + 1)
@@ -643,6 +703,7 @@ def aggregate(rows: list[dict]) -> dict:
             if fc:
                 d["forced_choice_balanced_accuracy"] = balanced_stats(fc, "forced_choice_pred")["balanced_accuracy"]
             d["paired_accuracy"] = _rate(sub, "paired_correct")
+            d["paired_accuracy_norm"] = _rate(sub, "paired_correct_norm")
             d["pair_both_correct_rate"] = _rate(sub, "pair_both_correct")
         if any(r["task"] == "T2" for r in sub):
             d["named_variant_class_accuracy"] = _rate(sub, "named_variant_correct")
@@ -650,6 +711,7 @@ def aggregate(rows: list[dict]) -> dict:
                                              if sub else None)
         if any(r["task"] == "XCOPA" for r in sub):
             d["logprob_accuracy"] = _rate(sub, "logprob_correct")
+            d["logprob_accuracy_norm"] = _rate(sub, "logprob_correct_norm")
         return d
 
     groups: dict[str, dict] = {"by_task": {}, "by_task_variant": {}, "by_task_arm": {}, "by_task_prompt": {},
@@ -694,8 +756,12 @@ def summary_table(agg: dict) -> str:
                 extra += f" fc={c['forced_choice_accuracy']:.3f}"
             if c.get("paired_accuracy") is not None:
                 extra += f" paired={c['paired_accuracy']:.3f}"
+            if c.get("paired_accuracy_norm") is not None:
+                extra += f" paired_norm={c['paired_accuracy_norm']:.3f}"
             if c.get("logprob_accuracy") is not None:
                 extra += f" lp={c['logprob_accuracy']:.3f}"
+            if c.get("logprob_accuracy_norm") is not None:
+                extra += f" lp_norm={c['logprob_accuracy_norm']:.3f}"
             ec = " ".join(f"{k}={v}" for k, v in sorted(c["error_classes"].items()))
             lines.append(f"{name:<22}{c['n']:>6}{acc:>8}{len_:>9}{copy:>7}{unp:>8}  {ec}{extra}")
         lines.append("")

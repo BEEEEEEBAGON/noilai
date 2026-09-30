@@ -13,8 +13,9 @@ information that the answer depends on is carried. Steering adds α·(μ_a − �
 difference of mean residuals between two tone classes at a layer, at the syllable
 positions and measures how often the answer flips.
 
-Works with any Hugging Face decoder-only model whose decoder blocks live in an
-nn.ModuleList (found automatically); tested on a tiny random LLaMA.
+Every forward here passes `use_cache=False` (design 9.3: no KV cache is allocated for a
+patched forward). Works with any Hugging Face decoder-only model whose decoder blocks live
+in an nn.ModuleList (found automatically); tested on a tiny random LLaMA.
 """
 from __future__ import annotations
 
@@ -147,6 +148,28 @@ class PatchResult:
     recovery: np.ndarray        # [n_layers, n_position_groups]
     position_groups: list[list[int]]
     layers: list[int]
+    clean_argmax: int | None = None    # greedy clean answer token at the answer position (filter 3)
+    raw_ld: np.ndarray | None = None   # [n_layers, n_position_groups] patched LD in nats (design 9.3 "raw nats")
+
+    @property
+    def gap(self) -> float:
+        return self.clean_ld - self.corrupt_ld
+
+
+def pair_gap(model, clean_ids, corrupt_ids, answer_pos: int, tok_clean: int, tok_corrupt: int) -> dict:
+    """Filter 3 of design 9.3 without any patching: LD_clean, LD_corrupt, their gap in nats
+    and whether the greedy clean answer at the answer position is the clean token."""
+    import torch
+
+    model.eval()
+    with torch.no_grad():
+        clean_logits = model(input_ids=clean_ids, use_cache=False).logits
+        corrupt_logits = model(input_ids=corrupt_ids, use_cache=False).logits
+    ld_clean = logit_diff(clean_logits, answer_pos, tok_clean, tok_corrupt)
+    ld_corr = logit_diff(corrupt_logits, answer_pos, tok_clean, tok_corrupt)
+    argmax = int(clean_logits[0, answer_pos].argmax())
+    return {"ld_clean": ld_clean, "ld_corrupt": ld_corr, "gap": ld_clean - ld_corr, "clean_argmax": argmax,
+            "clean_greedy_correct": argmax == tok_clean}
 
 
 def run_patching(model, clean_ids, corrupt_ids, answer_pos: int, tok_clean: int, tok_corrupt: int,
@@ -158,22 +181,25 @@ def run_patching(model, clean_ids, corrupt_ids, answer_pos: int, tok_clean: int,
     model.eval()
     with torch.no_grad():
         with ResidualCache(model) as cache:
-            clean_logits = model(input_ids=clean_ids).logits
-        corrupt_logits = model(input_ids=corrupt_ids).logits
+            clean_logits = model(input_ids=clean_ids, use_cache=False).logits
+        corrupt_logits = model(input_ids=corrupt_ids, use_cache=False).logits
         ld_clean = logit_diff(clean_logits, answer_pos, tok_clean, tok_corrupt)
         ld_corr = logit_diff(corrupt_logits, answer_pos, tok_clean, tok_corrupt)
+        clean_argmax = int(clean_logits[0, answer_pos].argmax())
         n_layers = len(cache.layers)
         layers = list(layers) if layers is not None else list(range(n_layers))
         rec = np.zeros((len(layers), len(position_groups)))
+        raw = np.zeros_like(rec)
         denom = ld_clean - ld_corr
         for li, L in enumerate(layers):
             for gi, pos in enumerate(position_groups):
                 vals = cache.store[L][0, list(pos), :]
                 with patch_layer(model, L, pos, vals):
-                    logits = model(input_ids=corrupt_ids).logits
+                    logits = model(input_ids=corrupt_ids, use_cache=False).logits
                 ld = logit_diff(logits, answer_pos, tok_clean, tok_corrupt)
+                raw[li, gi] = ld
                 rec[li, gi] = (ld - ld_corr) / denom if abs(denom) > 1e-8 else np.nan
-    return PatchResult(ld_clean, ld_corr, rec, [list(p) for p in position_groups], layers)
+    return PatchResult(ld_clean, ld_corr, rec, [list(p) for p in position_groups], layers, clean_argmax, raw)
 
 
 def difference_in_means(H_a: np.ndarray, H_b: np.ndarray) -> np.ndarray:
@@ -193,11 +219,11 @@ def steering_flip_rate(model, input_ids_list: Sequence, answer_pos_list: Sequenc
     shift = []
     with torch.no_grad():
         for k, ids in enumerate(input_ids_list):
-            base = model(input_ids=ids).logits
+            base = model(input_ids=ids, use_cache=False).logits
             ld0 = logit_diff(base, answer_pos_list[k], tok_a, tok_b)
             pos = positions_list[k] if positions_list is not None else None
             with add_direction(model, layer_idx, pos, direction, alpha):
-                steered = model(input_ids=ids).logits
+                steered = model(input_ids=ids, use_cache=False).logits
             ld1 = logit_diff(steered, answer_pos_list[k], tok_a, tok_b)
             flips += (ld0 > 0) != (ld1 > 0)
             shift.append(ld1 - ld0)

@@ -10,9 +10,17 @@ For every syllable we measure
   onset_rime_split    a boundary falls exactly between onset and rime
   tone_isolated       under NFD: the combining tone mark is in a token of its own
   byte_fallback       any token is a byte-fallback piece (<0xNN>)
-and for the tokenizer as a whole
-  normalizes_nfd      encode(NFD(x)) == encode(NFC(x)) for Vietnamese x (the census that
-                      decides whether the C1 arm can have an effect by construction)
+and for the tokenizer as a whole the THREE-VALUED normalization census (design 6.2, 12.8),
+per re-encoded form (NFD; PC = partial Windows-1258 decomposition):
+  verdict_<form>      'normalizes'     ids identical to NFC on every sample (the arm is a
+                                       "0 by construction" row),
+                      'passes_through' ids differ and decoding the ids returns the input
+                                       exactly (NFC(decoded.strip()) == NFC(input.strip())),
+                      'corrupts'       decoding does not return the input on some sample
+                                       (e.g. an HF Precompiled nmt_nfkc normalizer deleting
+                                       NFD tone marks, huggingface/tokenizers #2334): the arm
+                                       is refused on that engine.
+  normalizes_nfd      legacy two-valued field (= verdict_nfd == 'normalizes'), kept for readers
   normalizer_spec     SentencePiece normalizer name when available
 
 Two adapters: SentencePiece model files (works offline; Gemma) and Hugging Face fast
@@ -48,6 +56,11 @@ class TokenizerAdapter:
     def ids(self, text: str) -> list[int]:
         return [t.id for t in self.encode(text)]
 
+    def decode(self, ids: Sequence[int]) -> str:  # pragma: no cover - interface
+        """Detokenize ids to text WITHOUT clean-up (design 6.2: the round trip is
+        NFC(decoded.strip()) == NFC(input.strip()))."""
+        raise NotImplementedError
+
     def normalizer_info(self) -> dict:
         return {}
 
@@ -72,6 +85,9 @@ class SentencePieceAdapter(TokenizerAdapter):
         for p in proto.pieces:
             out.append(Token(text=p.piece, start=b2c[p.begin], end=b2c[p.end], id=p.id))
         return out
+
+    def decode(self, ids: Sequence[int]) -> str:
+        return self.sp.decode(list(ids))
 
     def normalizer_info(self) -> dict:
         try:
@@ -104,6 +120,9 @@ class HFAdapter(TokenizerAdapter):
         enc = self.tok(text, add_special_tokens=False, return_offsets_mapping=True)
         toks = self.tok.convert_ids_to_tokens(enc["input_ids"])
         return [Token(text=t, start=s, end=e, id=i) for t, (s, e), i in zip(toks, enc["offset_mapping"], enc["input_ids"])]
+
+    def decode(self, ids: Sequence[int]) -> str:
+        return self.tok.decode(list(ids), skip_special_tokens=True, clean_up_tokenization_spaces=False)
 
     def normalizer_info(self) -> dict:
         info = {"type": "huggingface", "class": type(self.tok).__name__, "vocab_size": len(self.tok)}
@@ -214,27 +233,74 @@ def _nfd_to_nfc_offset(surf_nfd: str, k: int) -> float:
     return letters
 
 
-def normalization_census(adapter: TokenizerAdapter, samples: Sequence[str]) -> dict:
-    """Does the tokenizer treat NFD input like NFC input?"""
-    same_ids = 0
-    nfd_longer = 0
-    byte_fallback_nfd = 0
-    for s in samples:
-        a = adapter.ids(U.nfc(s))
-        b_toks = adapter.encode(U.nfd(s))
-        b = [t.id for t in b_toks]
-        same_ids += a == b
-        nfd_longer += len(b) > len(a)
-        byte_fallback_nfd += any(t.text.startswith("<0x") for t in b_toks)
+CENSUS_FORMS = {"nfd": U.nfd, "pc": U.to_nfd_partial_windows1258}
+CENSUS_VERDICTS = ("normalizes", "passes_through", "corrupts")
+
+
+def roundtrip_ok(adapter: TokenizerAdapter, text: str, ids: Sequence[int]) -> bool:
+    """Design 6.2: decoding the ids returns the input string exactly, i.e.
+    NFC(decoded.strip()) == NFC(input.strip())."""
+    return U.nfc(adapter.decode(ids).strip()) == U.nfc(text.strip())
+
+
+def census_verdict(same_ids: int, roundtrip_failures: int, n: int) -> str | None:
+    if n == 0:
+        return None
+    if same_ids == n:
+        return "normalizes"
+    return "corrupts" if roundtrip_failures > 0 else "passes_through"
+
+
+def normalization_census(adapter: TokenizerAdapter, samples: Sequence[str], forms: dict | None = None,
+                         max_examples: int = 10) -> dict:
+    """Three-valued census per re-encoded form (design 6.2): for every sample compare the ids
+    of the form with the ids of the NFC form and check the decode round trip of the form.
+    Emits `verdict_<form>` in {'normalizes', 'passes_through', 'corrupts'}, the id-equality
+    and round-trip fractions, the first failing examples, the legacy `normalizes_nfd`, and
+    `verdict` (the NFD verdict, the C1 arm's)."""
+    forms = forms if forms is not None else CENSUS_FORMS
     n = len(samples)
-    return {
-        "n_samples": n,
-        "nfd_same_ids_frac": same_ids / n if n else None,
-        "normalizes_nfd": (same_ids == n) if n else None,
-        "nfd_longer_frac": nfd_longer / n if n else None,
-        "nfd_byte_fallback_frac": byte_fallback_nfd / n if n else None,
-        **adapter.normalizer_info(),
-    }
+    out: dict = {"n_samples": n, "forms": sorted(forms)}
+    nfc_ids = [adapter.ids(U.nfc(s)) for s in samples]
+    for form, fn in forms.items():
+        same_ids = longer = byte_fb = rt_fail = 0
+        failures = []
+        for s, a in zip(samples, nfc_ids):
+            text = fn(s)
+            toks = adapter.encode(text)
+            b = [t.id for t in toks]
+            same_ids += a == b
+            longer += len(b) > len(a)
+            byte_fb += any(t.text.startswith("<0x") for t in toks)
+            if not roundtrip_ok(adapter, text, b):
+                rt_fail += 1
+                if len(failures) < max_examples:
+                    failures.append({"input": s, "decoded": adapter.decode(b)})
+        out[f"{form}_same_ids_frac"] = same_ids / n if n else None
+        out[f"{form}_longer_frac"] = longer / n if n else None
+        out[f"{form}_byte_fallback_frac"] = byte_fb / n if n else None
+        out[f"{form}_roundtrip_ok_frac"] = (n - rt_fail) / n if n else None
+        out[f"{form}_roundtrip_failures"] = failures
+        out[f"verdict_{form}"] = census_verdict(same_ids, rt_fail, n)
+    out["normalizes_nfd"] = (out.get("verdict_nfd") == "normalizes") if n and "nfd" in forms else None
+    out["verdict"] = out.get("verdict_nfd")
+    out["roundtrip_rule"] = "NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)"
+    out.update(adapter.normalizer_info())
+    return out
+
+
+def census_probe_set(words: Sequence[str], item_texts: Sequence[str], n_words: int = 500, n_items: int = 500,
+                     seed: int = 0) -> list[str]:
+    """The fixed 1,000-string census probe set of design 6.2: 500 multi-syllable words and
+    500 NóiLái item inputs, drawn with a fixed seed (fewer when the pools are smaller)."""
+    import random
+
+    rng = random.Random(seed)
+    multi = sorted({w for w in words if " " in w})
+    items = sorted(set(item_texts))
+    pick_w = rng.sample(multi, min(n_words, len(multi)))
+    pick_i = rng.sample(items, min(n_items, len(items)))
+    return pick_w + pick_i
 
 
 def audit_inventory(adapter: TokenizerAdapter, syllables: Iterable[str], encodings=("nfc", "nfd")) -> dict:

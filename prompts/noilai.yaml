@@ -50,8 +50,10 @@ concepts:
       âm chính và âm cuối nếu có) và thanh điệu (một trong sáu thanh: ngang, huyền, sắc, hỏi,
       ngã, nặng). Ví dụ: "trung" gồm phụ âm đầu "tr", vần "ung" và thanh ngang; "bình" gồm
       phụ âm đầu "b", vần "inh" và thanh huyền.
+    # [NATIVE-CHECK] review round 2026-09-30: the /k/ trigger set now names y as well (kỳ, kỹ, ký;
+    # DESIGN_DECISIONS 2.2 R1 = {e, ê, i, y}); the earlier clause omitted y and read literally would ask for 'cỹ'.
     spelling: >-
-      Khi ghép lại, hãy viết đúng chính tả tiếng Việt: âm /k/ viết là "k" trước e, ê, i, viết
+      Khi ghép lại, hãy viết đúng chính tả tiếng Việt: âm /k/ viết là "k" trước e, ê, i, y, viết
       là "q" trước âm đệm u và viết là "c" trong các trường hợp còn lại (ví dụ "c" ghép với
       vần "eo" phải viết là "keo", không viết "ceo"); tương tự, "gh" và "ngh" đứng trước e, ê,
       i (ví dụ "nghe", không viết "nge"); dấu thanh đặt đúng vị trí.
@@ -68,7 +70,7 @@ concepts:
       ngang; "bình" is onset "b" + rime "inh" + tone huyền.
     spelling: >-
       When reassembling, follow Vietnamese spelling: the sound /k/ is written "k" before e, ê,
-      i, "q" before the glide u and "c" otherwise (so "c" + rime "eo" is written "keo", not
+      i, y, "q" before the glide u and "c" otherwise (so "c" + rime "eo" is written "keo", not
       "ceo"); likewise "gh" and "ngh" appear before e, ê, i ("nghe", not "nge"); the tone mark
       must be placed correctly.
     four_kinds_intro: "There are four common kinds of nói lái:"

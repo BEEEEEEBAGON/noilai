@@ -1,1 +1,1 @@
-"""Statistics: clustered bootstrap, paired tests with Holm correction, mixed models, effect decomposition, power, agreement, tables."""
+"""Statistics: clustered bootstrap (stratified, BCa, small-cell Wilson), paired tests (paired t primary, McNemar secondary) with Holm correction, the E2 fixed-effects fit and nested H1 test, GEE/VB fits, Δtokens dose–response, power, agreement (Krippendorff α, Gwet AC1), tables."""

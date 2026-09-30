@@ -13,15 +13,17 @@ positions align), and with the two gold answers diverging at their first token.
 from __future__ import annotations
 
 import random
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from ..gen import variants as V
 from ..vi import unicode as U
 from ..vi.syllable import Inventory, Syllable, spell
 
-# Minimal instruction so that the answer follows immediately; the model answers with
-# the transformed phrase. The prompt text is kept short because every extra token is a
-# position the patching sweep must cover.   # NATIVE-CHECK
+# Minimal-pair SKELETON used to build and align candidate pairs cheaply (and by the paper's
+# worked example, tests/test_paper.py). Readout B of design 9.3 does NOT run on it: the
+# driver re-renders every retained pair into E1's exact V3 prompt (`rerender_pair`, with the
+# IT chat template) before patching.   # NATIVE-CHECK
 PATCH_PROMPT = "Nói lái kiểu đổi thanh điệu (giữ phụ âm đầu và vần, đổi chỗ hai thanh): {a} {b} →"
 
 
@@ -84,6 +86,31 @@ def build_pairs(inv: Inventory, n: int, seed: int = 0, target_first: bool = Fals
     return pairs
 
 
+def rerender_pair(pair: PatchPair, render_input: Callable[[str], str]) -> PatchPair:
+    """The same pair inside a full prompt: `render_input(item_input)` returns the complete
+    prompt text for the item whose input is `partner target` (target second, design 9.3),
+    e.g. E1's V3 prompt with demonstrations and the chat template. The target span is
+    recomputed on the rendered text (the item input is its LAST occurrence: the
+    demonstrations precede it). The rendered text must contain the input verbatim."""
+    inp_c = f"{pair.partner} {pair.clean[pair.target_char_span[0]:pair.target_char_span[1]]}"
+    inp_k = f"{pair.partner} {pair.corrupt[pair.target_char_span[0]:pair.target_char_span[1]]}"
+    clean, corrupt = render_input(inp_c), render_input(inp_k)
+    at = clean.rfind(inp_c)
+    if at < 0 or corrupt.rfind(inp_k) < 0:
+        raise ValueError("the rendered prompt must contain the item input verbatim")
+    start = at + len(pair.partner) + 1
+    tgt_len = pair.target_char_span[1] - pair.target_char_span[0]
+    return PatchPair(clean=clean, corrupt=corrupt, target_syllable_clean=pair.target_syllable_clean,
+                     target_syllable_corrupt=pair.target_syllable_corrupt, partner=pair.partner,
+                     answer_clean=pair.answer_clean, answer_corrupt=pair.answer_corrupt,
+                     target_char_span=(start, start + tgt_len))
+
+
+def positions_for_span(offsets: Sequence[tuple[int, int]], start: int, end: int) -> list[int]:
+    """Token indices whose span overlaps [start, end) (a space-only token is excluded)."""
+    return [i for i, (a, b) in enumerate(offsets) if b > start and a < end and b > a]
+
+
 def align_pair(tokenizer, pair: PatchPair, add_special_tokens: bool = True, answer_prefix: str = " ") -> dict | None:
     """Tokenize both prompts; keep the pair only if the token sequences have equal length and
     differ only inside the target span, and the two answers diverge. Answers are tokenized
@@ -116,6 +143,16 @@ def align_pair(tokenizer, pair: PatchPair, add_special_tokens: bool = True, answ
     piece_c = tokenizer.decode([ans_c[k]])
     piece_k = tokenizer.decode([ans_k[k]])
     tone_only = U.strip_tones(piece_c) == U.strip_tones(piece_k) and U.count_tone_marks(piece_c) <= 1 and U.count_tone_marks(piece_k) <= 1
+    # position groups of design 9.3 that follow from the prompt's structure: the fixed
+    # (partner) syllable G2, the context before the item G3, marker / suffix after the item G4
+    partner_start = s - len(pair.partner) - 1
+    partner_pos = positions_for_span(ec["offset_mapping"], partner_start, s - 1) if partner_start >= 0 else []
+    item_start = min(partner_pos + target_pos) if partner_pos else target_pos[0]
+    n_prompt = len(ec["input_ids"])
+    context_pos = [i for i in range(item_start) if i not in partner_pos]
+    suffix_pos = [i for i in range(max(target_pos) + 1, n_prompt + k - 1)]     # marker, newline, forced prefix; not the answer position
     return {"clean_ids": clean_ids, "corrupt_ids": corrupt_ids, "diff_positions": diff, "target_positions": target_pos,
             "answer_pos": len(clean_ids) - 1, "tok_clean": ans_c[k], "tok_corrupt": ans_k[k], "n_forced_prefix": k,
-            "readout_pieces": [piece_c, piece_k], "readout_tone_only": tone_only}
+            "readout_pieces": [piece_c, piece_k], "readout_tone_only": tone_only,
+            "partner_positions": partner_pos, "context_positions": context_pos, "suffix_positions": suffix_pos,
+            "offsets": [tuple(o) for o in ec["offset_mapping"]]}

@@ -21,7 +21,14 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from noilai.eval import score as S
-from noilai.eval.run import item_content_sha256, load_item_file, read_manifest, read_outputs, sha256_file
+from noilai.eval.run import (
+    STATUS_THINKING,
+    item_content_sha256,
+    load_item_file,
+    read_manifest,
+    read_outputs,
+    sha256_file,
+)
 
 
 def resolve_items_path(manifest: dict, root: Path = ROOT) -> Path:
@@ -69,10 +76,23 @@ def resolve_items_path(manifest: dict, root: Path = ROOT) -> Path:
                             f"{len(pool)} files under data/release, data/external (sha256 {want}); pass --items")
 
 
+class ThinkingPresentError(RuntimeError):
+    pass
+
+
 def score_run_dir(run_dir: Path, items_path: Path | None = None, audit: Path | None = None,
-                  quiet: bool = False) -> dict:
+                  quiet: bool = False, allow_thinking: bool = False) -> dict:
+    """Score one run directory. A run without a manifest is refused (read_manifest raises), and
+    so is a main run whose manifest status is `finished_thinking_present` (the model emitted
+    thinking text although DESIGN_DECISIONS 5.5 step 2 / 7.3 require 0 in main runs) unless
+    `allow_thinking` -- the reasoning sub-study's own runs never carry that status."""
     run_dir = Path(run_dir)
     manifest = read_manifest(run_dir)
+    if manifest.get("status") == STATUS_THINKING and not allow_thinking:
+        raise ThinkingPresentError(
+            f"{run_dir} has status {STATUS_THINKING!r}: {manifest.get('n_thinking_chars_total')} thinking characters in a "
+            "main run (DESIGN_DECISIONS 7.3: MUST be 0). Fix the thinking switch and rerun, or pass --allow-thinking "
+            "to score it as reasoning-sub-study material, never as a main-table row")
     if items_path is None:
         items_path = resolve_items_path(manifest)
         if not quiet:
@@ -101,8 +121,10 @@ def main(argv=None) -> int:
     ap.add_argument("--run", type=Path, required=True)
     ap.add_argument("--items", type=Path, default=None)
     ap.add_argument("--audit", type=Path, default=None)
+    ap.add_argument("--allow-thinking", action="store_true",
+                    help="score a run whose status is finished_thinking_present (reasoning sub-study only)")
     args = ap.parse_args(argv)
-    score_run_dir(args.run, args.items, args.audit)
+    score_run_dir(args.run, args.items, args.audit, allow_thinking=args.allow_thinking)
     return 0
 
 

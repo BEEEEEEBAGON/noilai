@@ -174,7 +174,11 @@ def test_inventory_legality_levels():
     # tone constraint
     assert not inv.is_legal(S("mất").with_tone(1), "rime")
     # unparseable / unattested rime
-    assert not inv.is_legal(S("kéo").with_rime_of(S("quốc")), "onset_rime") or True  # kuốc? handled by spelling
+    # the (w, ô, c) rime of quốc (design 2.1 O5 b'): c + glide + ô + c IS quốc and is attested;
+    # on any other onset the rime is attested after qu only, so it is illegal
+    assert inv.is_legal(S("kéo").with_rime_of(S("quốc")), "onset_rime")
+    assert spell(S("kéo").with_rime_of(S("quốc"))) == "quốc"
+    assert not inv.is_legal(S("béo").with_rime_of(S("quốc")), "onset_rime")      # buốc
 
 
 # ------------------------------------------------------------------ re-encoding
@@ -211,7 +215,7 @@ def test_variants_worked_examples(a, b, variant, x, y):
     out = V.apply(variant, S(a), S(b))
     assert (spell(out[0]), spell(out[1])) == (x, y)
     assert V.apply(variant, *out) == (S(a), S(b))            # involution
-    assert V.identify(S(a), S(b), *out) == variant or V.identify(S(a), S(b), *out) is not None
+    assert V.identify(S(a), S(b), *out) == variant      # no row is degenerate for its own variant
 
 
 def test_identity_cases_are_detected():

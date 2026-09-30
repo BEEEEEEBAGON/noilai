@@ -24,8 +24,9 @@ Steps (5.5):
      is taken, "cụm từ gốc là X Y" yields "X Y", a trailing gloss is cut. A hedge between two
      different candidate phrases ("X Y hoặc Y X") is unparseable (method `hedged`).
      T3: negation precedence (a capture whose first token is không/no/sai is "no"); otherwise
-     có/đúng/hợp lệ/yes is "yes"; a leading clause containing both classes, or "có thể"
-     alone, is unparseable. XCOPA: a single 1 or 2; both is a hedge.
+     the first yes/no token of the leading clause decides ("Câu này không đúng" is "no",
+     "Câu này đúng" is "yes"); an explicit alternative joining both classes ("Có hoặc Không")
+     or a leading "có thể" ("maybe") is unparseable. XCOPA: a single 1 or 2; both is a hedge.
   5. Fallbacks: a fallback marker (fallback_marker); ≤ 5 words → last line
      (fallback_last_line); T3 without a marker → first yes/no token anywhere (fallback_yesno).
   6. No lowercasing here (`canonical_text` casefolds).
@@ -213,9 +214,10 @@ def _leading_clause(text: str) -> str:
 
 def t3_label(answer: str | None) -> str | None:
     """Map an extracted T3 answer to 'yes' / 'no' with negation precedence (5.5 step 4):
-    a leading không/no/sai decides 'no' ('không đúng', 'không hợp lệ'); otherwise the leading
-    clause must contain exactly one class ('có hoặc không', 'có thể không' -> None) and 'có thể'
-    alone ("maybe") is not an answer."""
+    a leading không/no/sai decides 'no' ('không đúng', 'không hợp lệ'); 'có thể' ("maybe")
+    opening the answer is not an answer (None); otherwise the FIRST yes/no token of the leading
+    clause decides ('Câu này không đúng' -> no, 'Câu này đúng' -> yes), except that an explicit
+    alternative joining both classes ('Có hoặc Không', 'Có / Không') is None."""
     if not answer:
         return None
     clause = _leading_clause(answer)
@@ -224,13 +226,15 @@ def t3_label(answer: str | None) -> str | None:
         return None
     if words[0] in _NEGATION_FIRST:
         return "no"
-    toks = _yesno_tokens(clause)
-    classes = {c for _, c in toks}
-    if len(classes) != 1:
-        return None
     if words[0] == "có" and len(words) > 1 and words[1] == "thể":
         return None
-    return classes.pop()
+    toks = _yesno_tokens(clause)
+    if not toks:
+        return None
+    classes = {c for _, c in toks}
+    if len(classes) > 1 and _HEDGE_SPLIT.search(clause):
+        return None                                  # 'Có hoặc Không': a hedge, not an answer
+    return toks[0][1]
 
 
 def is_hedge(ans: str) -> bool:
@@ -368,7 +372,7 @@ def _finish(ans: str, task: str, method: str) -> tuple[str | None, str, bool]:
         tok = yesno_token(_leading_clause(ans)) or yesno_token(ans)
         label = t3_label(ans)
         if label is None and tok is not None:
-            # both classes in the leading clause, or "có thể": a hedge, kept as text for the log
+            # an explicit alternative ("Có hoặc Không") or "có thể": a hedge, kept as text for the log
             return ans, "hedged", True
         return (tok, method) + (False,) if tok else (ans, method, False)
     if task == "XCOPA":

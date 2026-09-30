@@ -4,9 +4,12 @@
         -> [{text, n_prompt_tokens, n_output_tokens, finish_reason, prompt_truncated?, reasoning?}]
     Backend.logprobs(prompt_text, continuations) -> [sum log P(continuation | prompt), ...]
         (local backends record `last_prefix_violations`, one bool per continuation: the prefix
-         property ids(prompt) ⊂ ids(prompt + continuation) failed and the continuation was
-         tokenized on its own -- DESIGN_DECISIONS 7.3, item 55; the row is excluded from
-         log-probability metrics)
+         property ids(prompt) ⊂ ids(prompt + continuation) failed -- DESIGN_DECISIONS 7.3,
+         item 55; HF then scores the continuation tokenized on its own and vLLM returns NaN;
+         the runner records None for that continuation and the row is excluded from
+         log-probability metrics. `last_n_tokens` holds the continuation token counts (the
+         per-token means of 5.3 item 40 / 5.7 need them) and `last_prompt_ids_sha256` the
+         sha256 of the prompt id sequence that was scored.)
     Backend.chat_to_text(messages) -> the templated prompt string (for logprob prompts)
     Backend.count_tokens(text) -> int | None (local tokenizers only; Δtokens per arm)
     Backend.info() -> what the manifest records (backend, version, model id, dtype, quant, flags,
@@ -41,7 +44,7 @@ import os
 import random
 import re
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -76,6 +79,11 @@ _TOKENIZER_FILES = ("tokenizer.json", "tokenizer.model", "tokenizer_config.json"
 
 def _sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def ids_sha256(ids) -> str:
+    """sha256 of a token-id sequence (DESIGN_DECISIONS 7.3: the ids are hashed next to the string)."""
+    return hashlib.sha256(json.dumps([int(i) for i in ids]).encode("ascii")).hexdigest()
 
 
 def tokenizer_fingerprint(tokenizer) -> dict:
@@ -114,6 +122,9 @@ class Backend:
     is_api: bool = False
     supports_logprobs: bool = False
     model_id: str | None = None
+    last_prefix_violations: Sequence[bool] = ()   # per continuation of the last logprobs call
+    last_n_tokens: Sequence[int] = ()             # continuation token counts of the last logprobs call
+    last_prompt_ids_sha256: str | None = None    # sha256 of the prompt ids of the last logprobs call
 
     def generate(self, messages_batch: list[list[dict]], max_new_tokens: int = 64, greedy: bool = True) -> list[dict]:
         raise NotImplementedError
@@ -216,6 +227,9 @@ class ScriptedBackend(Backend):
         if self.logprob_fn is None:
             raise NotImplementedError("scripted backend without logprob_fn")
         self.logprob_calls.append((prompt, list(continuations)))
+        self.last_prefix_violations = [False] * len(continuations)
+        self.last_n_tokens = [max(1, len(c.split())) for c in continuations]     # one "token" per word
+        self.last_prompt_ids_sha256 = _sha256_text(prompt)
         return [float(x) for x in self.logprob_fn(prompt, list(continuations))]
 
 
@@ -403,10 +417,12 @@ class HFBackend(Backend):
                         break
                     n_out += 1
                 text = self.tokenizer.decode(ids[:n_out], skip_special_tokens=True)
-                results.append({"text": text, "n_prompt_tokens": int(enc["attention_mask"][i].sum().item()),
+                n_prompt = int(enc["attention_mask"][i].sum().item())
+                prompt_ids = enc["input_ids"][i][-n_prompt:].tolist() if n_prompt else []     # left-padded
+                results.append({"text": text, "n_prompt_tokens": n_prompt,
                                 "n_output_tokens": n_out,
                                 "finish_reason": "length" if n_out >= max_new_tokens else "stop",
-                                "prompt_truncated": bool(long[i])})
+                                "prompt_truncated": bool(long[i]), "prompt_ids_sha256": ids_sha256(prompt_ids)})
         return results
 
     # ---- log-probabilities
@@ -428,9 +444,12 @@ class HFBackend(Backend):
         add_special = self._add_special(prompt)
         seqs, spans = [], []
         self.last_prefix_violations = []
+        self.last_n_tokens = []
+        self.last_prompt_ids_sha256 = ids_sha256(self.tokenizer(prompt, add_special_tokens=add_special)["input_ids"])
         for c in continuations:
             p_ids, c_ids, violated = self._cont_ids(prompt, c, add_special)
             self.last_prefix_violations.append(violated)
+            self.last_n_tokens.append(len(c_ids))
             seqs.append(p_ids + c_ids)
             spans.append((len(p_ids), len(p_ids) + len(c_ids)))
         pad = self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else 0
@@ -470,7 +489,14 @@ class HFBackend(Backend):
 # ------------------------------------------------------------------ vLLM
 class VLLMBackend(Backend):
     """vLLM offline engine. Import guarded: constructing it without vllm installed raises
-    BackendError. Engine flags are configuration (configs/models.yaml)."""
+    BackendError. Engine flags are configuration (configs/models.yaml).
+
+    The chat template is rendered in the runner and tokenized ONCE here with
+    add_special_tokens=False; the id list goes to the engine as a TokensPrompt
+    (`{"prompt_token_ids": ids}`, vLLM's TypedDict), so the engine never re-tokenizes the text
+    (no double <bos> from a template that already emits one) and the ids the model saw are
+    exactly the ids that are hashed (DESIGN_DECISIONS 7.3, item 55). `llm` / `tokenizer` /
+    `sampling_params_cls` may be injected for tests."""
     kind = "vllm"
     supports_logprobs = True
 
@@ -478,12 +504,17 @@ class VLLMBackend(Backend):
                  quantization: dict | None = None, max_model_len: int = 2048, gpu_memory_utilization: float = 0.9,
                  enforce_eager: bool = False, tensor_parallel_size: int = 1, seed: int = 0,
                  trust_remote_code: bool = False, chat_template_kwargs: dict | None = None,
-                 extra_engine_kwargs: dict | None = None, name: str | None = None):
+                 extra_engine_kwargs: dict | None = None, name: str | None = None, llm=None, tokenizer=None,
+                 sampling_params_cls=None):
         try:
             from vllm import LLM, SamplingParams
         except ImportError as e:
-            raise BackendError("vllm is not installed; `pip install vllm` on the GPU machine") from e
-        self.SamplingParams = SamplingParams
+            if llm is None:
+                raise BackendError("vllm is not installed; `pip install vllm` on the GPU machine") from e
+            LLM, SamplingParams = None, None
+        self.SamplingParams = sampling_params_cls or SamplingParams
+        if self.SamplingParams is None:
+            raise BackendError("an injected vLLM engine needs sampling_params_cls when vllm is not installed")
         self.model_id = model_id
         self.name = name or model_id
         self.revision = revision
@@ -502,14 +533,18 @@ class VLLMBackend(Backend):
         load_id = q.get("checkpoint") or model_id
         kw = dict(self.engine_flags)
         kw.pop("seed", None)
-        self.llm = LLM(model=load_id, revision=revision, seed=seed, **kw)   # [UNCERTAIN: verify] flag names on the pinned vLLM
-        self.tokenizer = self.llm.get_tokenizer()
+        if llm is None:
+            llm = LLM(model=load_id, revision=revision, seed=seed, **kw)   # [UNCERTAIN: verify] flag names on the pinned vLLM
+        self.llm = llm
+        self.tokenizer = tokenizer if tokenizer is not None else self.llm.get_tokenizer()
         tmpl = getattr(self.tokenizer, "chat_template", None) or ""
         self.supports_enable_thinking = "enable_thinking" in tmpl
         if self.supports_enable_thinking and "enable_thinking" not in self.chat_template_kwargs:
             self.chat_template_kwargs["enable_thinking"] = False
         self.n_prefix_property_violations = 0
         self.last_prefix_violations: list[bool] = []
+        self.last_n_tokens: list[int] = []
+        self.last_prompt_ids_sha256: str | None = None
 
     def chat_to_text(self, messages, add_generation_prompt=True):
         if not getattr(self.tokenizer, "chat_template", None):
@@ -517,43 +552,68 @@ class VLLMBackend(Backend):
         return self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=add_generation_prompt,
                                                   **self.chat_template_kwargs)
 
+    def _ids(self, text: str) -> list[int]:
+        """Tokenize once, never with special tokens: the rendered template already carries them."""
+        return [int(i) for i in self.tokenizer(text, add_special_tokens=False)["input_ids"]]
+
+    @staticmethod
+    def _tokens_prompt(ids: list[int]) -> dict:
+        """vLLM's TokensPrompt is a TypedDict: this dict IS one, without importing vllm."""
+        return {"prompt_token_ids": list(ids)}
+
     def count_tokens(self, text: str) -> int | None:
-        return len(self.tokenizer(text, add_special_tokens=False)["input_ids"])
+        return len(self._ids(text))
+
+    def _check_prompt_ids(self, ro, ids: list[int]) -> None:
+        got = getattr(ro, "prompt_token_ids", None)
+        if got is not None and [int(i) for i in got] != ids:
+            raise BackendError("vLLM scored a different id sequence than the one it was given "
+                               f"({len(got)} vs {len(ids)} ids): the engine re-tokenized the prompt (DESIGN_DECISIONS 7.3)")
 
     def generate(self, messages_batch, max_new_tokens=64, greedy=True):
         texts = [self.chat_to_text(m) for m in messages_batch]
+        ids = [self._ids(t) for t in texts]
         params = self.SamplingParams(temperature=0.0 if greedy else 1.0, max_tokens=max_new_tokens, seed=self.seed)
-        outs = self.llm.generate(texts, params, use_tqdm=False)
+        outs = self.llm.generate([self._tokens_prompt(i) for i in ids], params, use_tqdm=False)
         res = []
-        for o in outs:
+        for o, i in zip(outs, ids):
+            self._check_prompt_ids(o, i)
             c = o.outputs[0]
             n_out = len(c.token_ids)
-            res.append({"text": c.text, "n_prompt_tokens": len(o.prompt_token_ids), "n_output_tokens": n_out,
+            res.append({"text": c.text, "n_prompt_tokens": len(i), "n_output_tokens": n_out,
                         "finish_reason": getattr(c, "finish_reason", None) or ("length" if n_out >= max_new_tokens
-                                                                               else "stop")})
+                                                                               else "stop"),
+                        "prompt_ids_sha256": ids_sha256(i)})
         return res
 
     def logprobs(self, prompt, continuations):
         # prompt_logprobs=0 returns, for every prompt position, the log-probability of the
         # token actually present (a dict {token_id: Logprob}); the first position is None.
         # [UNCERTAIN: verify] the structure of RequestOutput.prompt_logprobs on the pinned vLLM.
+        # The prefix property is asserted, not degraded (7.3): a violated continuation yields NaN
+        # with the flag; the summed span is the continuation's ids only (never the last prompt token).
         params = self.SamplingParams(temperature=0.0, max_tokens=1, prompt_logprobs=0)
-        p_ids = self.tokenizer(prompt, add_special_tokens=False)["input_ids"]
+        p_ids = self._ids(prompt)
+        self.last_prompt_ids_sha256 = ids_sha256(p_ids)
         out = []
         self.last_prefix_violations = []
+        self.last_n_tokens = []
         for c in continuations:
-            full = prompt + c
-            f_ids = self.tokenizer(full, add_special_tokens=False)["input_ids"]
-            violated = f_ids[: len(p_ids)] != p_ids
+            f_ids = self._ids(prompt + c)
+            violated = f_ids[: len(p_ids)] != p_ids or len(f_ids) <= len(p_ids)
             self.last_prefix_violations.append(violated)
             if violated:
                 self.n_prefix_property_violations += 1     # recorded on the row, excluded from the metrics
-            start = len(p_ids) if not violated else len(p_ids) - 1
-            ro = self.llm.generate([full], params, use_tqdm=False)[0]
+                self.last_n_tokens.append(len(self._ids(c)))
+                out.append(float("nan"))
+                continue
+            self.last_n_tokens.append(len(f_ids) - len(p_ids))
+            ro = self.llm.generate([self._tokens_prompt(f_ids)], params, use_tqdm=False)[0]
+            self._check_prompt_ids(ro, f_ids)
             tot = 0.0
-            for pos in range(max(start, 1), len(ro.prompt_token_ids)):
+            for pos in range(len(p_ids), len(f_ids)):
                 entry = ro.prompt_logprobs[pos]
-                tid = ro.prompt_token_ids[pos]
+                tid = f_ids[pos]
                 lp = entry[tid].logprob if entry and tid in entry else float("nan")
                 tot += lp
             out.append(tot)
@@ -831,6 +891,11 @@ def get_model_entry(cfg: dict, name: str) -> dict:
             entry[k] = prov[k]
     if entry.get("backend") is None and prov.get("backend"):
         entry["backend"] = prov["backend"]
+    if entry.get("provider"):
+        # what the provider does with inputs travels with the entry (run.provider_privacy, the
+        # 11.2 core guard), so a --models-file other than the default is honored
+        entry.setdefault("provider_terms", prov.get("terms"))
+        entry.setdefault("provider_data_policy", prov.get("data_policy"))
     hw = (cfg.get("hardware") or {}).get(entry.get("hardware") or "", {})
     entry.setdefault("tensor_parallel_size", hw.get("tensor_parallel_size", 1))
     return entry

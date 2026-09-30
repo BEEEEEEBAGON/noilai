@@ -38,7 +38,8 @@ def test_build_data_writes_release_and_manifest(release):
 def test_build_attested(tmp_path):
     out = tmp_path / "attested.jsonl"
     r = run("scripts/build_attested.py", "--out", str(out))
-    rows = [json.loads(l) for l in open(out, encoding="utf-8")]
+    with open(out, encoding="utf-8") as f:
+        rows = [json.loads(ln) for ln in f]
     assert len(rows) >= 30 and "rule reproduces" in r.stdout
     by_in = {(r["input"], r["declared_variant"]): r for r in rows}
     assert by_in[("mèo cái", "V1")]["rule_matches_attested"] is True and by_in[("mèo cái", "V1")]["eligible_h6"]
@@ -59,6 +60,17 @@ def test_build_attested(tmp_path):
         assert by_in[("thay đổi", v)]["rule_matches_attested"] is True, v
     assert by_in[("trái gió", "V6")]["vulgar"] is True
     assert all(r["parse_ok"] for r in rows) and not any(r["eligible_h6"] for r in rows if r["n_syllables"] == 3)
+    # design 12.5: attested text is stored in the release placement style like every other file
+    from noilai.vi.reencode import convert_placement
+    n_texts = 0
+    for r_ in rows:
+        for t in [r_["input"], r_["attested_output"], r_["rule_output"], *r_["gold"]]:
+            assert convert_placement(t, "old") == t, (r_["item_id"], t)
+            n_texts += 1
+        assert [d["spelled"] for d in r_["input_syllables"]] == r_["input"].split()
+    assert n_texts > 100
+    assert by_in[("thụy điển", "V3")]["input"] == "thụy điển" and by_in[("thụy điển", "V3")]["attested_output"] == "thủy điện"
+    assert "0 exactness problems" in r.stdout
 
 
 def test_validation_forms_sample_and_score(release, tmp_path):
@@ -73,14 +85,16 @@ def test_validation_forms_sample_and_score(release, tmp_path):
     from collections import Counter
     c = Counter()
     for f in forms:
-        for r in csv.DictReader(open(f, encoding="utf-8")):
-            c[r["item_id"]] += 1
+        with open(f, encoding="utf-8") as fh:
+            for r in csv.DictReader(fh):
+                c[r["item_id"]] += 1
     assert Counter(c.values()) == {2: 90, 3: 30}
     # fill in sheets and score
     ret = out / "returned"
     ret.mkdir()
     for f in forms:
-        rows = list(csv.DictReader(open(f, encoding="utf-8")))
+        with open(f, encoding="utf-8") as fh:
+            rows = list(csv.DictReader(fh))
         for r in rows:
             r.update(correct="yes", spelling="yes", lexical="no", offensive="no")
         with open(ret / f.name, "w", newline="", encoding="utf-8") as g:
@@ -99,7 +113,8 @@ def test_human_baseline_forms(release, tmp_path):
             "--n-forms", "4", "--per-form", "24")
     info = json.loads(r.stdout.strip().splitlines()[-1])
     assert info["forms"] == 4 and len(list(out.glob("baseline_form_*.csv"))) == 4
-    rows = list(csv.DictReader(open(out / "baseline_form_01.csv", encoding="utf-8")))
+    with open(out / "baseline_form_01.csv", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
     assert len(rows) == 24 and {r["task"] for r in rows} == {"T1", "T2", "T3"}
 
 
@@ -125,7 +140,8 @@ def test_audit_items_script(release, tmp_path):
     out = tmp_path / "items.jsonl"
     run("scripts/audit_items.py", "--items", str(release / "noilai_core.jsonl"), "--spm", f"{spm}:g3", "--out", str(out))
     from noilai.gen.generate import load_items
-    rows = [json.loads(l) for l in open(out, encoding="utf-8")]
+    with open(out, encoding="utf-8") as f:
+        rows = [json.loads(ln) for ln in f]
     core = load_items(release / "noilai_core.jsonl")
     assert len(rows) == 2 * len(core)
     nfd = [r for r in rows if r["encoding"] == "nfd"]
@@ -153,10 +169,11 @@ def test_sample_items_main_and_c2(release):
     assert {it["item_id"] for it in core} <= {it["item_id"] for it in main_items}       # the core is inside the main sample
     assert all(v <= 20 or k.startswith("T3") for k, v in info["counts"].items())
     assert read_header(release / "noilai_main.jsonl")["canary"] == read_header(release / "noilai_test.jsonl")["canary"]
-    r2 = run("scripts/sample_items.py", "c2", "--release", str(release), "--n", "30", "--seed", "7")
+    run("scripts/sample_items.py", "c2", "--release", str(release), "--n", "30", "--seed", "7")
     c2 = load_items(release / "noilai_c2.jsonl")
     rel_bp = {it["base_pair_id"] for it in load_items(release / "noilai_test.jsonl") + load_items(release / "noilai_dev.jsonl")}
     assert c2 and all(it["strata"]["c2_affected"] for it in c2) and not ({it["base_pair_id"] for it in c2} & rel_bp)
+    assert all(it["c2_enriched"] is True and it["strata"]["c2_enriched"] is True for it in c2)     # design 4.3 / 4.5
     m = json.loads((release / "manifest.json").read_text())
     assert m["samples"]["main"]["sha256"] and m["samples"]["c2"]["disjoint_from_release"] is True
 
@@ -164,9 +181,47 @@ def test_sample_items_main_and_c2(release):
 def test_attested_labels_are_engine_derived(tmp_path):
     out = tmp_path / "attested.jsonl"
     run("scripts/build_attested.py", "--out", str(out))
-    rows = [json.loads(l) for l in open(out, encoding="utf-8")]
+    with open(out, encoding="utf-8") as f:
+        rows = [json.loads(ln) for ln in f]
     by = {(r["input"], r["declared_variant"]): r for r in rows}
     assert "V2" in by[("khoái ăn sang", "V2")]["variant_labels"] and by[("khoái ăn sang", "V2")]["declared_matches_engine"]
     assert set(by[("cây còn", "V1")]["variant_labels"]) >= {"V1", "V2"}
     assert not by[("thầy giáo", "V4")]["declared_matches_engine"] and by[("thầy giáo", "V4")]["exactness"].startswith("approx(substitution")
     assert not any(r["input"] == "mộng mơ" for r in rows)
+    # design 4.7(b) / 3.7: exactness is engine-derived and every approx row is reachable by exactly its named change
+    approx = [r for r in rows if not r["exact"]]
+    assert len(approx) >= 5 and all(r["exact"] == r["rule_matches_attested"] for r in rows)
+    assert all(r["exactness"] == "exact" for r in rows if r["rule_matches_attested"])
+    assert all(r["exactness"].startswith("approx(") and r["approx_reachable"] is True for r in approx), \
+        [(r["input"], r["exactness"], r["approx_reachable"]) for r in approx]
+    assert all(r["approx_reachable"] is None for r in rows if r["exact"])
+    assert {r["exactness"].split("(")[1].split(":")[0] for r in approx} == {"merger", "substitution"}
+
+
+def test_build_attested_refuses_a_declared_exact_row_the_engine_does_not_reproduce(tmp_path):
+    """A hand-typed `exact` is never trusted: the row is labelled by the engine and --strict fails."""
+    import importlib.util
+    seed = tmp_path / "seed.tsv"
+    header = "input\toutput\tvariant\tpositions\texactness\tregion_tag\tgloss_input\tgloss_output\tnote\tconfidence\tvulgar\tsource\tverified_by\n"
+    seed.write_text(header + "đại học\tđộc hại\tV1\t0-1\texact\t\tuniversity\tharmful\t\thigh\tno\ttest\t\n"
+                    + "đại học\tđộc hại\tV1\t0-1\tapprox(substitution: o→a)\t\tuniversity\tharmful\t\thigh\tno\ttest\t\n", encoding="utf-8")
+    out = tmp_path / "att.jsonl"
+    r = subprocess.run([PY, "scripts/build_attested.py", "--seed-file", str(seed), "--out", str(out), "--strict"],
+                       cwd=ROOT, text=True, capture_output=True, check=False)
+    assert r.returncode == 1 and "[WARN]" in r.stdout and "2 exactness problems" in r.stdout
+    with open(out, encoding="utf-8") as f:
+        rows = [json.loads(ln) for ln in f]
+    assert rows[0]["exact"] is False and rows[0]["exactness"] == "approx(unspecified)" and rows[0]["declared_exactness"] == "exact"
+    assert rows[0]["approx_reachable"] is False and not rows[0]["eligible_h6"]
+    assert rows[1]["approx_reachable"] is False                  # o→a is not the change that yields độc
+    spec = importlib.util.spec_from_file_location("build_attested", ROOT / "scripts" / "build_attested.py")
+    ba = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ba)
+    from noilai.vi.syllable import try_parse
+
+    def S(t):
+        return [try_parse(w, strict=False).syllable for w in t.split()]
+    assert ba.reachable_by_named_change(S("đọc hại"), S("độc hại"), "approx(substitution: o→ô)") is True
+    assert ba.reachable_by_named_change(S("đan giởn"), S("đang giỡn"), "approx(merger: n/ng + hỏi/ngã)") is True
+    assert ba.reachable_by_named_change(S("đan giởn"), S("đang giỡn"), "approx(merger: hỏi/ngã)") is False   # n/ng unexplained
+    assert ba.reachable_by_named_change(S("vẫn như củ"), S("vẫn như cũ"), "approx(merger: n/ng + hỏi/ngã)") is False  # n/ng unused

@@ -130,6 +130,8 @@ def cmd_c2(args) -> int:
         it["item_id"] = f"C2-{it['variant']}-{k+1:06d}"
         it["split"] = "test"
         it["in_core"] = False
+        it["c2_enriched"] = True                    # design 4.3 / 4.5: true only on this separate file
+        it["strata"]["c2_enriched"] = True
         if header:
             it["canary"] = header["canary"]
             it["do_not_train"] = True

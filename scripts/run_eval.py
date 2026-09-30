@@ -4,25 +4,36 @@
     python scripts/run_eval.py --items data/release/v0.2/noilai_core.jsonl --model-config gemma-3-1b-it \
         --tasks T1 T2 T3 --variants V1 V2 V3 V4 --paraphrases p0 p1 p2 --shots 3 --arms nfc nfd
 
-    python scripts/run_eval.py --items data/release/v0.2/noilai_test.jsonl --model-config gemma-3-1b-it \
-        --sample 4200 --sample-seed 20261004          # seeded stratified sample, ids in the manifest
+    python scripts/run_eval.py --items data/release/v0.2/noilai_main.jsonl --model-config gemma-3-1b-it \
+        --tasks T1 T2 T3                              # the paper's main sample is a seeded FILE (scripts/sample_items.py)
 
     python scripts/run_eval.py --items data/release/v0.2/noilai_dev.jsonl --backend echo --smoke --limit 20 --score
+    python scripts/run_eval.py --items data/release/v0.2/noilai_dev.jsonl --model-config gemma-3-1b-it \
+        --smoke --sample 240 --sample-seed 7          # SMOKE/PILOT ONLY: a run-time stratified draw
     python scripts/run_eval.py --items data/external/xcopa_test_vi.jsonl --model-config gemma-3-1b-it \
         --arms nfc nfd placement_new strip_tones
 
 --model-config names an entry of configs/models.yaml (or --models-file); --backend overrides
 the entry's backend (e.g. its fallback). Outputs stream to data/runs/<run_id>/outputs.jsonl;
---resume continues a run under the same --run-id. Sub-samples: --sample N draws a seeded,
-stratified sample (per task x variant cell, core forced in, T3 pairs together, vulgar
-excluded; noilai.eval.sample) and records the ids and seed in the manifest; --limit N is a
-head truncation ("first N", one task on a release file) and is refused unless --smoke is
-given (DESIGN_DECISIONS 12.32). An API backend refuses non-core items unless
---allow-noncore-api and any file whose path contains validation / human / sealed; an item
-equal to a demonstration phrase is refused unless --allow-demo-overlap; items sharing a
-syllable with the demonstrations are flagged (--demo-overlap-policy flag|drop|refuse).
---arm-scope whole_prompt|item (default whole_prompt, DESIGN_DECISIONS 6.1). --score runs
-scripts/score_run.py's scoring at the end.
+--resume continues a run under the same --run-id. Sub-samples: every paper sub-sample is a
+seeded, stratified FILE written by scripts/sample_items.py and referenced by hash in
+configs/run_plan.yaml, never drawn at run time (DESIGN_DECISIONS 4.5 / 12.32); the two
+run-time selectors are therefore SMOKE/PILOT ONLY and refused without --smoke: --sample N
+(a seeded draw per task x variant cell, core forced in, T3 pairs together, vulgar excluded;
+noilai.eval.sample; its strata are not those of sample_items.py) and --limit N (a head
+truncation: "first N", one task on a release file). A local backend (hf / vllm / llama_cpp)
+refuses to start without --smoke unless the entry's `revision` is pinned (a full commit hash,
+a Kaggle Models slug + version, or a GGUF SHA-256; DESIGN_DECISIONS 7.1), checked before any
+weight is downloaded. An API backend refuses non-core items unless --allow-noncore-api, any
+file whose path contains validation / human / sealed, and any CORE item when the provider's
+terms train on inputs or are not cleared (`trains_on_inputs` not false in the models file;
+DESIGN_DECISIONS 11.2) unless --core-to-training-provider-opt-out records a key with a
+verified data-use opt-out; an item equal to a demonstration phrase is refused unless
+--allow-demo-overlap; items sharing a syllable with the demonstrations are flagged
+(--demo-overlap-policy flag|drop|refuse). --arm-scope whole_prompt|item (default
+whole_prompt, DESIGN_DECISIONS 6.1). A main run whose model emitted thinking text ends with
+status finished_thinking_present, which the scorer refuses unless --allow-thinking (set it
+for the reasoning sub-study only). --score runs scripts/score_run.py's scoring at the end.
 """
 from __future__ import annotations
 
@@ -39,7 +50,9 @@ from noilai.eval.run import (
     ATTESTED_POLICIES,
     DEMO_OVERLAP_POLICIES,
     RUNS_DIR,
+    RevisionError,
     RunOptions,
+    check_revision,
     load_item_file,
     run,
 )
@@ -65,8 +78,11 @@ def build_parser() -> argparse.ArgumentParser:
                                                               "strip_tones strip_all")
     ap.add_argument("--arm-scope", default=P.DEFAULT_ARM_SCOPE, choices=P.ARM_SCOPES)
     ap.add_argument("--limit", type=int, default=0, help="SMOKE ONLY: the first N selected items (requires --smoke)")
-    ap.add_argument("--smoke", action="store_true", help="a smoke test: allows --limit")
-    ap.add_argument("--sample", type=int, default=0, help="seeded stratified sample of N items (recorded in the manifest)")
+    ap.add_argument("--smoke", action="store_true",
+                    help="a smoke test / pilot: allows --limit and --sample, waives the revision pin, tolerates thinking")
+    ap.add_argument("--sample", type=int, default=0,
+                    help="SMOKE/PILOT ONLY (requires --smoke): run-time seeded stratified draw of N items, recorded in the "
+                         "manifest; the paper's sub-samples are seeded files from scripts/sample_items.py (DD 4.5 / 12.32)")
     ap.add_argument("--sample-seed", type=int, default=DEFAULT_SEED)
     ap.add_argument("--sample-keep-vulgar", action="store_true", help="keep vulgar-flagged items in the sample")
     ap.add_argument("--in-core-only", action="store_true")
@@ -74,6 +90,12 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--run-id")
     ap.add_argument("--out-root", type=Path, default=RUNS_DIR)
     ap.add_argument("--allow-noncore-api", action="store_true")
+    ap.add_argument("--core-to-training-provider-opt-out", action="store_true",
+                    help="the API key has a verified data-use opt-out (paid Gemini key with opt-out; OpenRouter with "
+                         "data_collection: deny): lets core items reach a provider whose tier otherwise trains on inputs; "
+                         "recorded in the manifest (DESIGN_DECISIONS 11.2)")
+    ap.add_argument("--allow-thinking", action="store_true",
+                    help="tolerate thinking text in the completions (reasoning sub-study only; DESIGN_DECISIONS 7.3)")
     ap.add_argument("--allow-demo-overlap", action="store_true", help="override the phrase-level refusal (pilots)")
     ap.add_argument("--demo-overlap-policy", default="flag", choices=DEMO_OVERLAP_POLICIES,
                     help="items sharing a syllable with the demonstrations: flag per row (default), drop, or refuse")
@@ -121,11 +143,19 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     if args.limit and not args.smoke:
         ap.error("--limit is a head truncation (the first N items: one task on a release file) and is smoke-only; "
-                 "pass --smoke for a smoke test, or --sample N --sample-seed S for a seeded stratified sample "
-                 "(DESIGN_DECISIONS 4.5 / 12.32)")
+                 "pass --smoke for a smoke test; the paper's sub-samples are the seeded files written by "
+                 "scripts/sample_items.py (noilai_main.jsonl, ...; DESIGN_DECISIONS 4.5 / 12.32)")
+    if args.sample and not args.smoke:
+        ap.error("--sample is a run-time draw and is smoke/pilot-only (DESIGN_DECISIONS 4.5 / 12.32): the main sample "
+                 "is the seeded file noilai_main.jsonl from scripts/sample_items.py (stratified by source x "
+                 "output_lexical / twin_type, referenced by hash in configs/run_plan.yaml); pass --smoke for a pilot")
     if args.limit and args.sample:
         ap.error("--limit and --sample are exclusive")
     entry = resolve_entry(args)
+    try:        # DESIGN_DECISIONS 7.1: the revision pin is checked before any weight is downloaded
+        check_revision(entry, args.backend or entry.get("backend"), smoke=args.smoke)
+    except RevisionError as e:
+        ap.error(str(e))
     backend = B.make_backend(entry, backend=args.backend)
     items, kind = load_item_file(args.items)
     opts = RunOptions(
@@ -133,6 +163,7 @@ def main(argv=None) -> int:
         shots=tuple(args.shots), arms=tuple(args.arms), arm_scope=args.arm_scope, limit=args.limit,
         sample_n=args.sample, sample_seed=args.sample_seed, sample_exclude_vulgar=not args.sample_keep_vulgar,
         in_core_only=args.in_core_only, resume=args.resume, allow_noncore_api=args.allow_noncore_api,
+        core_to_training_provider_opt_out=args.core_to_training_provider_opt_out, allow_thinking=args.allow_thinking,
         allow_demo_overlap=args.allow_demo_overlap, demo_overlap_policy=args.demo_overlap_policy,
         attested_policy=args.attested_policy,
         max_new_tokens=args.max_new_tokens or int(entry.get("max_new_tokens") or 64), batch_size=args.batch_size,
@@ -149,7 +180,7 @@ def main(argv=None) -> int:
     if args.score:
         from score_run import score_run_dir
 
-        score_run_dir(run_dir, items_path=args.items, audit=args.audit)
+        score_run_dir(run_dir, items_path=args.items, audit=args.audit, allow_thinking=args.allow_thinking or args.smoke)
     return 0
 
 

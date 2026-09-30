@@ -11,7 +11,9 @@ Selection (DESIGN_DECISIONS 4.5, 3.7, 12.32)
     Attested V5/V6 rows render with their own variant templates.
   * `sample_n` draws a seeded stratified sample (noilai.eval.sample: per task x variant cell,
     core forced in, T3 pairs kept together, vulgar excluded); the ids, their SHA-256, the seed
-    and the per-cell counts go into the manifest and `sample_ids.json`.
+    and the per-cell counts go into the manifest and `sample_ids.json`. It is SMOKE/PILOT-ONLY
+    (the CLI refuses it without --smoke): every paper sub-sample is a seeded FILE written by
+    scripts/sample_items.py, whose strata differ from this draw (DESIGN_DECISIONS 4.5, 12.32).
   * `limit` is a head truncation ("first N") and is SMOKE-ONLY: the CLI refuses it without
     --smoke because the first rows of a release file are one task.
 
@@ -30,6 +32,16 @@ Safety guards
     flagged never_to_api (header, item or sibling manifest), non-core items unless
     allow_noncore_api (the core set and the public attested examples are API-eligible), and
     never sends an attested item whose `vulgar` flag is set (counted in the manifest);
+  * a provider whose terms train on inputs, or whose terms are unknown (no explicit
+    `trains_on_inputs: false` in the models file), never receives a core item
+    (DESIGN_DECISIONS 11.2 / 12.41): run it on the dev-derived API set, or pass
+    core_to_training_provider_opt_out for a key with a verified data-use opt-out (recorded);
+  * the runner refuses to start a local (hf / vllm / llama_cpp) non-smoke run unless the entry's
+    `revision` is a full commit hash, a Kaggle Models slug + version, or (llama_cpp) a GGUF
+    SHA-256 (`check_revision`, DESIGN_DECISIONS 7.1); the accepted form is in the manifest;
+  * a main run (not the reasoning sub-study, not a smoke run, allow_thinking unset) whose model
+    emitted thinking text finishes with status `finished_thinking_present`, which the scorer
+    refuses without --allow-thinking (DESIGN_DECISIONS 5.5 step 2 / 7.3: MUST be 0);
   * an item whose input / gold / reading / candidate EQUALS a demonstration phrase in either
     order is refused unless allow_demo_overlap (DESIGN_DECISIONS 7.4); items that merely share
     a SYLLABLE with the demonstrations or the instruction examples are flagged per row and
@@ -44,6 +56,7 @@ import json
 import math
 import os
 import platform
+import re
 import subprocess
 import sys
 import time
@@ -55,7 +68,7 @@ from ..vi import reencode as R
 from . import prompts as P
 from . import xcopa as X
 from .backends import Backend, backend_versions, slug
-from .extract import extract
+from .extract import extract, t3_label
 from .sample import DEFAULT_SEED, Sample, head_sample, stratified_sample
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -66,10 +79,47 @@ AUDIT_DIR = ROOT / "data" / "audit"
 FORBIDDEN_API_PATH_PARTS = ("validation", "human", "sealed")
 DEMO_OVERLAP_POLICIES = ("flag", "drop", "refuse")
 ATTESTED_POLICIES = ("exact2", "all")
+LOCAL_WEIGHT_BACKENDS = ("hf", "vllm", "llama_cpp")      # backends that download weights: revision pinned (7.1)
+REASONING_SUBSTUDY_GROUP = "reasoning_substudy"          # configs/models.yaml group whose runs may think
+STATUS_FINISHED = "finished"
+STATUS_THINKING = "finished_thinking_present"
+_COMMIT_HASH = re.compile(r"[0-9a-f]{40}")
+_KAGGLE_SLUG = re.compile(r"[\w.-]+/[\w.-]+/[\w.-]+/[\w.-]+/\d+")      # owner/model/framework/variation/version
+_SHA256 = re.compile(r"[0-9a-f]{64}")
 
 
 class ApiSafetyError(RuntimeError):
     pass
+
+
+class RevisionError(ValueError):
+    pass
+
+
+def classify_revision(entry: dict, backend_kind: str | None) -> str | None:
+    """The pinned form of the entry's model revision (DESIGN_DECISIONS 7.1): 'commit_hash' (40
+    hex), 'kaggle_slug' (owner/model/framework/variation/version), 'gguf_sha256' (llama_cpp: a
+    64-hex `gguf_sha256`), or None when nothing pins it."""
+    rev = str(entry.get("revision") or "").strip()
+    if _COMMIT_HASH.fullmatch(rev.lower()):
+        return "commit_hash"
+    if _KAGGLE_SLUG.fullmatch(rev):
+        return "kaggle_slug"
+    if backend_kind == "llama_cpp" and _SHA256.fullmatch(str(entry.get("gguf_sha256") or "").lower()):
+        return "gguf_sha256"
+    return None
+
+
+def check_revision(entry: dict, backend_kind: str | None, smoke: bool = False) -> str | None:
+    """Refuse a non-smoke run of a weight-downloading backend whose revision is not pinned
+    (DESIGN_DECISIONS 7.1, item 67); returns the accepted form (None for other backends / smoke)."""
+    kind = classify_revision(entry, backend_kind)
+    if backend_kind in LOCAL_WEIGHT_BACKENDS and not smoke and kind is None:
+        raise RevisionError(f"model entry {entry.get('name')!r} ({backend_kind}) has revision={entry.get('revision')!r}: "
+                            "DESIGN_DECISIONS 7.1 requires a full 40-hex commit hash, a Kaggle Models slug + version "
+                            "(owner/model/framework/variation/version) or, for llama_cpp, a 64-hex `gguf_sha256` before "
+                            "any non-smoke run; pin it in configs/models.yaml or pass --smoke for a smoke test")
+    return kind
 
 
 class DemoOverlapError(RuntimeError):
@@ -95,6 +145,8 @@ class RunOptions:
     in_core_only: bool = False
     resume: bool = False
     allow_noncore_api: bool = False
+    core_to_training_provider_opt_out: bool = False   # the API key has a verified data-use opt-out (11.2); recorded
+    allow_thinking: bool = False              # thinking text tolerated (reasoning sub-study / smoke set it too)
     allow_demo_overlap: bool = False          # override the phrase-level refusal (dev pilots only)
     demo_overlap_policy: str = "flag"         # syllable-level overlap: flag | drop | refuse
     attested_policy: str = "exact2"           # exact2 | all
@@ -256,9 +308,15 @@ def _never_to_api(item_path: Path, items: list[dict]) -> str | None:
 
 
 def check_api_safety(backend: Backend, items: list[dict], opts: RunOptions,
-                     item_path: Path | None = None) -> tuple[list[dict], dict]:
-    """Enforce the API rules (DESIGN_DECISIONS 7.3); returns (items to send, report)."""
-    report = {"is_api": backend.is_api, "n_excluded_vulgar": 0, "n_noncore": 0}
+                     item_path: Path | None = None, privacy: dict | None = None) -> tuple[list[dict], dict]:
+    """Enforce the API rules (DESIGN_DECISIONS 7.3, 11.2); returns (items to send, report).
+    `privacy` is `provider_privacy(entry)`: a provider whose `trains_on_inputs` is not exactly
+    False (True, a string, or unknown = not cleared) never receives a core item unless
+    `opts.core_to_training_provider_opt_out` documents a key with a data-use opt-out."""
+    privacy = privacy or {}
+    report = {"is_api": backend.is_api, "n_excluded_vulgar": 0, "n_noncore": 0, "n_core": 0,
+              "trains_on_inputs": privacy.get("trains_on_inputs"),
+              "core_to_training_provider_opt_out": bool(opts.core_to_training_provider_opt_out)}
     if not backend.is_api:
         return items, report
     if item_path is not None:
@@ -278,6 +336,17 @@ def check_api_safety(backend: Backend, items: list[dict], opts: RunOptions,
             report["n_excluded_vulgar"] += 1
             continue
         kept.append(it)
+    core = [it for it in kept if it.get("in_core")]
+    report["n_core"] = len(core)
+    trains = privacy.get("trains_on_inputs")
+    if core and trains is not False and not opts.core_to_training_provider_opt_out:
+        prov = privacy.get("provider")
+        state = "trains on inputs" if trains is True else f"has no cleared no-training terms (trains_on_inputs={trains!r})"
+        raise ApiSafetyError(f"{len(core)} core items would reach provider {prov!r}, which {state}: a provider whose "
+                             "tier trains on inputs never receives the core (DESIGN_DECISIONS 11.2 / 12.41, item 33); "
+                             "run the dev-derived API set (noilai_api_dev, 4.5) instead, set `terms.trains_on_inputs: "
+                             "false` for a provider with no-training terms, or pass "
+                             "--core-to-training-provider-opt-out for a paid key with a verified data-use opt-out")
     return kept, report
 
 
@@ -405,20 +474,32 @@ def t3_logprobs(backend: Backend, req: Request, messages: list[dict], opts: RunO
     candidate's string log-probability under a T1 context for the same input and variant
     (shared by the yes/no pair -> BLiMP-style paired scoring). Under a strip arm the candidate
     log-probability is None: tone twins become identical strings once stripped, so the pair
-    comparison is undefined there (only the yes/no answer tokens are scored)."""
+    comparison is undefined there (only the yes/no answer tokens are scored).
+
+    Boundary convention (DESIGN_DECISIONS 7.3, item 55): the scoring context ends with the
+    answer marker ("Đáp án:") and every continuation carries its leading space (" Có",
+    " Không", " " + candidate), the piece the model itself produces after the marker and the
+    convention of xcopa.completion_pair. A context ending in "Đáp án: " would merge the space
+    into the first continuation token on SentencePiece and byte-level BPE tokenizers alike and
+    violate the prefix property on every row. A violated continuation is recorded as None; the
+    continuation token counts are recorded for the per-token means (5.3 item 40)."""
     out: dict = {}
     arm, scope = req.arm, opts.arm_scope
     encode_marker = R.meaning_preserving(arm) and scope == "whole_prompt"
-    prompt_text = backend.chat_to_text(messages) + _marker_for(arm, scope) + " "
-    conts = [R.reencode(w, arm) if encode_marker else w for w in ("Có", "Không")]
+    prompt_text = backend.chat_to_text(messages) + _marker_for(arm, scope)
+    conts = [" " + (R.reencode(w, arm) if encode_marker else w) for w in ("Có", "Không")]
     lp = backend.logprobs(prompt_text, conts)
-    out["Có"], out["Không"] = float(lp[0]), float(lp[1])
-    viol = list(getattr(backend, "last_prefix_violations", []) or [])
-    out["prefix_property_violation"] = any(viol) if viol else None
+    viol = _violations(backend, 2)
+    n_tok = _n_tokens(backend, 2)
+    out["Có"], out["Không"] = _lp(lp[0], viol[0]), _lp(lp[1], viol[1])
+    out["n_tokens_Có"], out["n_tokens_Không"] = n_tok
+    out["prompt_ids_sha256"] = getattr(backend, "last_prompt_ids_sha256", None)
+    out["prefix_property_violation"] = any(viol) if any(v is not None for v in viol) else None
     it = req.item
+    out["candidate"] = None
+    out["candidate_n_tokens"] = None
+    out["candidate_context_hash"] = None
     if arm in P.STRIP_ARMS:
-        out["candidate"] = None
-        out["candidate_context_hash"] = None
         out["candidate_skipped_reason"] = "strip arm: stripped twins are not distinct strings"
         return out
     pseudo = {"task": "T1", "variant": it["variant"], "input": it["input"], "item_id": it["item_id"],
@@ -426,22 +507,48 @@ def t3_logprobs(backend: Backend, req: Request, messages: list[dict], opts: RunO
     ctx_messages = P.render(pseudo, paraphrase=req.paraphrase, shots=req.shots, arm=arm, input_format=opts.input_format,
                             instruction=opts.instruction, language=opts.language, system=opts.system_prompt,
                             arm_scope=scope)
-    ctx = backend.chat_to_text(ctx_messages) + _marker_for(arm, scope) + " "
-    cand = R.reencode(it["candidate"], arm)
-    out["candidate"] = float(backend.logprobs(ctx, [cand])[0])
-    viol2 = list(getattr(backend, "last_prefix_violations", []) or [])
-    if viol2 and any(viol2):
+    ctx = backend.chat_to_text(ctx_messages) + _marker_for(arm, scope)
+    cand = " " + R.reencode(it["candidate"], arm)
+    lp2 = backend.logprobs(ctx, [cand])
+    viol2 = _violations(backend, 1)
+    out["candidate"] = _lp(lp2[0], viol2[0])
+    out["candidate_n_tokens"] = _n_tokens(backend, 1)[0]
+    out["candidate_context_ids_sha256"] = getattr(backend, "last_prompt_ids_sha256", None)
+    if viol2[0]:
         out["prefix_property_violation"] = True
     out["candidate_context_hash"] = P.prompt_hash(ctx_messages)
     return out
 
 
+def _violations(backend: Backend, n: int) -> list[bool | None]:
+    v = list(getattr(backend, "last_prefix_violations", []) or [])
+    return [bool(x) for x in v] if len(v) == n else [None] * n
+
+
+def _n_tokens(backend: Backend, n: int) -> list[int | None]:
+    v = list(getattr(backend, "last_n_tokens", []) or [])
+    return [int(x) for x in v] if len(v) == n else [None] * n
+
+
+def _lp(value, violated) -> float | None:
+    """A continuation's summed log-probability, or None when its prefix property was violated
+    (asserted, not degraded: DESIGN_DECISIONS 7.3) or the backend returned no number."""
+    if violated or value is None:
+        return None
+    value = float(value)
+    if math.isnan(value) and violated is None:      # a backend without violation flags signalled it by NaN
+        return None
+    return value                                    # a NaN with violated=False is unexpected and is counted by run()
+
+
 def xcopa_logprobs(backend: Backend, req: Request) -> dict:
     ctx, conts = X.completion_pair(req.item, req.arm)
     lp = backend.logprobs(ctx, conts)
-    viol = list(getattr(backend, "last_prefix_violations", []) or [])
-    return {"1": float(lp[0]), "2": float(lp[1]), "context": ctx,
-            "prefix_property_violation": any(viol) if viol else None}
+    viol = _violations(backend, 2)
+    n_tok = _n_tokens(backend, 2)
+    return {"1": _lp(lp[0], viol[0]), "2": _lp(lp[1], viol[1]), "n_tokens_1": n_tok[0], "n_tokens_2": n_tok[1],
+            "context": ctx, "prompt_ids_sha256": getattr(backend, "last_prompt_ids_sha256", None),
+            "prefix_property_violation": any(viol) if any(v is not None for v in viol) else None}
 
 
 # ------------------------------------------------------------------ manifest helpers
@@ -567,6 +674,14 @@ def provider_privacy(entry: dict) -> dict:
     prov = entry.get("provider")
     out = {"provider": prov, "extra_body": entry.get("extra_body"), "terms": None, "data_policy": None,
            "trains_on_inputs": None}
+    if "provider_terms" in entry:
+        # copied from the models file the entry was read from (backends.get_model_entry), or set
+        # directly on an in-memory entry (tests, pilots): the entry's own statement wins
+        terms = entry.get("provider_terms") or {}
+        out["terms"] = entry.get("provider_terms")
+        out["data_policy"] = entry.get("provider_data_policy")
+        out["trains_on_inputs"] = terms.get("trains_on_inputs") if isinstance(terms, dict) else None
+        return out
     if prov:
         with contextlib.suppress(Exception):
             from .backends import MODELS_FILE, load_models_config
@@ -627,7 +742,8 @@ def run(backend: Backend, entry: dict, items: list[dict], item_path: Path, opts:
     selection: dict = {}
     selected = select_items(items, opts, kind, selection)
     sample_obj: Sample | None = selection.pop("_sample", None)
-    selected, api_report = check_api_safety(backend, selected, opts, item_path)
+    privacy = provider_privacy(entry)
+    selected, api_report = check_api_safety(backend, selected, opts, item_path, privacy)
     overlap = check_demo_overlap(selected, opts, kind)
     selected, demo_report = apply_demo_policy(selected, overlap, opts)
     flagged_ids = set(demo_report.get("item_ids", [])) if opts.demo_overlap_policy == "flag" else set()
@@ -667,8 +783,13 @@ def run(backend: Backend, entry: dict, items: list[dict], item_path: Path, opts:
         if kind == "noilai" else None
     account_holder = (opts.account_holder or entry.get("account_holder") or os.environ.get("NOILAI_ACCOUNT_HOLDER_ROLE")
                       or opts.notes.get("account_holder"))
+    is_tpu = str(entry.get("hardware") or "").lower() == "tpu"
+    smoke = bool(opts.notes.get("smoke"))
+    thinking_allowed = bool(opts.allow_thinking or smoke or entry.get("group") == REASONING_SUBSTUDY_GROUP)
+    backend_kind = backend_info.get("backend") or entry.get("backend")
     manifest = {
         "run_id": run_id, "status": "running", "started_utc": started, "finished_utc": None,
+        "start_utc": started, "end_utc": None,          # DESIGN_DECISIONS 7.5 names; started_utc/finished_utc are aliases
         "model": {"name": entry.get("name"), "model_id": entry.get("hf_id") or entry.get("model_id")
                   or entry.get("provider_model_id"), "revision": entry.get("revision"),
                   "provider": entry.get("provider"), "provider_model_id": entry.get("provider_model_id"),
@@ -683,13 +804,16 @@ def run(backend: Backend, entry: dict, items: list[dict], item_path: Path, opts:
                       "header": {k: v for k, v in (read_header(item_path) or {}).items() if k != "canary"} or None},
         "selection": selection, "api_safety": api_report, "demo_overlap": overlap, "demo_overlap_report": demo_report,
         "n_requests": len(reqs), "n_unchanged": len(unchanged), "n_resumed": len(runnable) - len(todo), "n_written": 0,
-        "hardware": hardware_info(opts.n_accelerators), "resource_sha256": resource_hashes(), **git_info(),
+        "hardware": {**hardware_info(opts.n_accelerators), "accelerator_kind": "tpu" if is_tpu else "gpu",
+                     "kaggle_kernel": kaggle_kernel_info()},
+        "resource_sha256": resource_hashes(), **git_info(),
         "code_sha256": code_sha256(),
-        "gpu_hours": None, "wall_s": None, "canary_check": None,
+        "gpu_hours": None, "tpu_hours": None, "wall_s": None, "canary_check": None,
         # DESIGN_DECISIONS 7.5, grouped
         "identity": {"run_id": run_id, "model_key": entry.get("name"),
                      "model_id": entry.get("hf_id") or entry.get("model_id") or entry.get("provider_model_id"),
-                     "revision": entry.get("revision"), "tokenizer_sha256": backend_info.get("tokenizer_sha256"),
+                     "revision": entry.get("revision"), "revision_kind": classify_revision(entry, backend_kind),
+                     "tokenizer_sha256": backend_info.get("tokenizer_sha256"),
                      "tokenizer_sha256_source": backend_info.get("tokenizer_sha256_source"),
                      "chat_template_sha256": backend_info.get("chat_template_sha256"),
                      "template_kwargs": (backend_info.get("engine_flags") or {}).get("chat_template_kwargs"),
@@ -713,10 +837,12 @@ def run(backend: Backend, entry: dict, items: list[dict], item_path: Path, opts:
                  **placement_baseline_for(item_path, items), "n_changed_prompts": n_changed,
                  "n_unchanged_prompts": n_unchanged, "prefix_property_violations": 0,
                  "sample": selection.get("sample"), "demo_overlap_item_ids": demo_report.get("item_ids", [])},
-        "sampling": {"temperature": 0.0, "max_tokens": opts.max_new_tokens, "seed": opts.seed, "stop": None,
+        "sampling": {"temperature": 0.0, "max_tokens": opts.max_new_tokens, "seed": opts.seed,
+                     "stop": getattr(backend, "stop", None),      # the stop list handed to the backend, if it has one
                      "greedy": True, "logprobs_mode": ("t3_yesno+t3_pair+xcopa_choice" if opts.logprobs and
                                                       backend.supports_logprobs else "none")},
         "outcome": {"n_done": 0, "n_unparseable": None, "n_truncated": None, "n_thinking_chars_total": None,
+                    "thinking_allowed": thinking_allowed, "smoke": smoke,
                     "n_hedged": None, "nan_inf_events": 0, "api_model_echo": [], "rate_limit_events": None,
                     "account_holder": account_holder if account_holder else ("unknown" if backend.is_api else None),
                     "api_account_holder": account_holder if account_holder else ("unknown" if backend.is_api else None),
@@ -736,6 +862,7 @@ def run(backend: Backend, entry: dict, items: list[dict], item_path: Path, opts:
     use_lp = opts.logprobs and backend.supports_logprobs
     n_written = 0
     nan_inf = 0
+    canary_in_prompts = False        # computed over every rendered prompt of this run, never assumed
     model_echo: set = set()
     base_tokens: dict[tuple[str, str], int | None] = {}
     bs = max(1, opts.batch_size)
@@ -743,6 +870,8 @@ def run(backend: Backend, entry: dict, items: list[dict], item_path: Path, opts:
         for start in range(0, len(todo), bs):
             batch = todo[start: start + bs]
             messages_batch = [render_request(r, opts, kind) for r in batch]
+            if canary and any(canary in P.messages_text(m) for m in messages_batch):
+                canary_in_prompts = True
             t0 = time.monotonic()
             gens = backend.generate(messages_batch, max_new_tokens=opts.max_new_tokens, greedy=True)
             batch_latency = time.monotonic() - t0
@@ -774,6 +903,7 @@ def run(backend: Backend, entry: dict, items: list[dict], item_path: Path, opts:
                     "arm": req.arm, "arm_scope": opts.arm_scope, "prompt_id": req.prompt_id, "paraphrase": req.paraphrase,
                     "shots": req.shots, "prompt_hash": P.prompt_hash(msgs),
                     "templated_prompt_hash": hashlib.sha256(templated.encode("utf-8")).hexdigest(),
+                    "prompt_ids_sha256": g.get("prompt_ids_sha256"),      # the id sequence the engine received (7.3)
                     "raw": raw, "answer": ex.answer, "extraction_method": ex.method, "hedged": ex.hedged,
                     "n_marker_lines": ex.n_marker_lines, "n_thinking_chars": n_think,
                     "thinking_unclosed": ex.thinking_unclosed, "reasoning": reasoning,
@@ -811,13 +941,23 @@ def run(backend: Backend, entry: dict, items: list[dict], item_path: Path, opts:
 
     wall = time.monotonic() - t_start
     outcome = count_outcomes(outputs_path)
-    manifest.update(status="finished", finished_utc=_now(), wall_s=wall, n_written=n_written,
-                    gpu_hours=wall / 3600.0 * manifest["hardware"]["n_gpus"],
-                    canary_check=canary_check(outputs_path, canary), backend=backend.info())
+    ended = _now()
+    n_acc = manifest["hardware"]["n_gpus"]
+    hours = wall / 3600.0 * n_acc
+    status = STATUS_FINISHED
+    if outcome["n_thinking_chars_total"] > 0 and not thinking_allowed:
+        # DESIGN_DECISIONS 5.5 step 2 / 7.3: thinking text MUST be 0 in a main run; the scorer refuses this status
+        status = STATUS_THINKING
+        log(f"[run {run_id}] WARNING: {outcome['n_thinking_chars_total']} thinking characters in a main run -> status "
+            f"{status}; score with --allow-thinking only for the reasoning sub-study")
+    manifest.update(status=status, finished_utc=ended, end_utc=ended, wall_s=wall, n_written=n_written,
+                    gpu_hours=0.0 if is_tpu else hours, tpu_hours=hours if is_tpu else 0.0,
+                    canary_check=canary_check(outputs_path, canary, canary_in_prompts), backend=backend.info())
     manifest["data"]["canary_check"] = manifest["canary_check"]
     manifest["identity"]["tokenizer_sha256"] = manifest["backend"].get("tokenizer_sha256")
     manifest["outcome"].update(n_done=outcome["n_rows"], n_unparseable=outcome["n_unparseable"],
                                n_truncated=outcome["n_truncated"], n_thinking_chars_total=outcome["n_thinking_chars_total"],
+                               thinking_present_in_main_run=(status == STATUS_THINKING),
                                n_hedged=outcome["n_hedged"], n_prompt_truncated=outcome["n_prompt_truncated"],
                                nan_inf_events=nan_inf, api_model_echo=sorted(model_echo),
                                rate_limit_events=getattr(backend, "n_retries", None),
@@ -827,8 +967,29 @@ def run(backend: Backend, entry: dict, items: list[dict], item_path: Path, opts:
     manifest["n_truncated"] = outcome["n_truncated"]
     manifest["n_thinking_chars_total"] = outcome["n_thinking_chars_total"]
     write_manifest(run_dir, manifest)
-    log(f"[run {run_id}] finished: {n_written} rows in {wall:.1f}s")
+    log(f"[run {run_id}] {status}: {n_written} rows in {wall:.1f}s")
     return run_dir
+
+
+def kaggle_kernel_info() -> dict:
+    """The KAGGLE_* environment of the process (kernel slug, run type, ...; DESIGN_DECISIONS 7.5
+    `kaggle_kernel_slug/version`), secrets excluded; an empty dict off Kaggle."""
+    return {k: os.environ[k] for k in sorted(os.environ)
+            if k.startswith("KAGGLE_") and not any(s in k for s in ("SECRET", "KEY", "TOKEN", "PASSWORD"))}
+
+
+def is_unparseable_row(d: dict) -> bool:
+    """The scorer's notion of unparseable (5.6) for one outputs row: no answer; a T3 answer that
+    maps to neither label (a kept hedge such as 'Có thể'); an XCOPA answer that is not 1 or 2."""
+    ans = d.get("answer")
+    if ans is None:
+        return True
+    task = d.get("task")
+    if task == "T3":
+        return t3_label(ans) is None
+    if task == X.XCOPA_TASK:
+        return ans not in ("1", "2")
+    return False
 
 
 def count_outcomes(outputs_path: Path) -> dict:
@@ -843,7 +1004,7 @@ def count_outcomes(outputs_path: Path) -> dict:
                 continue
             d = json.loads(ln)
             out["n_rows"] += 1
-            if d.get("answer") is None:
+            if is_unparseable_row(d):
                 out["n_unparseable"] += 1
             if d.get("truncated"):
                 out["n_truncated"] += 1
@@ -855,11 +1016,12 @@ def count_outcomes(outputs_path: Path) -> dict:
     return out
 
 
-def canary_check(outputs_path: Path, canary: str | None) -> dict:
+def canary_check(outputs_path: Path, canary: str | None, canary_in_prompts: bool = False) -> dict:
     """The canary must never be echoed: it is never put in a prompt, and a model producing it
-    would be evidence of contamination."""
+    would be evidence of contamination. `canary_in_prompts` is what run() measured over every
+    rendered prompt (the outputs rows carry prompt hashes, not prompt text), never a constant."""
     if canary is None:
-        return {"item_file_has_canary": False, "canary_in_outputs": False, "canary_in_prompts": False}
+        return {"item_file_has_canary": False, "canary_in_outputs": False, "canary_in_prompts": bool(canary_in_prompts)}
     hit = False
     if outputs_path.exists():
         with open(outputs_path, encoding="utf-8") as f:
@@ -867,7 +1029,7 @@ def canary_check(outputs_path: Path, canary: str | None) -> dict:
                 if canary in ln:
                     hit = True
                     break
-    return {"item_file_has_canary": True, "canary_in_outputs": hit, "canary_in_prompts": False}
+    return {"item_file_has_canary": True, "canary_in_outputs": hit, "canary_in_prompts": bool(canary_in_prompts)}
 
 
 def read_outputs(run_dir: Path) -> list[dict]:
