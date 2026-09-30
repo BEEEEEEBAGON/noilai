@@ -101,6 +101,17 @@ def test_split_is_by_base_pair_and_core_is_inside_test(build):
     assert all(v == 10 for v in core.values()) and len(core) == 12
 
 
+def test_qu_syllables_are_excluded_by_default(build):
+    g, b = build
+    for it in b["items"]:
+        for w in it["input"].split():
+            s = try_parse(w).syllable
+            assert not (s.onset == "c" and s.glide), it["item_id"]
+    g2 = Generator(seed=11, exclude_qu=False)
+    pairs = g2.base_pairs(200, 100)
+    assert any(p.a.onset == "c" and p.a.glide or p.b.onset == "c" and p.b.glide for p in pairs)
+
+
 def test_build_is_deterministic():
     a = Generator(seed=5).build(n_lexicon=40, n_pseudo=20, per_cell_t1=15, per_cell_t2=8, per_cell_t3=6, core_per_cell=4)
     b = Generator(seed=5).build(n_lexicon=40, n_pseudo=20, per_cell_t1=15, per_cell_t2=8, per_cell_t3=6, core_per_cell=4)

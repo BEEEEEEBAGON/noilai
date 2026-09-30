@@ -1,0 +1,44 @@
+# XCOPA (Vietnamese) prompt for the re-encoding arms (E3).
+#
+# Generated-answer scoring (API models and open models alike): the model answers "1" or "2"
+# on the "Đáp án:" line. Log-probability scoring (open models only): the two candidate
+# continuations are the two alternatives written as a completion of the premise with a
+# causal connective; the score is the summed log-probability of each continuation given the
+# same context, and the higher one is the prediction (the XCOPA paper's LM-scoring setup).
+#
+# [NATIVE-CHECK] framing sentences, the two relation words and the two connectives.
+version: 1
+answer_marker: "Đáp án:"
+relation_vi:
+  cause: "nguyên nhân"
+  effect: "kết quả"
+vi:
+  p0: |-
+    Dưới đây là một tình huống và hai lựa chọn. Hãy chọn lựa chọn có nhiều khả năng là {relation} của tình huống đó hơn.
+
+    Tình huống: {premise}
+    Lựa chọn 1: {choice1}
+    Lựa chọn 2: {choice2}
+
+    Chỉ trả lời bằng số 1 hoặc 2 trên một dòng riêng, theo đúng dạng:
+    Đáp án: <1 hoặc 2>
+  p1: |-
+    Tình huống: {premise}
+    Trong hai câu sau, câu nào nhiều khả năng là {relation} của tình huống trên hơn?
+    1. {choice1}
+    2. {choice2}
+    Chỉ viết số 1 hoặc 2 trên một dòng riêng, theo đúng dạng:
+    Đáp án: <1 hoặc 2>
+  p2: |-
+    Hãy đọc tình huống và chọn {relation} hợp lí hơn trong hai lựa chọn.
+    Tình huống: {premise}
+    (1) {choice1}
+    (2) {choice2}
+    Trả lời bằng số 1 hoặc 2 trên một dòng riêng, theo đúng dạng:
+    Đáp án: <1 hoặc 2>
+# Completion form for log-probability scoring: context + " " + continuation.
+# The premise loses its final period; the continuation is the alternative with its first
+# letter lower-cased. "vì" = because (cause); "nên" = so (effect).
+completion_vi:
+  cause: "{premise_no_period} vì"
+  effect: "{premise_no_period} nên"

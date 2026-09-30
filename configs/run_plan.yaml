@@ -1,0 +1,378 @@
+# configs/run_plan.yaml -- the run matrix of docs/PLAN_2026-09-30.md, sections 2.5-2.6 and 3.
+#
+# One entry under `runs` per line of the compute table (plan 3, "Bundle A fits in 70-150
+# GPU-hours"). `scripts/kaggle_run_plan.py --run <id>` turns an entry into one
+# `scripts/run_eval.py` command per model:
+#
+#   run_eval.py --model-config <name> --items <path> --tasks ... --variants ... --paraphrases ...
+#               --shots N --arms ... [--limit N] [--in-core-only] --resume --out data/runs/<id>__<name>
+#
+# Item files are referenced by key. `sha256` is null until the data freeze (Gate 2, 8 Nov
+# 2026); once recorded, scripts/kaggle_verify_items.py refuses a file whose hash differs.
+# Every estimate is the plan's (author's estimate, no source unless given); the sums of the
+# GPU lines reproduce the plan's subtotal of 70-150 GPU-hours and tests/test_cloud.py checks
+# that they still do. Model names must exist in configs/models.yaml; `model_sets` expand to
+# lists of names.
+
+version: 1
+date: 2026-09-30
+plan: docs/PLAN_2026-09-30.md
+run_eval_cli: scripts/run_eval.py
+runs_root: data/runs
+compute_log: data/compute_log.csv
+
+item_files:
+  noilai_test:
+    path: data/release/v0.1/noilai_test.jsonl
+    sha256: null           # recorded at the data freeze; verified by scripts/kaggle_verify_items.py
+    description: "gated test split; the 3,000-item stratified sample for open models is drawn by run_eval.py (--limit) and contains the core"
+    canary_required: true
+  noilai_core:
+    path: data/release/v0.1/noilai_core.jsonl
+    sha256: null
+    description: "balanced 1,500-item core (125 per task x variant cell); the only NóiLái items an API may see"
+    canary_required: true
+  noilai_dev:
+    path: data/release/v0.1/noilai_dev.jsonl
+    sha256: null
+    description: "public dev split (CC BY 4.0); prompt development only"
+    canary_required: false
+  attested:
+    path: data/release/v0.1/attested.jsonl
+    sha256: null
+    description: "200-400 attested folk/literary examples; items with vulgar=yes never reach an API or the human form"
+    canary_required: false
+  xcopa_vi_test:
+    path: data/external/xcopa_test_vi.jsonl
+    sha256: 24cb28827066abb00a2f4004d86c447c4a30a9edb17938b26b61fb2385f94170   # data/HASHES.json
+    description: "XCOPA Vietnamese test, 500 items, CC BY 4.0; the E3 re-encoding arms"
+    canary_required: false
+  sealed:
+    path: data/release/sealed/noilai_test.jsonl
+    sha256: null
+    description: "regenerated at release with another seed and canary; NEVER sent to any API"
+    canary_required: true
+    never_to_api: true
+
+model_sets:
+  pilot: [gemma-3-1b-it, qwen3.5-2b, phogpt-4b-chat]
+  t4_single:
+    - gemma-3-1b-it
+    - qwen3.5-0.8b
+    - qwen3.5-2b
+    - qwen3.5-4b
+    - qwen3.5-9b
+    - gemma-4-e2b
+    - gemma-4-e4b
+    - gemma-sea-lion-v4.5-e2b-it
+    - sailor2-8b-chat
+    - phogpt-4b-chat
+    - vistral-7b-chat
+    - llama-3.1-8b-instruct
+  t4_double: [gemma-3-4b-it, gemma-4-12b]
+  tpu: [gemma-3-12b-it, qwen3.8-27b, qwen-sea-lion-v4.5-27b-it]
+  api: [gemini-flash, gemini-flash-lite, gpt-oss-120b, gpt-oss-20b]
+  self_hosted: {union: [t4_single, t4_double, tpu]}
+  panel: {union: [t4_single, t4_double, tpu, api]}
+  bf16_reference: {group: bf16_reference}          # every entry of that group in models.yaml
+  reasoning_t4: [qwen3.5-4b--thinking, qwen3.5-9b--thinking]
+  reasoning_tpu: [qwen3.8-27b--thinking]
+  reasoning_api: [gpt-oss-120b--thinking, gpt-oss-20b--thinking, gemini-flash--thinking]
+  # E3 subset: the fastest fp16/fp32 T4 models plus the TPU trio, chosen so that the arms fit
+  # 10-25 GPU-h; the full panel runs C1-C3 only if the pilot's throughput allows (plan 3).
+  e3_open: {union: [t4_single, t4_double, tpu]}
+
+# --------------------------------------------------------------------------- experiments
+experiments:
+  pilot: "week-2 go/no-go: three open models on 200 items per idea (plan 2.6, Gate 1 on 18 Oct 2026)"
+  smoke: "every model family loads, generates and returns log-probs (open models) on 20 items before the panel is fixed"
+  E1: "all 21 models on NóiLái against human, random and copy baselines (plan 2.6)"
+  E3: "orthographic counterfactual arms C1-C3 on NóiLái and Vietnamese XCOPA (plan 2.6)"
+  reasoning: "500-item run with thinking ON: accuracy vs reasoning tokens (plan 2.5)"
+  bf16_drift: "~200 items per T4 model re-run unquantized in bf16 (plan 2.5)"
+  E4: "tone probing and activation patching on Gemma 3 1B/4B in fp32 (plan 2.6; noilai.probe, not run_eval)"
+
+runs:
+
+  - id: pilot_200
+    experiment: pilot
+    purpose: "Gate 1 evidence: measurable effect on 200 items per idea"
+    platform: kaggle
+    hardware: t4
+    models: {set: pilot}
+    items: noilai_dev            # pilot runs on the public dev split; the test split stays untouched until the panel is fixed
+    tasks: [T1, T2, T3]
+    variants: [V1, V2, V3, V4]
+    arms: [nfc, nfd, placement_old]
+    paraphrases: [p0]
+    shots: 3
+    limit: 200
+    in_core_only: false
+    estimate: {unit: gpu_hours, low: 2, high: 3}
+    counts_toward: pilots_and_smoke
+    week: "Oct 12-18"
+
+  - id: smoke_20
+    experiment: smoke
+    purpose: "load + generate + log-prob check per model family before the panel is fixed"
+    platform: kaggle
+    hardware: mixed             # each model on its own configured hardware
+    models: {set: self_hosted}
+    items: noilai_dev
+    tasks: [T1, T3]
+    variants: [V1]
+    arms: [nfc]
+    paraphrases: [p0]
+    shots: 3
+    limit: 20
+    in_core_only: false
+    estimate: {unit: gpu_hours, low: 2, high: 2}   # the plan books pilots + smoke at ~5 GPU-h in all; see `plan_lines`
+    counts_toward: pilots_and_smoke
+    week: "Oct 19-25"
+
+  - id: E1_main
+    experiment: E1
+    purpose: "NóiLái main runs: 3,000-item stratified test sample (contains the core) + attested set, three paraphrases, reasoning off, <= 64 output tokens"
+    platform: kaggle
+    hardware: mixed
+    models: {set: self_hosted}
+    items: noilai_test
+    tasks: [T1, T2, T3]
+    variants: [V1, V2, V3, V4]
+    arms: [nfc]
+    paraphrases: [p0, p1, p2]
+    shots: 3
+    limit: 3000
+    in_core_only: false
+    extra_item_files: [attested]
+    estimate: {unit: gpu_hours, low: 10, high: 20}
+    counts_toward: noilai_main
+    week: "Nov 9-15"
+    ablations: "zero-shot, name-only and English-instruction prompts run as separate paraphrase ids on the core (plan 2.5); logged under E1_main__<model>/ablations"
+
+  - id: E1_api_core
+    experiment: E1
+    purpose: "API models on the 1,500-item core, main paraphrase"
+    platform: api
+    hardware: api
+    models: {set: api}
+    items: noilai_test
+    tasks: [T1, T2, T3]
+    variants: [V1, V2, V3, V4]
+    arms: [nfc]
+    paraphrases: [p0]
+    shots: 3
+    limit: null
+    in_core_only: true
+    estimate: {unit: api_calls, low: 6000, high: 6000, tokens: 3000000}
+    counts_toward: api_runs
+    week: "Nov 9-22 (Groq: ~4 days per model at 1,000 RPD / 200K TPD)"
+
+  - id: E1_api_paraphrase
+    experiment: E1
+    purpose: "API models on a 300-item subset of the core under the two other paraphrases (prompt-sensitivity range)"
+    platform: api
+    hardware: api
+    models: {set: api}
+    items: noilai_test
+    tasks: [T1, T2, T3]
+    variants: [V1, V2, V3, V4]
+    arms: [nfc]
+    paraphrases: [p1, p2]
+    shots: 3
+    limit: 300
+    in_core_only: true
+    estimate: {unit: api_calls, low: 2400, high: 2400, tokens: 1200000}
+    counts_toward: api_runs
+    week: "Nov 16-22"
+
+  - id: E3_noilai
+    experiment: E3
+    purpose: "C1 (nfd), C2 (placement_old), C3 (strip_tones) against the nfc baseline on NóiLái; H3 crossover on V3"
+    platform: kaggle
+    hardware: mixed
+    models: {set: e3_open}
+    items: noilai_test
+    tasks: [T1, T2, T3]
+    variants: [V1, V2, V3, V4]
+    arms: [nfc, nfd, placement_old, strip_tones]
+    paraphrases: [p0]
+    shots: 3
+    limit: 1500
+    in_core_only: false
+    estimate: {unit: gpu_hours, low: 6, high: 15}
+    counts_toward: counterfactuals
+    week: "Oct 26-Nov 1 (queued during the crunch week)"
+
+  - id: E3_xcopa
+    experiment: E3
+    purpose: "the same arms on XCOPA's 500 Vietnamese test items, scored by log-likelihood of the two alternatives"
+    platform: kaggle
+    hardware: mixed
+    models: {set: e3_open}
+    items: xcopa_vi_test
+    tasks: [XCOPA]
+    variants: []
+    arms: [nfc, nfd, placement_old, strip_tones]
+    paraphrases: [p0]
+    shots: 0
+    limit: 500
+    in_core_only: false
+    estimate: {unit: gpu_hours, low: 4, high: 10}
+    counts_toward: counterfactuals
+    week: "Oct 26-Nov 1"
+    note: "XCOPA is not a NóiLái item file: run_eval.py needs an XCOPA task adapter (owned by noilai/eval); memorized spellings could inflate effects, so each effect is re-estimated on fresh NóiLái items (plan 2.3)"
+
+  - id: E3_api_core
+    experiment: E3
+    purpose: "API models: nfd and placement_old arms on the core only (C3 skipped: destroys meaning, no log-probs to rescue it)"
+    platform: api
+    hardware: api
+    models: {set: api}
+    items: noilai_test
+    tasks: [T1, T3]
+    variants: [V1, V2, V3, V4]
+    arms: [nfd, placement_old]
+    paraphrases: [p0]
+    shots: 3
+    limit: 300
+    in_core_only: true
+    estimate: {unit: api_calls, low: 2400, high: 2400, tokens: 1200000}
+    counts_toward: api_runs
+    week: "Nov 16-22"
+
+  - id: reasoning_500
+    experiment: reasoning
+    purpose: "thinking ON: accuracy against reasoning tokens; if reasoning solves nói lái, the cost curve is the finding"
+    platform: kaggle
+    hardware: mixed
+    models: {set: reasoning_t4}
+    items: noilai_test
+    tasks: [T1, T2, T3]
+    variants: [V1, V2, V3, V4]
+    arms: [nfc]
+    paraphrases: [p0]
+    shots: 3
+    limit: 500
+    in_core_only: true           # the 500 come from the core so the API variants see nothing new
+    estimate: {unit: gpu_hours, low: 5, high: 10}
+    counts_toward: reasoning
+    week: "Nov 16-22"
+
+  - id: reasoning_500_tpu
+    experiment: reasoning
+    purpose: "thinking ON for the 27B on the TPU"
+    platform: kaggle
+    hardware: tpu
+    models: {set: reasoning_tpu}
+    items: noilai_test
+    tasks: [T1, T2, T3]
+    variants: [V1, V2, V3, V4]
+    arms: [nfc]
+    paraphrases: [p0]
+    shots: 3
+    limit: 500
+    in_core_only: true
+    estimate: {unit: tpu_hours, low: 2, high: 4}
+    counts_toward: tpu_models_and_bf16
+    week: "Nov 16-22"
+
+  - id: reasoning_500_api
+    experiment: reasoning
+    purpose: "thinking ON for the API models (reasoning_effort high / dynamic thinking budget)"
+    platform: api
+    hardware: api
+    models: {set: reasoning_api}
+    items: noilai_test
+    tasks: [T1, T2, T3]
+    variants: [V1, V2, V3, V4]
+    arms: [nfc]
+    paraphrases: [p0]
+    shots: 3
+    limit: 500
+    in_core_only: true
+    estimate: {unit: api_calls, low: 1500, high: 1500, tokens: 1500000}
+    counts_toward: api_runs
+    week: "Nov 16-22"
+
+  - id: tpu_main
+    experiment: E1
+    purpose: "the three TPU models' E1 runs are part of E1_main (set self_hosted); this line books their TPU time"
+    platform: kaggle
+    hardware: tpu
+    models: {set: tpu}
+    items: noilai_test
+    tasks: [T1, T2, T3]
+    variants: [V1, V2, V3, V4]
+    arms: [nfc]
+    paraphrases: [p0, p1, p2]
+    shots: 3
+    limit: 3000
+    in_core_only: false
+    extra_item_files: [attested]
+    estimate: {unit: tpu_hours, low: 4, high: 8}
+    counts_toward: tpu_models_and_bf16
+    week: "Nov 9-15 (TPU week)"
+    note: "identical command to E1_main for these models; run whichever notebook reaches them first, --resume makes the other a no-op"
+
+  - id: bf16_drift_200
+    experiment: bf16_drift
+    purpose: "~200 items per T4 model re-run unquantized in bf16 on the TPU; reported as precision drift in the appendix"
+    platform: kaggle
+    hardware: tpu
+    models: {set: bf16_reference}
+    items: noilai_test
+    tasks: [T1, T2, T3]
+    variants: [V1, V2, V3, V4]
+    arms: [nfc]
+    paraphrases: [p0]
+    shots: 3
+    limit: 200
+    in_core_only: true           # the 200 are core items so the same rows exist in every T4 run
+    estimate: {unit: tpu_hours, low: 4, high: 8}
+    counts_toward: tpu_models_and_bf16
+    fallback: {platform: modal, hardware: l4, estimate: {unit: l4_hours, low: 5, high: 15}, note: "Modal Starter credit ($30/month, card on file) if the TPU route fails"}
+    week: "Nov 16-22"
+
+  - id: E4_probe
+    experiment: E4
+    purpose: "layer-wise probes, activation patching and difference-in-means steering on Gemma 3 1B/4B (notebooks/colab_probe_gemma3.ipynb; noilai.probe)"
+    platform: kaggle_or_colab
+    hardware: 2xt4
+    models: [gemma-3-1b-it, gemma-3-4b-it]
+    items: noilai_test          # P items are built from the syllable inventory, not from run_eval
+    tasks: [P]
+    variants: []
+    arms: [nfc, nfd]
+    paraphrases: []
+    shots: 0
+    limit: null
+    in_core_only: false
+    not_a_run_eval_line: true
+    estimate: {unit: gpu_hours, low: 5, high: 15}
+    counts_toward: probing
+    week: "Nov 23-Dec 6 (keep only if patching is clean: Gate 4)"
+
+# --------------------------------------------------------------------------- compute table
+# The plan's line items (section 3). `runs[*].counts_toward` maps runs onto these lines; the
+# test asserts that the GPU lines sum to the plan's subtotal (70-150) and that every run's
+# estimate is not larger than the line it counts toward.
+plan_lines:
+  pilots_and_smoke:      {where: "Kaggle T4",        unit: gpu_hours, low: 5,  high: 5,  cash_usd: 0}
+  noilai_main:           {where: "Kaggle T4, 2xT4",  unit: gpu_hours, low: 10, high: 20, cash_usd: 0}
+  reasoning:             {where: "Kaggle T4",        unit: gpu_hours, low: 5,  high: 10, cash_usd: 0}
+  counterfactuals:       {where: "Kaggle T4",        unit: gpu_hours, low: 10, high: 25, cash_usd: 0}
+  probing:               {where: "Kaggle 2xT4",      unit: gpu_hours, low: 5,  high: 15, cash_usd: 0}
+  reruns_and_debugging:  {where: "Kaggle",           unit: gpu_hours, low: 35, high: 75, cash_usd: 0, note: "100% buffer"}
+  tpu_models_and_bf16:   {where: "Kaggle TPU",       unit: tpu_hours, low: 10, high: 20, cash_usd: 0}
+  bf16_reruns_fallback:  {where: "Modal L4",         unit: l4_hours,  low: 5,  high: 15, cash_usd: 0, note: "card on file; ~37 free L4-h/month"}
+  api_runs:              {where: "Gemini, Groq free tiers", unit: api_calls, low: 12000, high: 12300, tokens: 6000000, cash_usd: 0, note: "plan: ~12,000 calls (4 models x up to ~3,000); the matrix above sums to 12,300"}
+  optional_fifth_api:    {where: "OpenRouter free models", unit: api_calls, low: 3000, high: 3000, cash_usd: 10}
+gpu_subtotal: {low: 70, high: 150, note: "2.5-5 weeks of Kaggle's ~30 free GPU-hours a week"}
+quota:
+  kaggle_gpu_hours_per_week: 30      # https://aimultiple.com/free-cloud-gpu ; secondary, dated source (plan 3)
+  kaggle_tpu_hours_per_week: 20      # one TPU v5e-8 session at a time, 9 h max
+  kaggle_session_hours_gpu: 12
+  kaggle_session_hours_tpu: 9
+  kaggle_working_dir_gb: 20          # models and outputs belong in Kaggle/HF datasets
+  window: "Oct 5, 2026 - Jan 4, 2027: ~390 GPU-h and ~260 TPU-h available"

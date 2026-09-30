@@ -1,0 +1,337 @@
+# NóiLái prompt templates (T1 transformation, T2 decoding, T3 validity).
+#
+# Rendering: noilai/eval/prompts.py substitutes the {placeholders}; everything else is
+# emitted verbatim. Three paraphrases (p0, p1, p2) carry the same content in different
+# wording and order. The English set (language "en") is the English-instruction ablation:
+# only the instruction language changes, the item stays Vietnamese and the answer line
+# stays "Đáp án:". Instruction level "explained" inserts the step-by-step description of
+# the variant; "name_only" inserts the variant's name and no steps (cultural recall vs.
+# rule-following). Zero-shot is shots=0 (the {demos} block is empty). Input formats are
+# in `input_formats`.
+#
+# [NATIVE-CHECK] Every Vietnamese string in this file must be read by a native validator
+# before the runs: terminology (phụ âm đầu / vần / thanh điệu / âm đệm / âm chính / âm
+# cuối), the spelling-rule sentence, and the wording of the three paraphrases.
+#
+# Examples inside the instruction text use only syllables listed under
+# `example_syllables`; together with the demonstration pairs in demos.yaml they must not
+# occur in the item file (checked by noilai.eval.prompts.demo_overlap).
+
+version: 1
+answer_marker: "Đáp án:"
+
+example_syllables: [chủ, nhà, keo, ceo, nghe, nge]
+
+concepts:
+  vi:
+    definition: >-
+      Nói lái là một cách chơi chữ trong tiếng Việt: hai âm tiết của một cụm từ trao đổi
+      với nhau một số thành phần (phụ âm đầu, vần hoặc thanh điệu) để tạo thành một cụm từ mới.
+    structure: >-
+      Mỗi âm tiết tiếng Việt gồm ba phần: phụ âm đầu (có thể không có), vần (âm đệm nếu có,
+      âm chính và âm cuối nếu có) và thanh điệu (một trong sáu thanh: ngang, huyền, sắc, hỏi,
+      ngã, nặng). Ví dụ: "chủ" gồm phụ âm đầu "ch", vần "u" và thanh hỏi; "nhà" gồm phụ âm
+      đầu "nh", vần "a" và thanh huyền.
+    spelling: >-
+      Khi ghép lại, hãy viết đúng chính tả tiếng Việt: âm /k/ viết là "k" trước e, ê, i, viết
+      là "q" trước âm đệm u và viết là "c" trong các trường hợp còn lại (ví dụ "c" ghép với
+      vần "eo" phải viết là "keo", không viết "ceo"); tương tự, "gh" và "ngh" đứng trước e, ê,
+      i (ví dụ "nghe", không viết "nge"); dấu thanh đặt trên âm chính.
+    four_kinds_intro: "Có bốn kiểu nói lái thường gặp:"
+  en:
+    definition: >-
+      Nói lái is a Vietnamese word game: the two syllables of a phrase exchange some of their
+      parts (initial consonant, rime or tone) to form a new phrase.
+    structure: >-
+      Every Vietnamese syllable has three parts: an onset (initial consonant, possibly empty),
+      a rime (an optional glide, the main vowel and an optional final) and a tone (one of six:
+      ngang, huyền, sắc, hỏi, ngã, nặng). For example "chủ" is onset "ch" + rime "u" + tone
+      hỏi; "nhà" is onset "nh" + rime "a" + tone huyền.
+    spelling: >-
+      When reassembling, follow Vietnamese spelling: the sound /k/ is written "k" before e, ê,
+      i, "q" before the glide u and "c" otherwise (so "c" + rime "eo" is written "keo", not
+      "ceo"); likewise "gh" and "ngh" appear before e, ê, i ("nghe", not "nge"); the tone mark
+      sits on the main vowel.
+    four_kinds_intro: "There are four common kinds of nói lái:"
+
+variants:
+  V1:
+    name_vi: "đổi vần, giữ phụ âm đầu và thanh điệu"
+    name_en: "swap the rimes; keep the onsets and tones in place"
+    steps_vi:
+      - "Tách mỗi âm tiết thành phụ âm đầu, vần và thanh điệu."
+      - "Đổi vần của âm tiết thứ nhất cho vần của âm tiết thứ hai."
+      - "Giữ nguyên phụ âm đầu và thanh điệu của mỗi âm tiết ở vị trí cũ."
+      - "Ghép lại thành hai âm tiết và viết đúng chính tả."
+    steps_en:
+      - "Split each syllable into onset, rime and tone."
+      - "Exchange the rime of the first syllable with the rime of the second."
+      - "Keep each syllable's onset and tone where they were."
+      - "Reassemble the two syllables with correct spelling."
+  V2:
+    name_vi: "đổi cả phụ âm đầu và vần, giữ thanh điệu"
+    name_en: "swap the onsets and rimes; keep the tones in place"
+    steps_vi:
+      - "Tách mỗi âm tiết thành phụ âm đầu, vần và thanh điệu."
+      - "Đổi chỗ phần phụ âm đầu và vần của hai âm tiết cho nhau (tức là đổi chỗ hai âm tiết)."
+      - "Giữ thanh điệu ở vị trí cũ: âm tiết đứng trước vẫn mang thanh của âm tiết đứng trước, âm tiết đứng sau vẫn mang thanh của âm tiết đứng sau."
+      - "Ghép lại thành hai âm tiết và viết đúng chính tả."
+    steps_en:
+      - "Split each syllable into onset, rime and tone."
+      - "Exchange the onset-plus-rime of the two syllables (that is, swap the syllables)."
+      - "Keep the tones in their positions: the first position keeps the first syllable's tone, the second position keeps the second syllable's tone."
+      - "Reassemble the two syllables with correct spelling."
+  V3:
+    name_vi: "đổi thanh điệu, giữ phụ âm đầu và vần"
+    name_en: "swap the tones; keep the onsets and rimes"
+    steps_vi:
+      - "Tách mỗi âm tiết thành phụ âm đầu, vần và thanh điệu."
+      - "Đổi thanh điệu của âm tiết thứ nhất cho thanh điệu của âm tiết thứ hai."
+      - "Giữ nguyên phụ âm đầu và vần của mỗi âm tiết."
+      - "Ghép lại thành hai âm tiết và viết đúng chính tả (chú ý vị trí dấu thanh)."
+    steps_en:
+      - "Split each syllable into onset, rime and tone."
+      - "Exchange the tone of the first syllable with the tone of the second."
+      - "Keep each syllable's onset and rime unchanged."
+      - "Reassemble the two syllables with correct spelling (mind the position of the tone mark)."
+  V4:
+    name_vi: "đổi vần và thanh điệu, giữ phụ âm đầu"
+    name_en: "swap the rimes and tones; keep the onsets"
+    steps_vi:
+      - "Tách mỗi âm tiết thành phụ âm đầu, vần và thanh điệu."
+      - "Đổi cả vần và thanh điệu của âm tiết thứ nhất cho vần và thanh điệu của âm tiết thứ hai."
+      - "Giữ nguyên phụ âm đầu của mỗi âm tiết ở vị trí cũ."
+      - "Ghép lại thành hai âm tiết và viết đúng chính tả."
+    steps_en:
+      - "Split each syllable into onset, rime and tone."
+      - "Exchange both the rime and the tone of the first syllable with those of the second."
+      - "Keep each syllable's onset where it was."
+      - "Reassemble the two syllables with correct spelling."
+
+# The answer-line requirement. Every template ends with it.
+answer_instruction:
+  vi:
+    phrase: |-
+      Chỉ viết cụm từ kết quả trên một dòng riêng ở cuối, theo đúng dạng:
+      Đáp án: <cụm từ kết quả>
+    original: |-
+      Chỉ viết cụm từ gốc trên một dòng riêng ở cuối, theo đúng dạng:
+      Đáp án: <cụm từ gốc>
+    yesno: |-
+      Trả lời "Có" hoặc "Không" trên một dòng riêng ở cuối, theo đúng dạng:
+      Đáp án: <Có hoặc Không>
+  en:
+    phrase: |-
+      Write only the resulting phrase on its own line at the end, exactly in the form:
+      Đáp án: <resulting phrase>
+    original: |-
+      Write only the original phrase on its own line at the end, exactly in the form:
+      Đáp án: <original phrase>
+    yesno: |-
+      Answer "Có" (yes) or "Không" (no) on its own line at the end, exactly in the form:
+      Đáp án: <Có or Không>
+
+demo_format:
+  vi:
+    header: "Ví dụ:"
+    T1: |-
+      Cụm từ: {input}
+      Đáp án: {answer}
+    T2: |-
+      Cụm từ: {input}
+      Đáp án: {answer}
+    T3: |-
+      Cụm từ gốc: {input}; cụm từ cần xét: {candidate}
+      Đáp án: {answer}
+  en:
+    header: "Examples:"
+    T1: |-
+      Phrase: {input}
+      Đáp án: {answer}
+    T2: |-
+      Phrase: {input}
+      Đáp án: {answer}
+    T3: |-
+      Original phrase: {input}; phrase to judge: {candidate}
+      Đáp án: {answer}
+
+input_formats:
+  raw:
+    note_vi: ""
+    note_en: ""
+  components:
+    note_vi: >-
+      Mỗi âm tiết của cụm từ đã được tách sẵn thành ba phần, theo dạng [phụ âm đầu, vần,
+      thanh điệu]; hãy làm việc trực tiếp trên các phần đó.
+    note_en: >-
+      Each syllable of the phrase is given already split into its three parts, in the form
+      [onset, rime, tone]; work directly on those parts.
+    onset_label_vi: 'phụ âm đầu "{onset}"'
+    onset_label_en: 'onset "{onset}"'
+    zero_onset_vi: "không có phụ âm đầu"
+    zero_onset_en: "no onset"
+    rime_label_vi: 'vần "{rime}"'
+    rime_label_en: 'rime "{rime}"'
+    tone_label_vi: "thanh {tone}"
+    tone_label_en: "tone {tone}"
+  spaced:
+    note_vi: >-
+      Các chữ cái của cụm từ được viết cách nhau bằng dấu cách; dấu gạch chéo "/" ngăn cách
+      hai âm tiết. Kết quả vẫn viết liền từng âm tiết như bình thường.
+    note_en: >-
+      The letters of the phrase are separated by spaces and the two syllables by a slash "/".
+      Write the result as ordinary syllables.
+
+tasks:
+  T1:
+    vi:
+      p0: |-
+        {definition}
+        {structure}
+
+        Kiểu nói lái cần áp dụng: {variant_name}.
+        {variant_steps}
+        {spelling}
+        {input_format_note}
+        {demos}
+        Bây giờ hãy áp dụng kiểu nói lái trên cho cụm từ sau.
+        Cụm từ: {input}
+        {answer_instruction}
+      p1: |-
+        Bạn sẽ biến đổi một cụm từ hai âm tiết theo một kiểu nói lái cho trước.
+        {structure}
+        {definition}
+
+        Kiểu nói lái ở đây là "{variant_name}".
+        {variant_steps}
+        Lưu ý chính tả. {spelling}
+        {input_format_note}
+        {demos}
+        Cụm từ cần biến đổi: {input}
+        {answer_instruction}
+      p2: |-
+        Hãy thực hiện một phép nói lái.
+        Trước hết, nhắc lại cấu tạo âm tiết. {structure}
+        {definition}
+        Phép cần làm là: {variant_name}. Cụ thể:
+        {variant_steps}
+        Về chính tả: {spelling}
+        {input_format_note}
+        {demos}
+        Đầu vào: {input}
+        {answer_instruction}
+    en:
+      p0: |-
+        {definition}
+        {structure}
+
+        Kind of nói lái to apply: {variant_name}.
+        {variant_steps}
+        {spelling}
+        {input_format_note}
+        {demos}
+        Now apply this kind of nói lái to the following phrase.
+        Phrase: {input}
+        {answer_instruction}
+  T2:
+    vi:
+      p0: |-
+        {definition} {four_kinds_intro}
+        {variants_overview}
+        {structure}
+        {input_format_note}
+        {demos}
+        Cụm từ sau đây là một cách nói lái. Cụm từ gốc là gì?
+        Cụm từ: {input}
+        {answer_instruction}
+      p1: |-
+        Bạn sẽ giải một câu nói lái: tìm lại cụm từ gốc từ cụm từ đã bị nói lái.
+        {structure}
+        {definition} {four_kinds_intro}
+        {variants_overview}
+        {input_format_note}
+        {demos}
+        Cụm từ sau đây là một cách nói lái. Cụm từ gốc là gì?
+        Cụm từ đã nói lái: {input}
+        {answer_instruction}
+      p2: |-
+        Hãy giải mã một câu nói lái.
+        {definition} {four_kinds_intro}
+        {variants_overview}
+        Nhắc lại về âm tiết: {structure}
+        {input_format_note}
+        {demos}
+        Cụm từ sau đây là một cách nói lái. Cụm từ gốc là gì?
+        Đầu vào: {input}
+        {answer_instruction}
+    en:
+      p0: |-
+        {definition} {four_kinds_intro}
+        {variants_overview}
+        {structure}
+        {input_format_note}
+        {demos}
+        The following phrase is a nói lái. What is the original phrase?
+        Phrase: {input}
+        {answer_instruction}
+  T3:
+    vi:
+      p0: |-
+        {definition}
+        {structure}
+
+        Kiểu nói lái đang xét: {variant_name}.
+        {variant_steps}
+        {spelling}
+        {input_format_note}
+        {demos}
+        Câu hỏi: Cụm từ "{candidate}" có phải là kết quả đúng khi nói lái cụm từ "{input}" theo kiểu trên không? Kết quả đúng phải đúng cả phụ âm đầu, vần, thanh điệu và chính tả.
+        {answer_instruction}
+      p1: |-
+        Bạn sẽ kiểm tra một kết quả nói lái.
+        {structure}
+        {definition}
+
+        Kiểu nói lái đang xét là "{variant_name}".
+        {variant_steps}
+        Lưu ý chính tả. {spelling}
+        {input_format_note}
+        {demos}
+        Cụm từ gốc: {input}
+        Cụm từ cần xét: {candidate}
+        Cụm từ cần xét có đúng là kết quả nói lái theo kiểu trên của cụm từ gốc không (đúng cả phụ âm đầu, vần, thanh điệu và chính tả)?
+        {answer_instruction}
+      p2: |-
+        Hãy phán đoán một câu nói lái đúng hay sai.
+        Trước hết, nhắc lại cấu tạo âm tiết. {structure}
+        {definition}
+        Kiểu nói lái đang xét: {variant_name}. Cụ thể:
+        {variant_steps}
+        Về chính tả: {spelling}
+        {input_format_note}
+        {demos}
+        Nếu nói lái cụm từ "{input}" theo kiểu trên thì có được đúng cụm từ "{candidate}" không (đúng cả phụ âm đầu, vần, thanh điệu và chính tả)?
+        {answer_instruction}
+    en:
+      p0: |-
+        {definition}
+        {structure}
+
+        Kind of nói lái under consideration: {variant_name}.
+        {variant_steps}
+        {spelling}
+        {input_format_note}
+        {demos}
+        Question: Is the phrase "{candidate}" the correct result of applying this kind of nói lái to the phrase "{input}"? A correct result must have the right onsets, rimes, tones and spelling.
+        {answer_instruction}
+
+# Layout of the variant description blocks.
+variant_blocks:
+  vi:
+    steps_header: "Cách làm từng bước:"
+    overview_explained: "- {name}: {steps}"
+    overview_name_only: "- {name}"
+  en:
+    steps_header: "Step by step:"
+    overview_explained: "- {name}: {steps}"
+    overview_name_only: "- {name}"

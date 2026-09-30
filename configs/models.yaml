@@ -1,0 +1,651 @@
+# configs/models.yaml -- the model panel of docs/PLAN_2026-09-30.md, sections 2.5 and 3.
+#
+# One entry per (model, serving configuration). `scripts/run_eval.py --model-config <name>`
+# reads one entry by its `name`. Everything here is configuration, not code: hardware,
+# precision, quantization, thinking switches and provider limits live here so that a run's
+# manifest can copy the entry verbatim (checklist C1/C4).
+#
+# Reading the flags:
+#   hf_id_status: known      the checkpoint existed under this id when the plan was written
+#                            (still request gated access and re-check before the run)
+#   hf_id_status: uncertain  the plan names a family or version that could not be resolved
+#                            from the build machine (huggingface.co unreachable). Every such
+#                            entry carries "[UNCERTAIN: verify]" in `verify`. Keep the plan's
+#                            names; fix the id, never the name, when the panel is frozen.
+#
+# The 21-model PANEL = every entry whose group is one of the seven panel groups below.
+# Entries in the groups `bf16_reference` and `reasoning_substudy` are serving variants of
+# panel models (same weights, different precision or thinking switch) used by the bf16-drift
+# check and the reasoning-cost curve; they exist so that the eval CLI needs no override flag.
+#
+# Hardware/dtype rules (enforced by tests/test_cloud.py):
+#   * a T4 (compute capability 7.5) has no bfloat16 units and vLLM refuses bf16 on it; T4
+#     entries are float16, float32, or quantized;
+#   * Gemma 3 is NEVER float16 (activations overflow: transformers PR #36832); it runs in
+#     float32 on T4s or bfloat16 on the TPU;
+#   * TPU entries are bfloat16; API entries have no dtype.
+
+version: 1
+date: 2026-09-30
+plan: docs/PLAN_2026-09-30.md
+
+defaults:
+  max_model_len: 2048          # ~500 prompt tokens (3 demonstrations) + <= 64 output tokens
+  max_new_tokens: 64
+  temperature: 0.0             # greedy decoding everywhere (plan 2.5)
+  seed: 20261004
+  gpu_memory_utilization: 0.9  # T4 recipe (plan 3): <= 0.9, CUDA graphs on unless a model forces eager
+  enforce_eager: false
+  trust_remote_code: false
+  answer_regex: "Đáp án:"      # the answer line the extractor looks for (plan 2.5)
+
+hardware:
+  t4:
+    description: "one Tesla T4, 16 GB, compute capability 7.5 (Kaggle or free Colab)"
+    allowed_dtypes: [float16, float32]
+    allows_quantization: true
+    tensor_parallel_size: 1
+    source: https://docs.vllm.ai/en/latest/getting_started/installation/gpu.html
+  2xt4:
+    description: "Kaggle 2 x Tesla T4 (2 x 16 GB), tensor parallel 2"
+    allowed_dtypes: [float16, float32]
+    allows_quantization: true
+    tensor_parallel_size: 2
+    source: https://github.com/kaggle-vllm/kaggle-vllm
+  tpu:
+    description: "Kaggle TPU v5e-8 (128 GB HBM) through vLLM-TPU; 9-hour sessions, ~20 h/week"
+    allowed_dtypes: [bfloat16]
+    allows_quantization: false
+    source: https://github.com/ARahim3/kaggle-tpu-lab
+  api:
+    description: "hosted inference; generation only, no log-probabilities"
+    allowed_dtypes: [null]
+    allows_quantization: false
+  p100:
+    description: "Kaggle P100: below vLLM's compute-capability floor (7.5); transformers or llama.cpp only"
+    allowed_dtypes: [float16, float32]
+    allows_quantization: true
+    fallback_only: true
+    source: https://docs.vllm.ai/en/latest/getting_started/installation/gpu.html
+
+groups:
+  interpretability_ladder:
+    why: "Gemma Scope 2 covers every layer of every Gemma 3 size; E4 probes the 1B and 4B"
+    panel: true
+  general_multilingual:
+    why: "scaling within two Apache-2.0 families (Qwen3.5, Gemma 4)"
+    panel: true
+  sea_specialised:
+    why: "Southeast Asian continued training; SEA-LION E2B vs Gemma 4 E2B isolates SEA training if the tokenizer was kept"
+    panel: true
+  vietnamese_specialised:
+    why: "Vietnamese-first tokenizers (PhoGPT's 20,480-token vocabulary; Vistral's extended vocabulary)"
+    panel: true
+  legacy_baseline:
+    why: "Vietnamese not officially supported"
+    panel: true
+  large_open_reference:
+    why: "largest open models that fit free hardware (TPU v5e-8)"
+    panel: true
+  api:
+    why: "strong hosted reference, generation only; sees the 1,500-item core only"
+    panel: true
+  bf16_reference:
+    why: "about 200 items per T4 model re-run in bf16 (plan 2.5) to measure precision drift"
+    panel: false
+  reasoning_substudy:
+    why: "500-item run with thinking ON: accuracy against reasoning tokens (plan 2.5)"
+    panel: false
+
+providers:
+  gemini:
+    backend: gemini
+    sdk: google-genai
+    api_key_env: GEMINI_API_KEY
+    base_url: null
+    free_tier:
+      covers: "Flash and Flash-Lite models only"
+      requests_per_day: null     # shown only inside AI Studio; the third-party figure of 1,500 RPD is unverified [UNCERTAIN: verify]
+      requests_per_minute: null  # [UNCERTAIN: verify] read in AI Studio at run time and record in the manifest
+      tokens_per_day: null
+      source: https://ai.google.dev/gemini-api/docs/rate-limits
+      pricing_source: https://ai.google.dev/gemini-api/docs/pricing
+    terms:
+      trains_on_inputs: true      # unpaid tier: prompts and responses improve Google's products; human reviewers may read them
+      minimum_age: 18
+      source: https://ai.google.dev/gemini-api/terms
+    data_policy: "core set only; never the sealed split; never annotator personal data"
+  groq:
+    backend: openai_compat
+    sdk: openai
+    api_key_env: GROQ_API_KEY
+    base_url: https://api.groq.com/openai/v1
+    free_tier:
+      requests_per_day: 1000
+      tokens_per_day: 200000
+      requests_per_minute: null  # [UNCERTAIN: verify] per-model; read from the console at run time
+      per_model: true
+      source: https://console.groq.com/docs/rate-limits
+      note: "at ~500 tokens per request the 1,500-item core alone takes about four days per model; the plan starts both Groq models on 9 Nov 2026"
+      catalogue_risk: "Groq retired Llama from its free plan on 16 Aug 2026 (https://klymentiev.com/blog/groq-pricing); pin model ids and dates, save raw outputs immediately"
+    data_policy: "core set only; never the sealed split"
+  openrouter:                    # optional fifth API model, $10 once for 1,000 requests/day
+    backend: openai_compat
+    sdk: openai
+    api_key_env: OPENROUTER_API_KEY
+    base_url: https://openrouter.ai/api/v1
+    free_tier:
+      requests_per_day: 50       # 1,000 after a one-time $10 purchase
+      source: https://openrouter.ai/docs/api-reference/limits
+    terms:
+      trains_on_inputs: "provider-dependent; filtered by an account setting"
+      source: https://openrouter.ai/docs/features/privacy-and-logging
+    data_policy: "core set only; not in the 21-model panel"
+
+# --------------------------------------------------------------------------- panel
+models:
+
+  # ---- interpretability ladder (Gemma 3 IT) ---------------------------------------------
+  - name: gemma-3-1b-it
+    display_name: "Gemma 3 1B (IT)"
+    hf_id: google/gemma-3-1b-it
+    hf_id_status: known
+    gated: true
+    family: gemma3
+    group: interpretability_ladder
+    params_b: 1.0
+    tokenizer_type: "SentencePiece BPE, 262,144 pieces, identity normalizer, byte fallback (data/audit/gemma3.json)"
+    backend: vllm
+    fallback_backend: hf
+    dtype: float32
+    never_float16: true
+    quantization: null
+    hardware: t4
+    max_model_len: 2048
+    chat_template_kwargs: {}
+    verify: []
+    notes:
+      - "Gemma 3 overflows in fp16; even the clamping fix cut one benchmark average from 0.752 to 0.657 (https://github.com/huggingface/transformers/pull/36832). fp32 on the T4."
+      - "Gemma Scope 2 residual SAEs exist for every layer (https://huggingface.co/google/gemma-scope-2-4b-it and siblings); E4 uses this model and the 4B."
+      - "Shares the tokenizer audited in data/audit/gemma3.json: 1.78 tokens per syllable (NFC), 2.83 (NFD); does not normalize NFD (3.4% same ids)."
+
+  - name: gemma-3-4b-it
+    display_name: "Gemma 3 4B (IT)"
+    hf_id: google/gemma-3-4b-it
+    hf_id_status: known
+    gated: true
+    family: gemma3
+    group: interpretability_ladder
+    params_b: 4.3
+    tokenizer_type: "SentencePiece BPE, 262,144 pieces (same model file as gemma-3-1b-it)"
+    backend: vllm
+    fallback_backend: hf
+    dtype: float32
+    never_float16: true
+    quantization: null
+    hardware: 2xt4          # ~17 GB of fp32 weights: tensor parallel over both T4s
+    max_model_len: 2048
+    chat_template_kwargs: {}
+    verify: []
+    notes:
+      - "fp32 weights (~17 GB) need both T4s (tensor_parallel_size 2); the hf fallback uses device_map=auto."
+      - "Multimodal checkpoint; load the text-only path (vLLM: limit_mm_per_prompt image=0) to save memory. [UNCERTAIN: verify] the flag name for the pinned vLLM."
+
+  - name: gemma-3-12b-it
+    display_name: "Gemma 3 12B (IT)"
+    hf_id: google/gemma-3-12b-it
+    hf_id_status: known
+    gated: true
+    family: gemma3
+    group: interpretability_ladder
+    params_b: 12.2
+    tokenizer_type: "SentencePiece BPE, 262,144 pieces (same model file as gemma-3-1b-it)"
+    backend: vllm             # vLLM-TPU
+    fallback_backend: null
+    dtype: bfloat16
+    never_float16: true
+    quantization: null
+    hardware: tpu
+    max_model_len: 2048
+    chat_template_kwargs: {}
+    verify: []
+    notes:
+      - "bf16 on the TPU v5e-8 (128 GB); a 2xT4 4-bit run is the fallback if vLLM-TPU fails, and then the run is labelled quantized."
+      - "Must load under vLLM-TPU and return prompt log-probabilities before its full run (plan 3)."
+
+  # ---- general multilingual: Qwen3.5 ---------------------------------------------------
+  - name: qwen3.5-0.8b
+    display_name: "Qwen3.5-0.8B"
+    hf_id: Qwen/Qwen3.5-0.8B          # [UNCERTAIN: verify] the plan's family name; the exact repo id and the instruct suffix were not resolvable from here
+    hf_id_status: uncertain
+    gated: false
+    family: qwen3.5
+    group: general_multilingual
+    params_b: 0.8
+    tokenizer_type: "byte-level BPE, ~151k pieces (Qwen family) [UNCERTAIN: verify size]"
+    backend: vllm
+    fallback_backend: hf
+    dtype: float16
+    quantization: null
+    hardware: t4
+    max_model_len: 2048
+    chat_template_kwargs: {enable_thinking: false}
+    verify:
+      - "[UNCERTAIN: verify] repository id and whether an -Instruct suffix exists"
+      - "[UNCERTAIN: verify] hybrid (Gated DeltaNet) layers under vLLM on a T4; fallbacks are llama.cpp and the TPU (plan 3)"
+    notes:
+      - "Qwen3.5 thinks by default (https://huggingface.co/Qwen/Qwen3.5-9B); thinking stays OFF in the main runs (enable_thinking false), ON only in the reasoning sub-study entries."
+      - "Apache-2.0."
+
+  - name: qwen3.5-2b
+    display_name: "Qwen3.5-2B"
+    hf_id: Qwen/Qwen3.5-2B            # [UNCERTAIN: verify]
+    hf_id_status: uncertain
+    gated: false
+    family: qwen3.5
+    group: general_multilingual
+    params_b: 2.0
+    tokenizer_type: "byte-level BPE, ~151k pieces (Qwen family) [UNCERTAIN: verify size]"
+    backend: vllm
+    fallback_backend: hf
+    dtype: float16
+    quantization: null
+    hardware: t4
+    max_model_len: 2048
+    chat_template_kwargs: {enable_thinking: false}
+    verify:
+      - "[UNCERTAIN: verify] repository id"
+      - "[UNCERTAIN: verify] hybrid layers under vLLM on a T4"
+    notes:
+      - "Week-2 pilot model (with gemma-3-1b-it and phogpt-4b-chat)."
+
+  - name: qwen3.5-4b
+    display_name: "Qwen3.5-4B"
+    hf_id: Qwen/Qwen3.5-4B            # [UNCERTAIN: verify]
+    hf_id_status: uncertain
+    gated: false
+    family: qwen3.5
+    group: general_multilingual
+    params_b: 4.0
+    tokenizer_type: "byte-level BPE, ~151k pieces (Qwen family) [UNCERTAIN: verify size]"
+    backend: vllm
+    fallback_backend: hf
+    dtype: float16
+    quantization: null
+    hardware: t4
+    max_model_len: 2048
+    chat_template_kwargs: {enable_thinking: false}
+    verify:
+      - "[UNCERTAIN: verify] repository id"
+      - "[UNCERTAIN: verify] hybrid layers under vLLM on a T4"
+    notes: []
+
+  - name: qwen3.5-9b
+    display_name: "Qwen3.5-9B"
+    hf_id: Qwen/Qwen3.5-9B            # the plan links this page; [UNCERTAIN: verify] that it resolves
+    hf_id_status: uncertain
+    gated: false
+    family: qwen3.5
+    group: general_multilingual
+    params_b: 9.0
+    tokenizer_type: "byte-level BPE, ~151k pieces (Qwen family) [UNCERTAIN: verify size]"
+    backend: vllm
+    fallback_backend: hf
+    dtype: float16
+    quantization: {method: awq, bits: 4, checkpoint: null}   # [UNCERTAIN: verify] pick a released AWQ/GPTQ repo or quantize once and cache it as a Kaggle dataset
+    hardware: t4
+    max_model_len: 2048
+    chat_template_kwargs: {enable_thinking: false}
+    verify:
+      - "[UNCERTAIN: verify] repository id (https://huggingface.co/Qwen/Qwen3.5-9B in the plan)"
+      - "[UNCERTAIN: verify] a 4-bit checkpoint that vLLM loads on a T4; llama.cpp GGUF is the fallback"
+    notes:
+      - "7-9B tier: AWQ/GPTQ 4-bit on one T4 (plan 3)."
+
+  # ---- general multilingual: Gemma 4 ---------------------------------------------------
+  - name: gemma-4-e2b
+    display_name: "Gemma 4 E2B (IT)"
+    hf_id: google/gemma-4-e2b-it      # [UNCERTAIN: verify] the plan cites the Gemma 4 model card (https://ai.google.dev/gemma/docs/core/model_card_4); the repo id is a guess at the naming pattern
+    hf_id_status: uncertain
+    gated: true
+    family: gemma4
+    group: general_multilingual
+    params_b: 2.0
+    tokenizer_type: "SentencePiece, 262k pieces expected (Gemma family) [UNCERTAIN: verify]"
+    backend: vllm
+    fallback_backend: llama_cpp
+    dtype: float16
+    quantization: {method: qat_int4, bits: 4, checkpoint: null}   # [UNCERTAIN: verify] the QAT int4 weights the dev.to report used
+    hardware: t4
+    max_model_len: 2048
+    chat_template_kwargs: {}
+    verify:
+      - "[UNCERTAIN: verify] repository id and the 4-bit QAT checkpoint"
+      - "[UNCERTAIN: verify] whether a kernel patch is still needed under the pinned vLLM"
+    notes:
+      - "One report needed a kernel patch and 16 GB of swap to load on a T4 under vLLM; QAT int4 weights decoded 1.79x faster than bf16 (72 tok/s on one stream, 216 across eight) (https://dev.to/gde/gemma-4-on-a-tesla-t4-qat-weights-decode-179x-faster-than-bf16-2fi4)."
+      - "Base of Gemma-SEA-LION-v4.5-E2B-IT: if the fine-tune kept this tokenizer, the pair isolates SEA training (E2)."
+
+  - name: gemma-4-e4b
+    display_name: "Gemma 4 E4B (IT)"
+    hf_id: google/gemma-4-e4b-it      # [UNCERTAIN: verify]
+    hf_id_status: uncertain
+    gated: true
+    family: gemma4
+    group: general_multilingual
+    params_b: 4.0
+    tokenizer_type: "SentencePiece, 262k pieces expected (Gemma family) [UNCERTAIN: verify]"
+    backend: vllm
+    fallback_backend: llama_cpp
+    dtype: float16
+    quantization: {method: qat_int4, bits: 4, checkpoint: null}   # [UNCERTAIN: verify]
+    hardware: t4
+    max_model_len: 2048
+    chat_template_kwargs: {}
+    verify:
+      - "[UNCERTAIN: verify] repository id and the 4-bit checkpoint"
+    notes:
+      - "Same T4 risks as gemma-4-e2b."
+
+  - name: gemma-4-12b
+    display_name: "Gemma 4 12B (IT)"
+    hf_id: google/gemma-4-12b-it      # [UNCERTAIN: verify]
+    hf_id_status: uncertain
+    gated: true
+    family: gemma4
+    group: general_multilingual
+    params_b: 12.0
+    tokenizer_type: "SentencePiece, 262k pieces expected (Gemma family) [UNCERTAIN: verify]"
+    backend: vllm
+    fallback_backend: llama_cpp
+    dtype: float16
+    quantization: {method: awq_or_int8, bits: 4, checkpoint: null}   # [UNCERTAIN: verify] 4- or 8-bit across both GPUs (plan 3)
+    hardware: 2xt4
+    max_model_len: 2048
+    chat_template_kwargs: {}
+    verify:
+      - "[UNCERTAIN: verify] repository id and a 4/8-bit checkpoint that fits 2 x 16 GB with KV cache"
+    notes:
+      - "12B, quantized, across both T4s (plan 3 tier table)."
+
+  # ---- SEA-specialised -------------------------------------------------------------------
+  - name: gemma-sea-lion-v4.5-e2b-it
+    display_name: "Gemma-SEA-LION-v4.5-E2B-IT"
+    hf_id: aisingapore/Gemma-SEA-LION-v4.5-E2B-IT   # [UNCERTAIN: verify] naming follows earlier SEA-LION releases; the plan cites https://github.com/aisingapore/sealion
+    hf_id_status: uncertain
+    gated: false
+    family: sea-lion-v4.5
+    base_model: gemma-4-e2b
+    group: sea_specialised
+    params_b: 2.0
+    tokenizer_type: "expected identical to gemma-4-e2b; VERIFY by diffing tokenizer files (the E2 control depends on it)"
+    backend: vllm
+    fallback_backend: llama_cpp
+    dtype: float16
+    quantization: {method: qat_int4, bits: 4, checkpoint: null}   # [UNCERTAIN: verify]
+    hardware: t4
+    max_model_len: 2048
+    chat_template_kwargs: {}
+    verify:
+      - "[UNCERTAIN: verify] repository id"
+      - "[UNCERTAIN: verify] tokenizer identical to Gemma 4 E2B (diff tokenizer.json / tokenizer.model hashes)"
+    notes:
+      - "Fine-tuned from Gemma 4 E2B (https://github.com/aisingapore/sealion). Holds tokenization fixed while varying SEA training if the tokenizer was kept."
+
+  - name: sailor2-8b-chat
+    display_name: "Sailor2-8B-Chat"
+    hf_id: sail/Sailor2-8B-Chat
+    hf_id_status: known
+    gated: false
+    family: sailor2
+    base_model: qwen2.5
+    group: sea_specialised
+    params_b: 8.0
+    tokenizer_type: "byte-level BPE, 151,936 pieces (Qwen2.5 tokenizer)"
+    backend: vllm
+    fallback_backend: hf
+    dtype: float16
+    quantization: {method: bitsandbytes_nf4, bits: 4, checkpoint: null}   # quantize at load; vLLM supports bitsandbytes on the T4 (plan 3)
+    hardware: t4
+    max_model_len: 2048
+    chat_template_kwargs: {}
+    verify:
+      - "[UNCERTAIN: verify] bitsandbytes 4-bit load under the pinned vLLM; AWQ repo as the alternative"
+    notes:
+      - "SEA continued pre-training on Qwen2.5 (https://huggingface.co/sail/Sailor2-8B-Chat; https://github.com/sail-sg/sailor2). Apache-2.0."
+
+  # ---- Vietnamese-specialised ------------------------------------------------------------
+  - name: phogpt-4b-chat
+    display_name: "PhoGPT-4B-Chat"
+    hf_id: vinai/PhoGPT-4B-Chat
+    hf_id_status: known
+    gated: false
+    family: phogpt
+    group: vietnamese_specialised
+    params_b: 3.7
+    tokenizer_type: "byte-level BPE, 20,480 pieces trained on Vietnamese (https://arxiv.org/abs/2311.02945)"
+    backend: vllm
+    fallback_backend: hf
+    dtype: float16
+    quantization: null
+    hardware: t4
+    max_model_len: 2048
+    trust_remote_code: true      # MPT architecture with custom modelling code
+    chat_template_kwargs: {}
+    verify:
+      - "[UNCERTAIN: verify] vLLM's MPT path loads this checkpoint; hf fallback otherwise"
+    notes:
+      - "H2: a small Vietnamese-first vocabulary that stores whole syllables as tokens may aid fluency but hurt sub-syllable manipulation."
+      - "Week-2 pilot model."
+
+  - name: vistral-7b-chat
+    display_name: "Vistral-7B-Chat"
+    hf_id: Viet-Mistral/Vistral-7B-Chat
+    hf_id_status: known
+    gated: true
+    family: vistral
+    base_model: mistral-7b
+    group: vietnamese_specialised
+    params_b: 7.3
+    tokenizer_type: "SentencePiece (Mistral 32k) extended with Vietnamese pieces [UNCERTAIN: verify final size]"
+    backend: vllm
+    fallback_backend: hf
+    dtype: float16
+    quantization: {method: bitsandbytes_nf4, bits: 4, checkpoint: null}
+    hardware: t4
+    max_model_len: 2048
+    chat_template_kwargs: {}
+    verify:
+      - "[UNCERTAIN: verify] gated access granted; 4-bit load path"
+    notes:
+      - "T4 at 4-bit (plan 2.5)."
+
+  # ---- legacy baseline -------------------------------------------------------------------
+  - name: llama-3.1-8b-instruct
+    display_name: "Llama-3.1-8B-Instruct"
+    hf_id: meta-llama/Llama-3.1-8B-Instruct
+    hf_id_status: known
+    gated: true
+    family: llama3.1
+    group: legacy_baseline
+    params_b: 8.0
+    tokenizer_type: "tiktoken-style byte-level BPE, 128,256 pieces"
+    backend: vllm
+    fallback_backend: hf
+    dtype: float16
+    quantization: {method: awq, bits: 4, checkpoint: hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4}   # [UNCERTAIN: verify] still available
+    hardware: t4
+    max_model_len: 2048
+    chat_template_kwargs: {}
+    verify:
+      - "[UNCERTAIN: verify] the AWQ checkpoint id"
+    notes:
+      - "Vietnamese is not among the officially supported languages (https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct)."
+
+  # ---- large open reference (TPU) -------------------------------------------------------
+  - name: qwen3.8-27b
+    display_name: "Qwen3.8-27B"
+    hf_id: Qwen/Qwen3.8-27B           # [UNCERTAIN: verify] the plan cites https://github.com/QwenLM/Qwen3.8; the HF id and instruct suffix are unresolved
+    hf_id_status: uncertain
+    gated: false
+    family: qwen3.8
+    group: large_open_reference
+    params_b: 27.0
+    tokenizer_type: "byte-level BPE (Qwen family) [UNCERTAIN: verify size]"
+    backend: vllm             # vLLM-TPU
+    fallback_backend: null
+    dtype: bfloat16
+    quantization: null
+    hardware: tpu
+    max_model_len: 2048
+    chat_template_kwargs: {enable_thinking: false}
+    verify:
+      - "[UNCERTAIN: verify] repository id"
+      - "[UNCERTAIN: verify] thinking switch name for this family"
+    notes:
+      - "kaggle-tpu-lab serves this model with vLLM on the v5e-8 at ~540 tok/s across 8 streams and ~10,300 tok/s prompt processing after a 6-22 minute startup (https://github.com/ARahim3/kaggle-tpu-lab)."
+      - "Must return prompt log-probabilities under vLLM-TPU before its full run."
+      - "Also available on Groq's free tier (1,000 RPD / 200K TPD) as a fallback route, generation only."
+
+  - name: qwen-sea-lion-v4.5-27b-it
+    display_name: "Qwen-SEA-LION-v4.5-27B-IT"
+    hf_id: aisingapore/Qwen-SEA-LION-v4.5-27B-IT   # [UNCERTAIN: verify]
+    hf_id_status: uncertain
+    gated: false
+    family: sea-lion-v4.5
+    base_model: qwen3.6-27b
+    group: large_open_reference
+    params_b: 27.0
+    tokenizer_type: "expected identical to its Qwen3.6-27B base [UNCERTAIN: verify by diffing tokenizer files]"
+    backend: vllm             # vLLM-TPU
+    fallback_backend: null
+    dtype: bfloat16
+    quantization: null
+    hardware: tpu
+    max_model_len: 2048
+    chat_template_kwargs: {enable_thinking: false}
+    verify:
+      - "[UNCERTAIN: verify] repository id"
+      - "[UNCERTAIN: verify] thinking switch; tokenizer identity with the base (a second E2 control pair if Qwen3.6-27B is added)"
+    notes:
+      - "Fine-tune of Qwen3.6-27B (https://github.com/aisingapore/sealion)."
+
+  # ---- free APIs -------------------------------------------------------------------------
+  - name: gemini-flash
+    display_name: "Gemini 3.x Flash"
+    hf_id: null
+    provider: gemini
+    provider_model_id: gemini-3.5-flash     # [UNCERTAIN: verify] the plan says "Gemini 3.x Flash"; read the current free-tier id in AI Studio and pin it with the date
+    hf_id_status: uncertain
+    family: gemini
+    group: api
+    params_b: null
+    tokenizer_type: "proprietary; not auditable (token counts only via the API)"
+    backend: gemini
+    dtype: null
+    quantization: null
+    hardware: api
+    max_model_len: null
+    chat_template_kwargs: {}
+    generation_kwargs: {thinking_budget: 0}   # [UNCERTAIN: verify] the parameter that disables thinking for this id
+    verify:
+      - "[UNCERTAIN: verify] model id and thinking switch"
+      - "[UNCERTAIN: verify] free-tier RPD/RPM shown in AI Studio at run time"
+    notes:
+      - "Free tier trains on inputs and requires users to be 18 or older (https://ai.google.dev/gemini-api/terms): core set only; an eligible adult's account if the author is under 18."
+      - "Generation only: T3 is scored from generated answers, no log-probabilities."
+
+  - name: gemini-flash-lite
+    display_name: "Gemini 3.x Flash-Lite"
+    hf_id: null
+    provider: gemini
+    provider_model_id: gemini-3.5-flash-lite   # [UNCERTAIN: verify]
+    hf_id_status: uncertain
+    family: gemini
+    group: api
+    params_b: null
+    tokenizer_type: "proprietary; not auditable"
+    backend: gemini
+    dtype: null
+    quantization: null
+    hardware: api
+    max_model_len: null
+    chat_template_kwargs: {}
+    generation_kwargs: {thinking_budget: 0}   # [UNCERTAIN: verify]
+    verify:
+      - "[UNCERTAIN: verify] model id and thinking switch"
+    notes:
+      - "Same terms and data policy as gemini-flash."
+
+  - name: gpt-oss-120b
+    display_name: "gpt-oss-120b (Groq)"
+    hf_id: openai/gpt-oss-120b        # open weights exist; the run goes through Groq, not the weights
+    provider: groq
+    provider_model_id: openai/gpt-oss-120b   # [UNCERTAIN: verify] Groq's catalogue id on the run date
+    hf_id_status: known
+    family: gpt-oss
+    group: api
+    params_b: 117.0
+    tokenizer_type: "o200k_harmony byte-level BPE (open tokenizer; auditable offline from the HF repo)"
+    backend: openai_compat
+    dtype: null
+    quantization: null
+    hardware: api
+    max_model_len: null
+    chat_template_kwargs: {}
+    generation_kwargs: {reasoning_effort: low}   # [UNCERTAIN: verify] the lowest setting Groq accepts; reasoning tokens are counted in the manifest either way
+    verify:
+      - "[UNCERTAIN: verify] Groq model id and reasoning_effort values"
+    notes:
+      - "Groq free plan: 1,000 requests and 200K tokens a day per model (https://console.groq.com/docs/rate-limits) -> about four days for the core at ~500 tokens a call; start 9 Nov 2026."
+
+  - name: gpt-oss-20b
+    display_name: "gpt-oss-20b (Groq)"
+    hf_id: openai/gpt-oss-20b
+    provider: groq
+    provider_model_id: openai/gpt-oss-20b    # [UNCERTAIN: verify]
+    hf_id_status: known
+    family: gpt-oss
+    group: api
+    params_b: 21.0
+    tokenizer_type: "o200k_harmony byte-level BPE (open tokenizer; auditable offline)"
+    backend: openai_compat
+    dtype: null
+    quantization: null
+    hardware: api
+    max_model_len: null
+    chat_template_kwargs: {}
+    generation_kwargs: {reasoning_effort: low}   # [UNCERTAIN: verify]
+    verify:
+      - "[UNCERTAIN: verify] Groq model id and reasoning_effort values"
+    notes:
+      - "Same Groq limits as gpt-oss-120b (per model)."
+
+  # ------------------------------------------------------------------ bf16 reference variants
+  # Same weights as the panel entry named in `reference_of`, served unquantized in bf16 on the
+  # TPU for the ~200-item drift check (plan 2.5: "about 200 items per model are re-run in bf16").
+  # Modal L4 (bf16-capable) is the fallback if the TPU route fails (plan 3).
+  - {name: gemma-3-1b-it--bf16, reference_of: gemma-3-1b-it, hf_id: google/gemma-3-1b-it, hf_id_status: known, gated: true, family: gemma3, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, never_float16: true, quantization: null, hardware: tpu, max_model_len: 2048, chat_template_kwargs: {}, verify: [], notes: ["bf16 reference for the fp32 T4 run"]}
+  - {name: gemma-3-4b-it--bf16, reference_of: gemma-3-4b-it, hf_id: google/gemma-3-4b-it, hf_id_status: known, gated: true, family: gemma3, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, never_float16: true, quantization: null, hardware: tpu, max_model_len: 2048, chat_template_kwargs: {}, verify: [], notes: ["bf16 reference for the fp32 2xT4 run"]}
+  - {name: qwen3.5-0.8b--bf16, reference_of: qwen3.5-0.8b, hf_id: Qwen/Qwen3.5-0.8B, hf_id_status: uncertain, gated: false, family: qwen3.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, chat_template_kwargs: {enable_thinking: false}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
+  - {name: qwen3.5-2b--bf16, reference_of: qwen3.5-2b, hf_id: Qwen/Qwen3.5-2B, hf_id_status: uncertain, gated: false, family: qwen3.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, chat_template_kwargs: {enable_thinking: false}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
+  - {name: qwen3.5-4b--bf16, reference_of: qwen3.5-4b, hf_id: Qwen/Qwen3.5-4B, hf_id_status: uncertain, gated: false, family: qwen3.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, chat_template_kwargs: {enable_thinking: false}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
+  - {name: qwen3.5-9b--bf16, reference_of: qwen3.5-9b, hf_id: Qwen/Qwen3.5-9B, hf_id_status: uncertain, gated: false, family: qwen3.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, chat_template_kwargs: {enable_thinking: false}, verify: ["[UNCERTAIN: verify] as reference"], notes: ["unquantized bf16 reference for the 4-bit T4 run"]}
+  - {name: gemma-4-e2b--bf16, reference_of: gemma-4-e2b, hf_id: google/gemma-4-e2b-it, hf_id_status: uncertain, gated: true, family: gemma4, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] as reference"], notes: ["unquantized bf16 reference for the 4-bit T4 run"]}
+  - {name: gemma-4-e4b--bf16, reference_of: gemma-4-e4b, hf_id: google/gemma-4-e4b-it, hf_id_status: uncertain, gated: true, family: gemma4, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
+  - {name: gemma-4-12b--bf16, reference_of: gemma-4-12b, hf_id: google/gemma-4-12b-it, hf_id_status: uncertain, gated: true, family: gemma4, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
+  - {name: gemma-sea-lion-v4.5-e2b-it--bf16, reference_of: gemma-sea-lion-v4.5-e2b-it, hf_id: aisingapore/Gemma-SEA-LION-v4.5-E2B-IT, hf_id_status: uncertain, gated: false, family: sea-lion-v4.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
+  - {name: sailor2-8b-chat--bf16, reference_of: sailor2-8b-chat, hf_id: sail/Sailor2-8B-Chat, hf_id_status: known, gated: false, family: sailor2, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, chat_template_kwargs: {}, verify: [], notes: []}
+  - {name: phogpt-4b-chat--bf16, reference_of: phogpt-4b-chat, hf_id: vinai/PhoGPT-4B-Chat, hf_id_status: known, gated: false, family: phogpt, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, trust_remote_code: true, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] MPT under vLLM-TPU"], notes: []}
+  - {name: vistral-7b-chat--bf16, reference_of: vistral-7b-chat, hf_id: Viet-Mistral/Vistral-7B-Chat, hf_id_status: known, gated: true, family: vistral, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, chat_template_kwargs: {}, verify: [], notes: []}
+  - {name: llama-3.1-8b-instruct--bf16, reference_of: llama-3.1-8b-instruct, hf_id: meta-llama/Llama-3.1-8B-Instruct, hf_id_status: known, gated: true, family: llama3.1, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, chat_template_kwargs: {}, verify: [], notes: ["unquantized bf16 reference for the AWQ T4 run"]}
+
+  # ------------------------------------------------------------------ reasoning sub-study variants
+  # Thinking ON, longer context for the reasoning tokens; 500 items (plan 2.5: "a budgeted
+  # 500-item run instead plots accuracy against reasoning tokens"). About six models.
+  - {name: qwen3.5-4b--thinking, reference_of: qwen3.5-4b, hf_id: Qwen/Qwen3.5-4B, hf_id_status: uncertain, gated: false, family: qwen3.5, group: reasoning_substudy, tokenizer_type: "as reference", backend: vllm, dtype: float16, quantization: null, hardware: t4, max_model_len: 4096, max_new_tokens: 2048, chat_template_kwargs: {enable_thinking: true}, verify: ["[UNCERTAIN: verify] as reference"], notes: ["reasoning tokens are counted from the raw completion"]}
+  - {name: qwen3.5-9b--thinking, reference_of: qwen3.5-9b, hf_id: Qwen/Qwen3.5-9B, hf_id_status: uncertain, gated: false, family: qwen3.5, group: reasoning_substudy, tokenizer_type: "as reference", backend: vllm, dtype: float16, quantization: {method: awq, bits: 4, checkpoint: null}, hardware: t4, max_model_len: 4096, max_new_tokens: 2048, chat_template_kwargs: {enable_thinking: true}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
+  - {name: qwen3.8-27b--thinking, reference_of: qwen3.8-27b, hf_id: Qwen/Qwen3.8-27B, hf_id_status: uncertain, gated: false, family: qwen3.8, group: reasoning_substudy, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 4096, max_new_tokens: 2048, chat_template_kwargs: {enable_thinking: true}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
+  - {name: gpt-oss-120b--thinking, reference_of: gpt-oss-120b, hf_id: openai/gpt-oss-120b, provider: groq, provider_model_id: openai/gpt-oss-120b, hf_id_status: known, family: gpt-oss, group: reasoning_substudy, tokenizer_type: "as reference", backend: openai_compat, dtype: null, quantization: null, hardware: api, max_model_len: null, max_new_tokens: 2048, chat_template_kwargs: {}, generation_kwargs: {reasoning_effort: high}, verify: ["[UNCERTAIN: verify] reasoning_effort values"], notes: ["counts against the same 200K tokens/day: budget ~250 calls a day at 800 tokens"]}
+  - {name: gpt-oss-20b--thinking, reference_of: gpt-oss-20b, hf_id: openai/gpt-oss-20b, provider: groq, provider_model_id: openai/gpt-oss-20b, hf_id_status: known, family: gpt-oss, group: reasoning_substudy, tokenizer_type: "as reference", backend: openai_compat, dtype: null, quantization: null, hardware: api, max_model_len: null, max_new_tokens: 2048, chat_template_kwargs: {}, generation_kwargs: {reasoning_effort: high}, verify: ["[UNCERTAIN: verify] reasoning_effort values"], notes: []}
+  - {name: gemini-flash--thinking, reference_of: gemini-flash, hf_id: null, provider: gemini, provider_model_id: gemini-3.5-flash, hf_id_status: uncertain, family: gemini, group: reasoning_substudy, tokenizer_type: "as reference", backend: gemini, dtype: null, quantization: null, hardware: api, max_model_len: null, max_new_tokens: 2048, chat_template_kwargs: {}, generation_kwargs: {thinking_budget: -1}, verify: ["[UNCERTAIN: verify] model id; -1 = dynamic thinking in the current SDK"], notes: []}

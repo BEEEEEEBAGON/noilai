@@ -100,8 +100,15 @@ def strata_for(inp: tuple[Syllable, Syllable], out: tuple[Syllable, Syllable], b
 
 class Generator:
     def __init__(self, seed: int = 20261004, inventory: Optional[Inventory] = None,
-                 words: Optional[list[str]] = None):
+                 words: Optional[list[str]] = None, exclude_qu: bool = True):
+        """exclude_qu: leave out base pairs containing a qu- syllable. The written 'qu' hides
+        the glide inside the onset letters; school grammar swaps 'qu' as an onset while
+        phonology (and this engine) treats the glide as part of the rime, and the two give
+        different outputs (quả hồng -> cổng hoà vs quồng hả). Until native validators settle
+        the convention, qu- pairs are generated only when explicitly requested and kept as
+        their own stratum (see docs/DESIGN_DECISIONS.md)."""
         self.seed = seed
+        self.exclude_qu = exclude_qu
         self.rng = random.Random(seed)
         self.inv = inventory or L.load_inventory()
         self.words = words if words is not None else L.load_words()
@@ -125,6 +132,8 @@ class Generator:
             if sum(1 for p in pairs if p.source == "lexicon") >= n_lexicon:
                 break
             sa, sb = try_parse(a).syllable, try_parse(b).syllable
+            if self.exclude_qu and any(self._is_qu(x) for x in (sa, sb)):
+                continue
             # both syllables must be attested in the inventory (guards against word-list typos,
             # loanwords and non-standard spellings; also guarantees the pair is a T2 reading)
             if not (self.inv.is_legal(sa, "attested") and self.inv.is_legal(sb, "attested")) or sa == sb:
@@ -138,10 +147,16 @@ class Generator:
             key = (spell(sa), spell(sb))
             if sa == sb or key in seen:
                 continue
+            if self.exclude_qu and any(self._is_qu(x) for x in (sa, sb)):
+                continue
             seen.add(key)
             pairs.append(BasePair(self._bp_id("pseudo", *key), sa, sb, "pseudo",
                                   self.freqs.get(key[0], 0), self.freqs.get(key[1], 0)))
         return pairs
+
+    @staticmethod
+    def _is_qu(s: Syllable) -> bool:
+        return s.onset == "c" and s.glide
 
     @staticmethod
     def _bp_id(source: str, a: str, b: str) -> str:
@@ -247,7 +262,7 @@ class Generator:
                 new = replace(s, tone=self.rng.choice([t for t in range(6) if t != s.tone]))
             else:
                 raise ValueError(tt)
-            if new == s or not self.inv.is_legal(new, LEGALITY):
+            if new == s or not self.inv.is_legal(new, LEGALITY) or (self.exclude_qu and self._is_qu(new)):
                 continue
             cand = list(out)
             cand[i] = new
