@@ -38,3 +38,15 @@ Caveats: these are the Gemma 2/3 tokenizer FILES from google/gemma_pytorch; the 
 Face tokenizers used at inference must be checked against them (same ids on the same
 strings) before any model result is joined to these statistics. Token counts here exclude
 the special/BOS tokens and the leading space when it forms a token of its own.
+
+## 2026-09-30 — Benchmark build v0.1 at the plan's default sizes (generator output, no model outputs)
+
+Source: `data/release/v0.1/manifest.json` (seed 20261004, generator at commit b03c7d5 with
+uncommitted docs; to be rebuilt at the commit that freezes the generator). 2,500 base pairs
+(1,500 lexical, 1,000 pseudo), 2,181 of them used; 10,000 items: T1 4,000, T2 2,000, T3 4,000
+(2,000 yes/no pairs); dev 1,984 / test 8,016 by base pair; core 1,496 (125 per T1/T2 cell,
+62 pairs per T3 cell). Pool sizes before capping: T1 1,465–2,145 per variant, T2 844–1,343.
+Of the 4,000 T1 items, 288 have a lexical output (287 from lexical inputs). T3 twins: tone
+494, rime 486, onset 476, other-variant 458, spelling 86 (spelling twins exist only when the
+gold has a c/k, g/gh or ng/ngh trigger). T2 inputs have 1 reading in 728 cases, 2 in 939,
+3+ in 333. Attested seed: 22 rows, 16 reproduced exactly by the engine.

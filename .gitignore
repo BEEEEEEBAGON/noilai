@@ -16,3 +16,4 @@ paper/*.blg
 paper/*.pdf
 .venv/
 data/cache/
+data/release/*/*.jsonl

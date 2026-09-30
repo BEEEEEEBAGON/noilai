@@ -117,7 +117,10 @@ def extract_answer(raw: Optional[str], task: str) -> tuple[Optional[str], str]:
                     method = "marker_next_line"
                     break
             if not ans:
-                continue
+                # a marker with nothing usable after it: the model gave no answer. Never fall
+                # through to the last-line fallback, which would pick the marker line itself
+                # ("Đáp án" is two syllables).
+                return None, "marker_empty"
         return _finish(ans, task, method)
     # --- no marker: last non-empty line
     for line in reversed(lines):
