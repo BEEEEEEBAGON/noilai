@@ -13,7 +13,9 @@ resolved there. Numbers in brackets are the plan's sections.
    give a different swap. Because the two analyses produce different outputs and no attested
    qu- example settles it, **qu- syllables are excluded from generated base pairs by default**
    (`Generator(exclude_qu=True)`) and will be added as a separate stratum only after the
-   native check of 20 qu- pairs. Attested qu- examples are kept in the attested set.
+   native check of 20 qu- pairs. The exclusion applies to INPUTS (T1 inputs, T2 nói lái
+   forms, T3 inputs): a /k/ + glide OUTPUT is spelled `qu…` unambiguously and is kept
+   (`chuyên cơ` -> `chơ quyên`). Attested qu- examples are kept in the attested set.
 2. **Short `a` before a semivowel coda is the nucleus `ă`** (`tay` = t, ă, j; `tai` = t, a, j;
    `tau` = t, ă, w; `tao` = t, a, w), spelled `a` again on output. This is the phonological
    analysis and it is what makes `thầy giáo → tháo giầy` come out with `ây`.

@@ -17,3 +17,4 @@ paper/*.pdf
 .venv/
 data/cache/
 data/release/*/*.jsonl
+data/audit/items_*.jsonl

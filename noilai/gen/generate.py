@@ -192,6 +192,8 @@ class Generator:
         if t1 is None:
             return None
         x, y = V.apply(variant, bp.a, bp.b)
+        if self.exclude_qu and any(self._is_qu(s) for s in (x, y)):
+            return None      # a qu- INPUT is ambiguous to analyse (see exclude_qu); qu- outputs are not
         golds = self.lexical_readings(x, y)
         assert any(g["output"] == bp.text for g in golds), "the base pair must be a reading"
         return {

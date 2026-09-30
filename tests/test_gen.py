@@ -104,7 +104,7 @@ def test_split_is_by_base_pair_and_core_is_inside_test(build):
 def test_qu_syllables_are_excluded_by_default(build):
     g, b = build
     for it in b["items"]:
-        for w in it["input"].split():
+        for w in it["input"].split():        # inputs (T1, T2 nói lái forms, T3) never contain qu-
             s = try_parse(w).syllable
             assert not (s.onset == "c" and s.glide), it["item_id"]
     g2 = Generator(seed=11, exclude_qu=False)
