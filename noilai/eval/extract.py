@@ -23,12 +23,15 @@ from ..vi.syllable import try_parse
 # Folded (lowercase, diacritics removed) forms of the marker. "answer" is accepted for the
 # English-instruction ablation, whose templates still ask for "Đáp án:".
 _MARKER = re.compile(r"(?:dap\s*an|answer)\s*[:：]", re.I)
-_YESNO = re.compile(r"(?<![a-z])(co|khong|yes|no)(?![a-z])", re.I)
+_WORD = re.compile(r"[^\W\d_]+")
 _EDGE_JUNK = " \t.,;:!?\"'“”‘’()[]{}«»*_`~-–—"
 _PUNCT_CUT = re.compile(r"[.,;:!?()\[\]{}\"“”«»]|\s[-–—]\s|\s(?:hoặc|hay|or)\s", re.I)
 
-YES_WORDS = {"co": "yes", "yes": "yes"}
-NO_WORDS = {"khong": "no", "no": "no"}
+# Exact Vietnamese forms, the English words, and the diacritic-less ASCII forms a model may
+# type. A token WITH other diacritics (cô, cò, cỏ) is not an answer: folding it to "co"
+# would read a false yes.
+YES_TOKENS = {"có": "yes", "yes": "yes", "co": "yes"}
+NO_TOKENS = {"không": "no", "no": "no", "khong": "no"}
 
 
 def fold(s: str) -> str:
@@ -64,13 +67,22 @@ def is_two_syllables(text: str) -> bool:
     return len(words) == 2 and all(try_parse(w, strict=False) is not None for w in words)
 
 
+def yesno_value(token: str) -> Optional[str]:
+    """'yes' / 'no' for one token (Có, Không, yes, no, and ASCII co / khong), else None."""
+    low = U.nfc(token).lower()
+    if low in YES_TOKENS:
+        return YES_TOKENS[low]
+    if low in NO_TOKENS:
+        return NO_TOKENS[low]
+    return None
+
+
 def yesno_token(text: str) -> Optional[str]:
     """The first Có/Không/yes/no token of `text` (original spelling), or None."""
-    folded, offsets = _fold_with_offsets(U.nfc(text))
-    m = _YESNO.search(folded)
-    if not m:
-        return None
-    return U.nfc(text)[offsets[m.start()]: offsets[m.end()]]
+    for m in _WORD.finditer(U.nfc(text)):
+        if yesno_value(m.group(0)) is not None:
+            return m.group(0)
+    return None
 
 
 def _truncate_phrase(ans: str) -> tuple[str, str]:
@@ -162,7 +174,4 @@ def t3_label(answer: Optional[str]) -> Optional[str]:
     if not answer:
         return None
     tok = yesno_token(answer)
-    if tok is None:
-        return None
-    f = fold(tok)
-    return YES_WORDS.get(f) or NO_WORDS.get(f)
+    return None if tok is None else yesno_value(tok)

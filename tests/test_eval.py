@@ -76,8 +76,12 @@ def make_t1(a: str, b: str, variant: str, item_id="T1-X-000001", canary=None) ->
 
 
 def gold_oracle(items, opts, kind="noilai"):
-    """A ScriptedBackend that answers every rendered prompt with its gold (keyed by prompt hash)."""
-    table = {}
+    """A ScriptedBackend that answers every rendered prompt with its gold (keyed by prompt hash)
+    and, for T3, gives the gold answer token and the correct candidate the higher log-probability."""
+    from noilai.vi import reencode as R
+
+    table, t3_table, ctx_table = {}, {}, {}
+    be = B.ScriptedBackend(default="Đáp án: ???")
     for req in RN.plan_requests(items, opts, kind):
         msgs = RN.render_request(req, opts, kind)
         it = req.item
@@ -87,6 +91,13 @@ def gold_oracle(items, opts, kind="noilai"):
             gold = it["gold"][0]["output"]
         elif it["task"] == "T3":
             gold = "Có" if it["gold"] == "yes" else "Không"
+            marker = R.reencode("Đáp án:", req.arm) if R.meaning_preserving(req.arm) else "Đáp án:"
+            t3_table[be.chat_to_text(msgs) + marker + " "] = R.reencode(gold, req.arm) if R.meaning_preserving(req.arm) else gold
+            pseudo = {"task": "T1", "variant": it["variant"], "input": it["input"], "item_id": it["item_id"],
+                      "canary": it.get("canary"), "gold": [it["correct_output"]]}
+            ctx = P.render(pseudo, paraphrase=req.paraphrase, shots=req.shots, arm=req.arm, input_format=opts.input_format,
+                           instruction=opts.instruction, language=opts.language)
+            ctx_table[be.chat_to_text(ctx) + marker + " "] = R.reencode(it["correct_output"], req.arm)
         else:
             gold = it["gold"]
         table[P.prompt_hash(msgs)] = "Đáp án: " + gold
@@ -94,7 +105,17 @@ def gold_oracle(items, opts, kind="noilai"):
     def respond(content):
         return table.get(P.prompt_hash([{"role": "user", "content": content}]))
 
-    return B.ScriptedBackend(script=respond, default="Đáp án: ???")
+    def logprob_fn(prompt, conts):
+        if prompt in t3_table:
+            return [-0.5 if c == t3_table[prompt] else -3.0 for c in conts]
+        if prompt in ctx_table:
+            return [-1.0 if c.strip() == ctx_table[prompt] else -6.0 for c in conts]
+        return [-2.0 - i for i, _ in enumerate(conts)]
+
+    be.script = respond
+    be.logprob_fn = logprob_fn
+    be.supports_logprobs = True
+    return be
 
 
 # ------------------------------------------------------------------ rendering
@@ -333,10 +354,11 @@ def meo_cai():
     ("mài", "unparseable", []),
     ("mài kéo mài", "unparseable", []),
     ("kéo mài", "order", ["order"]),
-    ("mái kèo", "wrong_variant", ["tone"]),         # the V4 output
-    ("cài méo", "wrong_variant", ["onset", "rime"]),  # the V2 output
+    ("mái kèo", "wrong_variant", ["tone"]),         # the V4 output: tones swapped relative to the V1 gold
+    ("cài méo", "wrong_variant", ["onset"]),        # the V2 output: onsets swapped relative to the V1 gold
     ("mài kèo", "component", ["tone"]),
-    ("mài kêu", "component", ["rime"]),
+    ("mài kếu", "component", ["rime"]),
+    ("mài kêu", "component", ["rime", "tone"]),      # kêu carries tone ngang
     ("mài téo", "component", ["onset"]),
     ("mài céo", "spelling", ["spelling"]),
 ])
@@ -415,7 +437,10 @@ def test_aggregate_and_scores_file(tmp_path, meo_cai):
     c = agg["by_task_variant"]["T1-V1"]
     assert c["n"] == 4 and c["accuracy"] == 0.25 and c["copy_rate"] == 0.25 and c["unparseable_rate"] == 0.25
     assert c["error_classes"] == {"correct": 1, "copy": 1, "unparseable": 1, "component": 1}
-    assert c["component_errors"] == {"tone": 1} and c["component_accuracy"]["tone"] == 0.75
+    assert c["component_errors"] == {"tone": 1}
+    # per-component accuracy over the three parseable answers (correct, copy, component): 6 syllables
+    assert abs(c["component_accuracy"]["tone"] - 5 / 6) < 1e-9 and abs(c["component_accuracy"]["rime"] - 4 / 6) < 1e-9
+    assert rows[0]["component_correct"] == {"onset": [True, True], "rime": [True, True], "tone": [True, True]}
     assert "T1-nfc" in agg["by_task_arm"] and agg["overall"]["n"] == 4
     table = S.summary_table(agg)
     assert "T1-V1" in table and "0.250" in table
@@ -431,8 +456,6 @@ def oracle_run(item_file, tmp_path_factory):
     opts = RN.RunOptions(paraphrases=("p0", "p1"), arms=("nfc", "nfd"), out_root=tmp_path_factory.mktemp("runs"),
                          run_id="oracle", batch_size=5)
     be = gold_oracle(items, opts)
-    be.logprob_fn = lambda prompt, conts: [(-1.0 if c in prompt else -2.0 - i) for i, c in enumerate(conts)]
-    be.supports_logprobs = True
     entry = {"name": "scripted-oracle", "model_id": "scripted", "backend": "scripted", "revision": None}
     run_dir = RN.run(be, entry, items, path, opts, log=lambda *a: None)
     return be, run_dir, items, path, opts

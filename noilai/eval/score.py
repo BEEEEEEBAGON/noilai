@@ -113,24 +113,25 @@ def score_t1(item: dict, answer: Optional[str], method: str = "marker", inv: Opt
     if answer is None:
         return row
     ca, cg = canonical_text(answer), canonical_text(gold)
+    inp = [_syl(d) for d in item["input_syllables"]]
+    gold_syls = [_syl(d) for d in item["gold_syllables"]] if item.get("gold_syllables") else list(
+        V.apply(item["variant"], *inp))
+    parsed = parse_phrase(answer)
+    if parsed is not None:
+        # per-component view of every parseable answer (correct and copy included), so that
+        # per-component accuracy is defined over all structural answers
+        row["component_detail"], row["component_correct"] = _component_diff(parsed[0], gold_syls)
     if ca == cg:
         row.update(correct=True, error_class="correct")
         return row
     if ca == canonical_text(item["input"]):
         row["error_class"] = "copy"
         return row
-    parsed = parse_phrase(answer)
     if parsed is None:
         return row
     syls, strict_ok = parsed
-    inp = [_syl(d) for d in item["input_syllables"]]
-    gold_syls = [_syl(d) for d in item["gold_syllables"]] if item.get("gold_syllables") else list(
-        V.apply(item["variant"], *inp))
     spelling_bad = not all(strict_ok)
-    detail, correct = _component_diff(syls, gold_syls)
-    row["component_detail"] = detail
-    row["component_correct"] = correct
-    errs = sorted({c for wrong in detail for c in wrong}, key=COMPONENTS.index)
+    errs = sorted({c for wrong in row["component_detail"] for c in wrong}, key=COMPONENTS.index)
     if spelling_bad:
         errs.append("spelling")
     row["component_errors"] = errs
@@ -194,6 +195,9 @@ def score_t2(item: dict, answer: Optional[str], method: str = "marker", raw: Opt
         row.update(correct=True, error_class="correct", identified_variants=[g["variant"]])
         if row["named_variant"] is not None:
             row["named_variant_correct"] = row["named_variant"] == g["variant"]
+        gp = parse_phrase(g["output"])
+        if parsed is not None and gp is not None:
+            row["component_detail"], row["component_correct"] = _component_diff(parsed[0], gp[0])
         return row
     if ca == canonical_text(item["input"]):
         row["error_class"] = "copy"
