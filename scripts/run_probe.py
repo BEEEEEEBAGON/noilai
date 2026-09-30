@@ -48,12 +48,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from noilai import constants
-from noilai.probe import extract, manifest as MF, patching, probes, readouts
+from noilai.probe import extract, patching, probes, readouts
+from noilai.probe import manifest as MF
 from noilai.probe import pairs as P
 from noilai.stats.bootstrap import cluster_bootstrap
 from noilai.vi import lexicon as L
 from noilai.vi import unicode as U
-from noilai.vi.syllable import spell
+from noilai.vi.syllable import Syllable, spell
 
 PRIMARY_FEATURES = ("tone",)
 SECONDARY_FEATURES = ("onset", "rime", "coda")
@@ -66,9 +67,11 @@ def sample_syllables(inv, n: int, seed: int) -> tuple[list[str], dict[str, dict]
     a per-syllable {'attested': bool} covariate."""
     rng = random.Random(seed)
     by_tone = defaultdict(list)
-    for s in inv.structures:
-        if inv.is_legal(s, "onset_rime"):
-            by_tone[s.tone].append(s)
+    for onset, glide, nucleus, coda in inv.toneless:
+        for tone in range(6):
+            s = Syllable(onset=onset, glide=glide, nucleus=nucleus, coda=coda, tone=tone)
+            if inv.is_legal(s, "onset_rime"):
+                by_tone[tone].append(s)
     out: list[str] = []
     labels: dict[str, dict] = {}
     per = n // 6
@@ -126,7 +129,7 @@ def summarize_recovery(R: np.ndarray, clusters, n_boot: int, seed: int = 0) -> d
             ci = cluster_bootstrap(v[ok], cl[ok], n_boot=n_boot, seed=seed, small_cell_rule=False, bca=False)
             mean[li, gi], lo[li, gi], hi[li, gi] = ci.estimate, ci.lo, ci.hi
     return {"mean_recovery": mean.tolist(), "lo": lo.tolist(), "hi": hi.tolist(), "n_pairs": int(n),
-            "n_clusters": int(len(set(cl.tolist()))), "n_boot": n_boot}
+            "n_clusters": len(set(cl.tolist())), "n_boot": n_boot}
 
 
 def run_patching_stage(model, tokenizer, inv, args, device, add_special: bool) -> tuple[dict | None, dict]:
@@ -202,7 +205,7 @@ def run_patching_stage(model, tokenizer, inv, args, device, add_special: bool) -
         if not (gap["gap"] >= constants.PATCHING_MIN_GAP_NATS and gap["clean_greedy_correct"]):
             continue
         retention["a_gap_ok"] += 1
-        al["partner_positions"], al["context_positions"] = [], list(range(0, min(al["target_positions"])))
+        al["partner_positions"], al["context_positions"] = [], list(range(min(al["target_positions"])))
         al["suffix_positions"] = list(range(max(al["target_positions"]) + 1, al["answer_pos"]))
         res = _patch_one(model, al, device)
         recs_a.append(res.recovery)

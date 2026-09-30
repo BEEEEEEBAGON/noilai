@@ -23,9 +23,20 @@ The run directory is data/runs/<run_id>__<name> either way.
 
 Guards (raise before anything runs): an API-served model must run with --in-core-only, and an
 item file flagged `never_to_api` never reaches an API backend (plan 2.3: APIs see only the
-core; the sealed split reaches no API); `limit` is accepted on `experiment: smoke` lines only
-(DESIGN_DECISIONS 12.32: every other sub-sample is a seeded file); a run flagged
-`not_a_run_eval_line` (E4) is refused.
+core; the sealed split reaches no API); a canary-bearing item file (`canary_required`, i.e. a
+test-split file) never reaches a provider whose `terms.trains_on_inputs` is not exactly false
+(DESIGN_DECISIONS 11.2 / 12.41, item 33: Gemini's unpaid tier), unless the provider block
+records `terms.paid_key_data_use_opt_out: true`, in which case the command carries
+--core-to-training-provider-opt-out and the manifest records it; `limit` is accepted on
+`experiment: smoke` lines only (DESIGN_DECISIONS 12.32: every other sub-sample is a seeded
+file); a run flagged `not_a_run_eval_line` (E4) is refused. `execute` reports a guarded
+(run, model) as "refused: ..." and goes on with the next model, so a mixed model set (Groq
+and Gemini) still runs its permitted members; the CLI exits 1 when anything was refused.
+
+Revision pins (DESIGN_DECISIONS 7.1): a self-hosted model whose `revision` is not a full
+commit hash, a Kaggle Models slug + version or a GGUF SHA-256 is skipped on every non-smoke
+line ("skipped: revision not pinned"), mirroring run_eval.py's own refusal, unless
+`allow_unpinned_revision`; dry runs still print the command.
 
 Item files. `{release}` in a plan path is the plan's `release` directory. A file with a
 `derive` block is a seeded sub-sample of another item file (per task x variant cell counts,
@@ -41,13 +52,19 @@ stops launching new models past the budget (DD 7.6: <= 9 h of work per 12-h Kagg
 `after_each` (a callable) runs after every executed model, e.g. a dataset push, so that a
 timed-out session keeps what it finished.
 
-Accounting: every executed command appends a compute-log row through scripts/compute_log.py,
-and API models keep a daily ledger (data/runs/api_ledger.json: requests AND tokens per model
-per UTC day, counted from the new rows of outputs.jsonl; `n_prompt_tokens + n_output_tokens`,
-or the plan's `assumed_tokens_per_call` when the provider returned no usage). A model whose
-daily request or token budget is spent is skipped until tomorrow; a running command is
-stopped (SIGINT) by a watchdog the moment the day's cap is reached and reported as "parked",
-never as failed; `--resume` continues it the next day.
+Accounting: every executed command appends TWO compute-log rows through scripts/compute_log.py:
+a provisional 0-hour row (`purpose = "<run_id> started HH:MMZ"`) before the child is launched,
+so that a session killed mid-model leaves its start on record, and the final row with the wall
+hours afterwards (a provisional row without a final row means the session died; its hours are
+reconstructed from the platform's session log). API models keep a daily ledger
+(data/runs/api_ledger.json: requests AND tokens per model per UTC day, counted from the new
+rows of outputs.jsonl; `n_prompt_tokens + n_output_tokens`, or the plan's
+`assumed_tokens_per_call` when the provider returned no usage). Under `scope: per_model` the
+budget pools every models.yaml entry that names the same (provider, provider_model_id), so a
+thinking variant shares its base entry's daily allowance. A model whose daily request or token
+budget is spent is skipped until tomorrow; a running command is stopped (SIGINT) by a watchdog
+the moment the day's cap is reached and reported as "parked", never as failed; `--resume`
+continues it the next day.
 """
 from __future__ import annotations
 
@@ -55,6 +72,7 @@ import argparse
 import datetime as dt
 import json
 import random
+import re
 import shlex
 import signal
 import subprocess
@@ -78,10 +96,16 @@ HARDWARE_DEVICES = {"t4": ("t4", 1), "2xt4": ("t4", 2), "tpu": ("tpu-v5e-8", 1),
 # entry hardware -> the sessions that can host it (a 1xT4 entry runs on a 2xT4 session; nothing else crosses)
 SESSION_COMPATIBLE = {"t4": {"t4", "2xt4"}, "2xt4": {"2xt4"}, "tpu": {"tpu"}, "l4": {"l4"}, "p100": {"p100"},
                       "api": {"t4", "2xt4", "tpu", "l4", "p100", "api", "cpu"}}
-ABLATION_FLAGS = (("input_format", "--input-format"), ("instruction", "--instruction"), ("language", "--language"))
+ABLATION_FLAGS = (("input_format", "--input-format"), ("instruction", "--instruction"), ("language", "--language"),
+                  ("arm_scope", "--arm-scope"), ("backend", "--backend"))
 TASKS = ("T1", "T2", "T3")
 VARIANTS = ("V1", "V2", "V3", "V4")
 PARKED = "parked"
+REFUSED = "refused"
+OPT_OUT_FLAG = "--core-to-training-provider-opt-out"
+# DESIGN_DECISIONS 7.1: a full HF commit hash, a Kaggle Models slug + version, or a GGUF SHA-256
+# (a Kaggle Models slug is owner/model/framework/variation/version; the framework segment is optional in older slugs)
+REVISION_PATTERNS = (re.compile(r"^[0-9a-f]{40}$"), re.compile(r"^[\w.-]+(?:/[\w.-]+){2,3}/\d+$"), re.compile(r"^[0-9a-f]{64}$"))
 
 
 # ------------------------------------------------------------------ loading
@@ -177,6 +201,45 @@ def is_api(entry: dict) -> bool:
     return entry.get("backend") in API_BACKENDS or entry.get("hardware") == "api"
 
 
+def provider_terms(entry: dict, models_cfg: dict) -> dict:
+    """The `terms` block of the entry's provider ({} when there is none)."""
+    prov = entry.get("provider")
+    block = (models_cfg.get("providers") or {}).get(prov) or {}
+    terms = block.get("terms")
+    return terms if isinstance(terms, dict) else {}
+
+
+def check_training_provider(run: dict, entry: dict, plan: dict, models_cfg: dict) -> bool:
+    """DESIGN_DECISIONS 11.2 / 12.41 (item 33): a canary-bearing (test-split) item file never reaches a
+    provider whose tier trains on inputs or whose terms are not cleared. Returns True when the
+    command must carry --core-to-training-provider-opt-out (a recorded paid-key opt-out), False when
+    nothing is needed; raises ValueError when the combination is refused."""
+    item_spec = plan["item_files"][run["items"]]
+    if not (is_api(entry) and item_spec.get("canary_required")):
+        return False
+    terms = provider_terms(entry, models_cfg)
+    trains = terms.get("trains_on_inputs")
+    if trains is False:
+        return False
+    if terms.get("paid_key_data_use_opt_out") is True:
+        return True
+    state = "trains on inputs" if trains is True else f"has no cleared no-training terms (trains_on_inputs={trains!r})"
+    raise ValueError(f"item file {run['items']!r} carries the canary (test split) and provider {entry.get('provider')!r} "
+                     f"of {entry['name']!r} {state}: a provider whose tier trains on inputs never receives the core "
+                     f"(DESIGN_DECISIONS 11.2 / 12.41, item 33). Either record a paid key with a verified data-use "
+                     f"opt-out (`providers.<name>.terms.paid_key_data_use_opt_out: true`) or run the dev-derived API set "
+                     f"(noilai_api_dev, DD 4.5) on a line of its own; the author decides (DD 13.18)")
+
+
+def revision_pinned(entry: dict) -> bool:
+    """DESIGN_DECISIONS 7.1: True for an API entry, or a self-hosted entry whose `revision` is a full
+    HF commit hash, a Kaggle Models slug + version or a GGUF SHA-256."""
+    if is_api(entry):
+        return True
+    rev = entry.get("revision")
+    return isinstance(rev, str) and any(p.fullmatch(rev.strip()) for p in REVISION_PATTERNS)
+
+
 def build_command(run: dict, model: str, plan: dict, models_cfg: dict, project_root: Path = ROOT,
                   python: str = sys.executable, extra: Sequence[str] = ()) -> list[str]:
     """The run_eval.py argv for one (run, model). Raises on a guarded combination."""
@@ -191,6 +254,7 @@ def build_command(run: dict, model: str, plan: dict, models_cfg: dict, project_r
         raise ValueError(f"item file {run['items']!r} must never reach an API ({model})")
     if api and not run.get("in_core_only"):
         raise ValueError(f"API model {model!r} may only run with in_core_only: true (run {run['id']!r})")
+    opt_out = check_training_provider(run, entry, plan, models_cfg)
     if run.get("limit") and run.get("experiment") != "smoke":
         raise ValueError(f"run {run['id']!r} uses `limit`, which is smoke-only (DESIGN_DECISIONS 12.32): "
                          f"select_items truncates a file sorted by task, so a limit measures T1 only; "
@@ -210,6 +274,8 @@ def build_command(run: dict, model: str, plan: dict, models_cfg: dict, project_r
         cmd += ["--smoke", "--limit", str(run["limit"])]      # run_eval.py refuses --limit without --smoke (DD 12.32)
     if run.get("in_core_only"):
         cmd.append("--in-core-only")
+    if opt_out:
+        cmd.append(OPT_OUT_FLAG)      # recorded by run.py in api_safety / api_privacy_settings (DD 11.2)
     cmd.append("--resume")
     rd = run_dir(plan, run, model)
     style = plan.get("run_eval_out_style", "run_id_root")
@@ -493,10 +559,17 @@ def daily_budget(entry: dict, models_cfg: dict) -> dict | None:
 
 
 def _budget_models(entry: dict, budget: dict, models_cfg: dict) -> list[str]:
-    """The models whose usage counts against this entry's daily budget (itself, or every model of the provider)."""
+    """The models whose usage counts against this entry's daily budget: every model of the provider
+    under `per_org`; otherwise every entry served as the same (provider, provider_model_id), so a
+    thinking variant (same provider model id) shares its base entry's daily cap (DD 7.2 / 7.3)."""
     if budget.get("scope") == "per_org":
         return [m["name"] for m in models_cfg["models"] if m.get("provider") == budget["provider"]]
-    return [entry["name"]]
+    pmid = entry.get("provider_model_id")
+    if not pmid:
+        return [entry["name"]]
+    same = [m["name"] for m in models_cfg["models"]
+            if m.get("provider") == entry.get("provider") and m.get("provider_model_id") == pmid]
+    return same if entry["name"] in same else [entry["name"], *same]
 
 
 def budget_status(entry: dict, models_cfg: dict, ledger: dict, day: str | None = None,
@@ -633,12 +706,15 @@ def execute(run_id: str, models: Sequence[str] | None = None, platform: str = "k
             models_cfg: dict | None = None, project_root: Path = ROOT, log_path: Path | None = None,
             python: str = sys.executable, session_hardware: str | None = None, allow_hardware_mismatch: bool = False,
             session_t0: float | None = None, max_session_hours: float | None = None,
-            after_each: Callable[[dict], None] | None = None, verify: bool = True, poll_s: float = 5.0) -> list[dict]:
+            after_each: Callable[[dict], None] | None = None, verify: bool = True, poll_s: float = 5.0,
+            allow_unpinned_revision: bool = False) -> list[dict]:
     """Run every (run, model) command in order; return one result dict per model.
 
     Statuses: 'dry-run', 'ok', 'failed (<rc>)', 'parked: ...' (an API day's cap reached; resume
-    tomorrow), 'skipped: ...' (budget spent, hardware not runnable in this session, session
-    budget reached, item file failed verification).
+    tomorrow), 'refused: ...' (a build_command guard: never_to_api, a training provider on a
+    test-split file, in_core_only missing, ...), 'skipped: ...' (budget spent, hardware not
+    runnable in this session, session budget reached, item file failed verification, revision
+    not pinned on a non-smoke line).
     """
     plan = plan or load_plan()
     models_cfg = models_cfg or load_models()
@@ -658,11 +734,25 @@ def execute(run_id: str, models: Sequence[str] | None = None, platform: str = "k
             print(f"[gate ] {run_id}: item file {run['items']!r} failed verification: {gate['problems']}")
     for name in names:
         entry = models_cfg["by_name"][name]
-        cmd = build_command(run, name, plan, models_cfg, project_root=project_root, python=python, extra=extra)
         out_dir = Path(project_root) / run_dir(plan, run, name)
-        res = {"run": run_id, "model": name, "cmd": cmd, "out": str(out_dir), "status": "dry-run",
+        res = {"run": run_id, "model": name, "cmd": None, "out": str(out_dir), "status": "dry-run",
                "hardware": entry.get("hardware"), "session_hardware": session_hardware}
+        try:
+            cmd = build_command(run, name, plan, models_cfg, project_root=project_root, python=python, extra=extra)
+        except ValueError as e:               # a guard of build_command: report, go on with the next model
+            res["status"] = f"{REFUSED}: {e}"
+            print(f"\n[plan ] {run_id} / {name}\n[refuse] {e}")
+            results.append(res)
+            continue
+        res["cmd"] = cmd
         print(f"\n[plan ] {run_id} / {name}\n[cmd  ] {shlex.join(cmd)}")
+        if not dry_run and not run.get("limit") and not allow_unpinned_revision and not revision_pinned(entry):
+            res["status"] = (f"skipped: revision not pinned ({entry.get('revision')!r}); DESIGN_DECISIONS 7.1 requires a full "
+                             f"commit hash, a Kaggle Models slug + version or a GGUF SHA-256 before a paper run "
+                             f"(run_eval.py refuses it too; --allow-unpinned-revision overrides for a rehearsal)")
+            print(f"[skip ] {name}: {res['status']}")
+            results.append(res)
+            continue
         if gate is not None and not gate["ok"]:
             res["status"] = f"skipped: item file {run['items']} failed verification"
             res["verify"] = gate
@@ -701,6 +791,10 @@ def execute(run_id: str, models: Sequence[str] | None = None, platform: str = "k
             print(f"[fix  ] {name}: dropped a partial trailing row of outputs.jsonl (redone by --resume)")
             before = count_outputs(out_dir)
         t0 = time.time()
+        dev, n = session_device(session_hardware) if session_hardware else device_for(entry)
+        # provisional row (checklist C1): a session killed mid-model still has this run's start on record
+        CL.append_entry(log_path, CL.Entry(date=CL.today(), platform=platform, gpu_type=dev, n_gpus=n, hours=0.0,
+                                           run_id=out_dir.name, purpose=f"{run_id} started {dt.datetime.now(dt.timezone.utc):%H:%M}Z"))
         stopped_by_budget = ""
         if status is not None:
             dog = BudgetWatchdog(out_dir, status, status["requests_used"], status["tokens_used"], before, assumed, poll_s)
@@ -729,7 +823,6 @@ def execute(run_id: str, models: Sequence[str] | None = None, platform: str = "k
             res["status"] = f"{PARKED}: command failed with >= {int(park_threshold * 100)}% of a daily cap used ({after['reason']}); resume tomorrow (UTC)"
         else:
             res["status"] = f"failed ({rc})"
-        dev, n = session_device(session_hardware) if session_hardware else device_for(entry)
         res["logged_device"] = {"gpu_type": dev, "n_gpus": n}
         CL.append_entry(log_path, CL.Entry(date=CL.today(), platform=platform, gpu_type=dev, n_gpus=n,
                                            hours=hours, run_id=out_dir.name, purpose=run_id))
@@ -764,6 +857,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--max-session-hours", type=float, default=None, help="launch no new model past this budget")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--no-verify", action="store_true", help="skip the item-file gate (tests only)")
+    ap.add_argument("--allow-unpinned-revision", action="store_true",
+                    help="run a self-hosted model whose `revision` is not pinned (rehearsals only; DD 7.1)")
     ap.add_argument("--stop-on-error", action="store_true")
     ap.add_argument("--extra", default="", help="extra run_eval.py args, one shell-quoted string")
     ap.add_argument("--python", default=sys.executable)
@@ -803,11 +898,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                       continue_on_error=not args.stop_on_error, extra=shlex.split(args.extra), plan=plan,
                       models_cfg=models_cfg, log_path=args.log, python=args.python,
                       session_hardware=args.session_hardware, allow_hardware_mismatch=args.allow_hardware_mismatch,
-                      session_t0=time.time(), max_session_hours=args.max_session_hours, verify=not args.no_verify)
+                      session_t0=time.time(), max_session_hours=args.max_session_hours, verify=not args.no_verify,
+                      allow_unpinned_revision=args.allow_unpinned_revision)
     failed = [r for r in results if str(r["status"]).startswith("failed")]
     parked = [r for r in results if str(r["status"]).startswith(PARKED)]
-    print(f"\n[summary] {len(results)} commands, {len(failed)} failed, {len(parked)} parked")
-    return 1 if failed else 0
+    refused = [r for r in results if str(r["status"]).startswith(REFUSED)]
+    print(f"\n[summary] {len(results)} commands, {len(failed)} failed, {len(parked)} parked, {len(refused)} refused")
+    return 1 if failed or refused else 0
 
 
 if __name__ == "__main__":

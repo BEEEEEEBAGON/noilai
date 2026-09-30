@@ -29,8 +29,12 @@
 #   * API entries have no dtype;
 #   * every self-hosted entry carries `revision` (DESIGN_DECISIONS 7.1: the runner refuses to
 #     start unless it is a full commit hash, a Kaggle Models slug + version or a GGUF SHA-256);
-#     it is null until the panel is frozen and MUST be filled before a paper run. The eval
-#     harness does not check it yet (open item for noilai/eval).
+#     it is null until the panel is frozen and MUST be filled before a paper run. `run_eval.py`
+#     refuses an unpinned local backend without --smoke, and `scripts/kaggle_run_plan.py` skips
+#     an unpinned self-hosted model on every non-smoke line (dry runs still print the command).
+#   * every provider block carries `terms.trains_on_inputs` as a BOOLEAN: the run driver refuses a
+#     canary-bearing (test-split) item file for a provider whose tier trains on inputs, and the eval
+#     harness refuses any core item unless the value is exactly false (DESIGN_DECISIONS 11.2 / 12.41).
 # Engine defaults follow DESIGN_DECISIONS 7.3 (vLLM 0.30.0 on Kaggle 2xT4): max_model_len 1024,
 # gpu_memory_utilization 0.85, TRITON_ATTN, zero multimodal limits, prefix caching, 64 seqs.
 
@@ -118,7 +122,7 @@ groups:
     why: "largest open models that fit free hardware (TPU v5e-8)"
     panel: true
   api:
-    why: "strong hosted reference, generation only; sees the 1,500-item core only"
+    why: "strong hosted reference, generation only; a provider with no-training terms (Groq) sees the 1,500-item core, a provider whose tier trains on inputs (Gemini unpaid) never does (DD 11.2: paid key with opt-out, or the dev-derived API set, reported separately)"
     panel: true
   bf16_reference:
     why: "about 200 items per T4 model re-run in bf16 (plan 2.5) to measure precision drift"
@@ -145,7 +149,11 @@ providers:
       trains_on_inputs: true      # unpaid tier: prompts and responses improve Google's products; human reviewers may read them
       minimum_age: 18
       source: https://ai.google.dev/gemini-api/terms
-    data_policy: "core set only; never the sealed split; never annotator personal data"
+      # DD 11.2 / 13.18: the author's choice for Gemini. Set to true ONLY for a paid key whose data-use
+      # opt-out has been verified and recorded; the run driver then emits --core-to-training-provider-opt-out
+      # and the manifest records it. Never true for the unpaid tier.
+      paid_key_data_use_opt_out: false
+    data_policy: "NEVER the core or any other test-split item on the unpaid tier (trains on inputs; DD 11.2 / 12.41, item 33): either a paid key with a verified data-use opt-out (terms.paid_key_data_use_opt_out) or the dev-derived API set noilai_api_dev (DD 4.5), reported separately and never in Table 2; never the sealed split; never annotator personal data"
   groq:
     backend: openai_compat
     sdk: openai
@@ -165,6 +173,11 @@ providers:
       source: https://console.groq.com/docs/rate-limits
       note: "at ~500 tokens per request the 1,500-item core alone takes about four days per model; the plan starts both Groq models on 9 Nov 2026"
       catalogue_risk: "Groq retired Llama from its free plan on 16 Aug 2026 (https://klymentiev.com/blog/groq-pricing); pin model ids and dates, save raw outputs immediately"
+    terms:
+      trains_on_inputs: false     # DD 11.2: "Groq states no training and no default retention"; the value the core guards key on
+      retention: "none by default; enable ZDR if eligible (DD 11.2)"
+      minimum_age: null           # [UNCERTAIN: verify] the author checks the minimum-age clause this week (DD 11.2 / 13.17)
+      source: https://groq.com/terms-of-use
     data_policy: "core set only; never the sealed split"
   openrouter:                    # optional fifth API model, $10 once for 1,000 requests/day
     backend: openai_compat
@@ -175,9 +188,14 @@ providers:
       requests_per_day: 50       # 1,000 after a one-time $10 purchase
       source: https://openrouter.ai/docs/api-reference/limits
     terms:
-      trains_on_inputs: "provider-dependent; filtered by an account setting"
+      # DD 11.2: OpenRouter is set to exclude training providers and to ZDR before any call, and the
+      # setting's state is recorded; `false` therefore holds ONLY for an entry whose `extra_body` carries
+      # {provider: {data_collection: deny}} (tests/test_cloud.py refuses an openrouter entry without it).
+      trains_on_inputs: false
+      requires_extra_body: {provider: {data_collection: deny}}
+      minimum_age: null           # [UNCERTAIN: verify] the author checks the clause this week (DD 11.2 / 13.17)
       source: https://openrouter.ai/docs/features/privacy-and-logging
-    data_policy: "core set only; not in the 21-model panel"
+    data_policy: "core set only with data_collection: deny and ZDR recorded (DD 11.2); not in the 21-model panel"
 
 # --------------------------------------------------------------------------- panel
 models:
@@ -613,7 +631,7 @@ models:
       - "[UNCERTAIN: verify] model id and thinking switch"
       - "[UNCERTAIN: verify] free-tier RPD/RPM shown in AI Studio at run time"
     notes:
-      - "Free tier trains on inputs and requires users to be 18 or older (https://ai.google.dev/gemini-api/terms): core set only; an eligible adult's account if the author is under 18."
+      - "Free tier trains on inputs and requires users to be 18 or older (https://ai.google.dev/gemini-api/terms): the core NEVER reaches this tier (DD 11.2, item 33); the run driver refuses every canary-bearing item file for it until the author records a paid key with a data-use opt-out or points the API lines at the dev-derived set (DD 13.18); an eligible adult's account if the author is under 18."
       - "Generation only: T3 is scored from generated answers, no log-probabilities."
 
   - name: gemini-flash-lite

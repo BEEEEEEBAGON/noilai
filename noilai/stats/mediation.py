@@ -5,6 +5,6 @@ so that existing imports resolve.
 """
 from __future__ import annotations
 
-from .dose_response import MIN_STRATUM, Decomposition, decompose  # noqa: F401
+from .dose_response import MIN_STRATUM, Decomposition, decompose
 
-__all__ = ["Decomposition", "decompose", "MIN_STRATUM"]
+__all__ = ["MIN_STRATUM", "Decomposition", "decompose"]

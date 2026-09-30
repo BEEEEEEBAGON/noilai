@@ -132,7 +132,10 @@ def wilson_deff_ci(values: np.ndarray, inv: np.ndarray, n_clusters: int, level: 
     p = float(values.mean()) if n else float("nan")
     n_eff = max(1.0, n / design_effect_from_clusters(values, inv, n_clusters))
     lo, hi = proportion_confint(p * n_eff, n_eff, alpha=1 - level, method="wilson")
-    return CI(p, float(lo), float(hi), n, n_clusters, level, 0, method="wilson_deff", small_cell=True)
+    lo, hi = float(np.clip(lo, 0.0, 1.0)), float(np.clip(hi, 0.0, 1.0))
+    if p in (0.0, 1.0):      # a 0 % / 100 % cell: the bound at the observed edge is exact
+        lo, hi = (0.0, hi) if p == 0.0 else (lo, 1.0)
+    return CI(p, lo, hi, n, n_clusters, level, 0, method="wilson_deff", small_cell=True)
 
 
 def _bca_bounds(boots: np.ndarray, est: float, jack: np.ndarray, level: float) -> tuple[float, float] | None:

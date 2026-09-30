@@ -3,6 +3,10 @@ data/external/*
 !data/external/README.md
 data/runs/*
 !data/runs/README.md
+# validator and human-baseline material (forms, returned sheets, consent): never committed, never in
+# the bundle a notebook clones (DESIGN_DECISIONS 11.2: participant data leaves the machine for nothing)
+data/validation/
+data/human/
 __pycache__/
 *.pyc
 .pytest_cache/

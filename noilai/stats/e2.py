@@ -214,7 +214,7 @@ def bootstrap_mean_slopes(df: pd.DataFrame, n_boot: int = 200, seed: int = 0, bp
         boot = pd.concat(parts, ignore_index=True)
         try:
             fe = fit_fixed_effects_clustered(boot, formula=formula, bp_col=bp_col, model_col=model_col, sandwich=False)
-        except Exception:
+        except Exception:  # noqa: BLE001, S112 - a replicate whose logit does not converge is dropped and counted in n_ok
             continue
         tps.append(fe.mean_slope_tps)
         al.append(fe.mean_slope_align)

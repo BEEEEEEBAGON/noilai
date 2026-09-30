@@ -235,14 +235,16 @@ def pip_install(project: Path, extras: Sequence[str] = ("eval",), pins: dict | N
         subprocess.run(cmd, check=True)
 
 
-def record_environment(out_dir: Path, python: str = sys.executable) -> Path:
-    """pip freeze + interpreter/torch/CUDA versions into <out_dir>/env_<utc>.json (checklist C4)."""
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    freeze = subprocess.run([python, "-m", "pip", "freeze"], capture_output=True, text=True, check=False).stdout
-    info: dict = {"utc": stamp, "python": platform.python_version(), "platform": platform.platform(),
-                  "pip_freeze": freeze.splitlines()}
+FRAMEWORK_MODULES = ("transformers", "vllm", "sentencepiece")
+
+
+def _probe_info(modules=FRAMEWORK_MODULES) -> dict:
+    """torch / CUDA / framework versions of THIS interpreter. Self-contained on purpose: its source is
+    shipped to the engine interpreter (RUN_PYTHON) with `python -c`, so the record describes the
+    interpreter that runs run_eval.py, not the notebook kernel (checklist C4; DESIGN_DECISIONS 7.5)."""
+    import platform as _platform
+
+    info: dict = {"python": _platform.python_version()}
     try:
         import torch  # type: ignore
 
@@ -254,14 +256,45 @@ def record_environment(out_dir: Path, python: str = sys.executable) -> Path:
                                 "capability": ".".join(map(str, torch.cuda.get_device_capability(i))),
                                 "memory_gb": round(torch.cuda.get_device_properties(i).total_memory / 2**30, 1)}
                                for i in range(torch.cuda.device_count())]
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - any import/CUDA failure is recorded, never raised
         info["torch"] = f"unavailable: {e}"
-    for mod in ("transformers", "vllm", "sentencepiece"):
+    for mod in modules:
         try:
             m = __import__(mod)
             info[mod] = getattr(m, "__version__", "?")
-        except Exception:
+        except Exception:  # noqa: BLE001 - a missing or broken framework is recorded as None
             info[mod] = None
+    return info
+
+
+def probe_interpreter(python: str = sys.executable) -> dict:
+    """`_probe_info()` as seen by `python`: in-process for this interpreter, else in a subprocess that
+    receives the function's own source, so both paths run the same code."""
+    if Path(python).resolve() == Path(sys.executable).resolve():
+        return _probe_info()
+    import inspect
+
+    src = (f"FRAMEWORK_MODULES = {FRAMEWORK_MODULES!r}\n" + inspect.getsource(_probe_info)
+           + "\nimport json\nprint(json.dumps(_probe_info()))\n")
+    r = subprocess.run([python, "-c", src], capture_output=True, text=True, check=False)
+    if r.returncode != 0 or not r.stdout.strip():
+        return {"python": None, "torch": f"unavailable: probe of {python} failed ({r.stderr.strip()[-300:]})",
+                **dict.fromkeys(FRAMEWORK_MODULES)}
+    return json.loads(r.stdout.strip().splitlines()[-1])
+
+
+def record_environment(out_dir: Path, python: str = sys.executable) -> Path:
+    """pip freeze + interpreter/torch/CUDA versions of the interpreter `python` (the one that runs
+    run_eval.py) into <out_dir>/env_<utc>.json (checklist C4). `driver_python` records the notebook
+    kernel when it differs, so the two interpreters are never mixed in one record."""
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    freeze = subprocess.run([python, "-m", "pip", "freeze"], capture_output=True, text=True, check=False).stdout
+    info: dict = {"utc": stamp, "interpreter": str(python), "driver_python": sys.executable,
+                  "driver_python_version": platform.python_version(), "platform": platform.platform(),
+                  "pip_freeze": freeze.splitlines()}
+    info.update(probe_interpreter(python))         # `python`, torch, cuda, frameworks: all from the SAME interpreter
     p = out_dir / f"env_{stamp}.json"
     p.write_text(json.dumps(info, indent=2), encoding="utf-8")
     (out_dir / f"pip_freeze_{stamp}.txt").write_text(freeze, encoding="utf-8")

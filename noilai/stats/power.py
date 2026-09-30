@@ -66,7 +66,7 @@ def n_for_mcnemar_power_conditional(diff: float, discordant_rate: float, power: 
     z_a = sps.norm.ppf(1 - alpha / 2)
     z_b = sps.norm.ppf(power)
     n_d = (z_a * 0.5 + z_b * sqrt(q * (1 - q))) ** 2 / (q - 0.5) ** 2
-    return int(round(n_d / r))
+    return round(n_d / r)
 
 
 def design_effect(items_per_cluster: float, icc: float) -> float:

@@ -24,11 +24,20 @@
 # differs. Observed hashes of the working-tree build are kept as comments for traceability only.
 #
 # Estimates are the plan's (author's estimate, no source unless given) re-budgeted within the
-# plan's 70-150 GPU-hour subtotal: the DD 12.11 raise of the main sample (3,000 -> 4,200) and the
-# ablation lines the plan requires (2.5-2.6) are carved out of the 100% rerun buffer; every GPU
-# line is re-priced from the pilot's measured tokens/s (DD 8.5, item 30). tests/test_cloud.py
-# checks that the lines still sum to 70-150 and that no run exceeds the line it counts toward.
-# Model names must exist in configs/models.yaml; `model_sets` expand to lists of names.
+# plan's 70-150 GPU-hour subtotal: the DD 12.11 raise of the main sample (3,000 -> 4,200), the
+# ablation lines the plan requires (2.5-2.6) and the DD 8.3 E3 family on the main sample are
+# carved out of the 100% rerun buffer; every GPU line is re-priced from the pilot's measured
+# tokens/s (DD 8.5, item 30). tests/test_cloud.py checks that the lines still sum to 70-150 and
+# that no run exceeds the line it counts toward. Model names must exist in configs/models.yaml;
+# `model_sets` expand to lists of names.
+#
+# Arms (DD 6.1 / 6.3 / 12.5): the release is stored in the OLD placement style, so the C2 arm is
+# `placement_new` everywhere (`placement_old` changes no prompt on the release and the runner
+# refuses such an arm); the E3 family is the DD 8.3 enumeration {nfd, pc, strip_tones, strip_all}
+# x {T1, T3, XCOPA} on the main sample plus {placement_new} x {T1, T3} on the C2-enriched file;
+# tests/test_cloud.py checks every arm against noilai.constants.ARMS and against the release copy.
+# Schedule (DD 8.8): no line whose item file carries `canary_required: true` (a test-split file)
+# is scheduled before 8 November 2026 (stage-2 pre-registration); E3 runs on dev only before that.
 
 version: 2
 date: 2026-09-30
@@ -38,7 +47,7 @@ run_eval_cli: scripts/run_eval.py
 run_eval_out_style: run_id_root      # run_id_root -> "--run-id <id>__<name> --out-root <runs_root>"; out -> "--out <runs_root>/<id>__<name>"
 runs_root: data/runs
 compute_log: data/compute_log.csv    # [UNCERTAIN: verify] location pending the author's confirmation (README, open question)
-release: data/release/v0.2           # DESIGN_DECISIONS 12.30: v0.1 is superseded; the version that is frozen at Gate 2
+release: data/release/v0.2           # DESIGN_DECISIONS 12.30: v0.1 and v0.2 are superseded; v0.3 is rebuilt at the generator-freeze commit (stage 1) -- bump this key then and re-record the item_files hashes
 release_manifest: "{release}/manifest.json"
 
 api:
@@ -62,7 +71,7 @@ item_files:
   noilai_core:
     path: "{release}/noilai_core.jsonl"
     sha256: null
-    description: "balanced core: 125 per T1/T2 cell, 62 yes/no pairs per T3 cell (1,496 items in v0.2; DD 4.5 allows 1,496-1,500); the only NóiLái items an API may see; the E3 open-model set; the source of the derived core subsets"
+    description: "balanced core: 125 per T1/T2 cell, 62 yes/no pairs per T3 cell (1,496 items in v0.2; DD 4.5 allows 1,496-1,500); the only NóiLái test items an API may see, and only a provider with no-training terms (DD 11.2: Groq; never Gemini's unpaid tier); the source of the derived core subsets"
     canary_required: true
   noilai_dev:
     path: "{release}/noilai_dev.jsonl"
@@ -109,6 +118,13 @@ item_files:
     canary_required: true
     derive: {source: noilai_core, seed: 20261008, per_cell: {T1: 17, T2: 17, T3: 16}, in_core_only: true}
     expected_counts: {n_items: 200}
+  noilai_scope500:
+    path: "{release}/noilai_scope500.jsonl"
+    sha256: null
+    description: "DD 6.1 / 6.2 agreement-check set: 500 core items (63 per T1 cell, 31 yes/no pairs per T3 cell; the two E3 Holm tasks) on which Gemma 3 1B runs the secondary arm scope `item` and the C1 arm through a second engine (HF); a subset of noilai_main, so the vLLM whole_prompt reference comes from E3_noilai on the same rows"
+    canary_required: true
+    derive: {source: noilai_core, seed: 20261011, tasks: [T1, T3], per_cell: {T1: 63, T3: 62}, in_core_only: true}
+    expected_counts: {n_items: 500}
   pilot_t1_200:
     path: "{release}/pilot_t1_200.jsonl"
     sha256: null
@@ -166,7 +182,7 @@ experiments:
   smoke: "every model family loads, generates and returns log-probs (open models) on 20 items before the panel is fixed; the only lines allowed a --limit"
   E1: "all 21 models on NóiLái against human, random and copy baselines (plan 2.6); explicit onset-rime-tone input is a main result (DD 12.17)"
   E1_ablation: "prompt ablations of plan 2.5-2.6 / DD 7.4 on the core: zero-shot, name-only, English instruction, character-spaced input"
-  E3: "orthographic counterfactual arms C1-C3 on NóiLái and Vietnamese XCOPA (plan 2.6); C2 on the enriched set for H4 (DD 12.6)"
+  E3: "orthographic counterfactual arms on NóiLái and Vietnamese XCOPA (plan 2.6): the DD 8.3 family {nfd, pc, strip_tones, strip_all} x {T1, T3, XCOPA} on the main sample, C2 (placement_new) on the enriched set for H4 (DD 12.6); test-split lines after 8 Nov (DD 8.8); the DD 6.1/6.2 scope and engine agreement checks on a 500-item Gemma 3 1B subset"
   reasoning: "500-item run with thinking ON: accuracy vs reasoning tokens (plan 2.5; appendix, DD 12.36)"
   bf16_drift: "~200 items per T4 model re-run unquantized in bf16 (plan 2.5; appendix, DD 12.36)"
   E4: "tone probing and activation patching on Gemma 3 1B/4B in fp32 (plan 2.6; noilai.probe, not run_eval)"
@@ -405,20 +421,21 @@ runs:
 
   - id: E3_noilai
     experiment: E3
-    purpose: "C1 (nfd), C2 (placement_old), C3 (strip_tones) against the nfc baseline on the core; H3 crossover on V3"
+    purpose: "the DD 8.3 Table 3 family on NóiLái: C1 (nfd), C1' (pc), C3a (strip_tones), C3b (strip_all) against the nfc baseline on the main sample, T1 and T3 (the Holm cells; T2 is not one); the three-arm base < pc < nfd contrast (DD 6.4 / 8.6) and the H3 crossover on V3 come from the same rows"
     platform: kaggle
     hardware: mixed
     models: {set: e3_open}
-    items: noilai_core
-    tasks: [T1, T2, T3]
+    items: noilai_main
+    tasks: [T1, T3]
     variants: [V1, V2, V3, V4]
-    arms: [nfc, nfd, placement_old, strip_tones]
+    arms: [nfc, nfd, pc, strip_tones, strip_all]
     paraphrases: [p0]
     shots: 3
     in_core_only: false
-    estimate: {unit: gpu_hours, low: 5, high: 12}
+    estimate: {unit: gpu_hours, low: 12, high: 28}   # 2,800 main-sample items x 5 arms (the core x 4 arms was 5-12); re-priced from the pilot (DD 8.5)
     counts_toward: counterfactuals
-    week: "Oct 26-Nov 1 (queued during the crunch week)"
+    week: "Nov 9-22"
+    note: "DD 8.8: a test-split E3 line runs only after the stage-2 pre-registration (8 Nov); the nfc column duplicates E1_main's p0 nfc rows on these items so that every arm of the family is scored under one run manifest. C2 is not run on the main sample (DD 6.3 / 12.6: E3_c2_enriched)"
 
   - id: E3_c2_enriched
     experiment: E3
@@ -429,49 +446,86 @@ runs:
     items: noilai_c2
     tasks: [T1]
     variants: [V1, V2, V3, V4]
-    arms: [nfc, placement_old]
+    arms: [nfc, placement_new]
     paraphrases: [p0]
     shots: 3
     in_core_only: false
     estimate: {unit: gpu_hours, low: 1, high: 3}
     counts_toward: counterfactuals
-    week: "Oct 26-Nov 1"
+    week: "Nov 9-22"
     note: "the verify gate refuses an empty noilai_c2.jsonl (an early working-tree build held 0 items), so this line runs only once the data owner's C2 build holds items"
 
   - id: E3_xcopa
     experiment: E3
-    purpose: "the same arms on XCOPA's 500 Vietnamese test items, scored by log-likelihood of the two alternatives"
+    purpose: "the DD 8.3 family's XCOPA column: nfd, pc, strip_tones, strip_all on XCOPA's 500 Vietnamese test items, scored by log-likelihood of the two alternatives"
     platform: kaggle
     hardware: mixed
     models: {set: e3_open}
     items: xcopa_vi_test
     tasks: [XCOPA]
     variants: []
-    arms: [nfc, nfd, placement_old, strip_tones]
+    arms: [nfc, nfd, pc, strip_tones, strip_all]
     paraphrases: [p0]
     shots: 0
     in_core_only: false
     estimate: {unit: gpu_hours, low: 4, high: 10}
     counts_toward: counterfactuals
-    week: "Oct 26-Nov 1"
-    note: "XCOPA is not a NóiLái item file (noilai/eval/xcopa.py adapts it); memorized spellings could inflate effects, so each effect is re-estimated on fresh NóiLái items (plan 2.3)"
+    week: "Nov 9-22"
+    note: "XCOPA is not a NóiLái item file (noilai/eval/xcopa.py adapts it); memorized spellings could inflate effects, so each effect is re-estimated on fresh NóiLái items (plan 2.3). C2 on XCOPA is not a tested cell (DD 6.3 / 12.36: 42 of 500 items change under placement_new) and is not run here; DD 8.8 keeps every E3 line off the crunch week"
 
   - id: E3_api_core
     experiment: E3
-    purpose: "API models: nfd and placement_old arms on the 296-item core subset (C3 skipped: destroys meaning, no log-probs to rescue it)"
+    purpose: "API models: nfd and placement_new arms on the 296-item core subset (C3 skipped: destroys meaning, no log-probs to rescue it); the nfc baseline is E1_api_core's p0 run on the same rows"
     platform: api
     hardware: api
     models: {set: api}
     items: noilai_api_para300
     tasks: [T1, T3]
     variants: [V1, V2, V3, V4]
-    arms: [nfd, placement_old]
+    arms: [nfd, placement_new]
     paraphrases: [p0]
     shots: 3
     in_core_only: true
     estimate: {unit: api_calls, low: 2400, high: 2400, tokens: 1200000}
     counts_toward: api_runs
     week: "Nov 16-22"
+
+  - id: E3_scope_item
+    experiment: E3
+    purpose: "DD 6.1: the secondary arm scope `item` (re-encode the item text only) for C1 on the 500-item Gemma 3 1B subset; compared with E3_noilai's whole_prompt nfd on the same rows (the 6.2 two-scope agreement check)"
+    platform: kaggle
+    hardware: t4
+    models: [gemma-3-1b-it]
+    items: noilai_scope500
+    tasks: [T1, T3]
+    variants: [V1, V2, V3, V4]
+    arms: [nfc, nfd]
+    arm_scope: item
+    paraphrases: [p0]
+    shots: 3
+    in_core_only: true
+    estimate: {unit: gpu_hours, low: 1, high: 1}
+    counts_toward: reruns_and_debugging
+    week: "Nov 9-22"
+
+  - id: E3_engine_hf
+    experiment: E3
+    purpose: "DD 6.2: C1 through a second engine (HF transformers, whole_prompt) on the same 500 Gemma 3 1B items as E3_scope_item; agreement with the vLLM run of E3_noilai is reported (arXiv 2609.20614: engine-dependent normalization)"
+    platform: kaggle
+    hardware: t4
+    models: [gemma-3-1b-it]
+    items: noilai_scope500
+    tasks: [T1, T3]
+    variants: [V1, V2, V3, V4]
+    arms: [nfc, nfd]
+    backend: hf
+    paraphrases: [p0]
+    shots: 3
+    in_core_only: true
+    estimate: {unit: gpu_hours, low: 1, high: 1}
+    counts_toward: reruns_and_debugging
+    week: "Nov 9-22"
+    note: "gemma-3-1b-it's fallback_backend is hf (fp32 on the T4); the run directory is its own, so both engines' manifests exist side by side"
 
   - id: reasoning_500
     experiment: reasoning
@@ -576,25 +630,28 @@ runs:
     not_a_run_eval_line: true
     estimate: {unit: gpu_hours, low: 5, high: 15}
     counts_toward: probing
-    week: "Nov 23-Dec 6 (keep only if patching is clean: Gate 4)"
+    week: "Nov 23-Dec 6"
+    note: "E4 is reported regardless of outcome (DD 8.8, item 26): main text if readout-B retention allows, appendix with the retention table if it is below PATCHING_READOUT_B_MIN_RETENTION; 'clean' is a compute/feasibility criterion, never a result criterion"
 
 # --------------------------------------------------------------------------- compute table
 # The plan's line items (section 3), re-budgeted within the plan's 70-150 GPU-hour subtotal:
 # `noilai_main` grows from 10-20 to 16-32 (DD 12.11's 4,200-item sample + the explicit-input main
-# result), a new `ablations` line of 4-8 holds the four prompt ablations, and the 100% buffer
-# shrinks from 35-75 to 25-55 to pay for both. `runs[*].counts_toward` maps runs onto these
-# lines; the test asserts that the GPU lines sum to 70-150 and that every line's runs fit it.
+# result), a new `ablations` line of 4-8 holds the four prompt ablations, `counterfactuals` grows
+# from 10-25 to 17-41 (the DD 8.3 family runs five arms on the 2,800 T1/T3 main-sample items, not
+# four arms on the core), and the 100% buffer shrinks from 35-75 to 18-39 to pay for all three.
+# `runs[*].counts_toward` maps runs onto these lines; the test asserts that the GPU lines sum to
+# 70-150 and that every line's runs fit it.
 plan_lines:
   pilots_and_smoke:      {where: "Kaggle T4",        unit: gpu_hours, low: 5,  high: 5,  cash_usd: 0}
   noilai_main:           {where: "Kaggle T4, 2xT4",  unit: gpu_hours, low: 16, high: 32, cash_usd: 0, note: "plan: 10-20 for 3,000 items; 4,200 items + explicit-input main result"}
   ablations:             {where: "Kaggle T4, 2xT4",  unit: gpu_hours, low: 4,  high: 8,  cash_usd: 0, note: "zero-shot, name-only, English instruction, spaced input on the core (plan 2.5-2.6)"}
   reasoning:             {where: "Kaggle T4",        unit: gpu_hours, low: 5,  high: 10, cash_usd: 0}
-  counterfactuals:       {where: "Kaggle T4",        unit: gpu_hours, low: 10, high: 25, cash_usd: 0}
+  counterfactuals:       {where: "Kaggle T4",        unit: gpu_hours, low: 17, high: 41, cash_usd: 0, note: "plan: 10-25 for C1-C3 on the core; DD 8.3's family on the main sample (T1, T3) + C2-enriched + XCOPA"}
   probing:               {where: "Kaggle 2xT4",      unit: gpu_hours, low: 5,  high: 15, cash_usd: 0}
-  reruns_and_debugging:  {where: "Kaggle",           unit: gpu_hours, low: 25, high: 55, cash_usd: 0, note: "the plan's 100% buffer (35-75) minus the re-budgeted lines above"}
+  reruns_and_debugging:  {where: "Kaggle",           unit: gpu_hours, low: 18, high: 39, cash_usd: 0, note: "the plan's 100% buffer (35-75) minus the re-budgeted lines above; also books the two 1-GPU-h DD 6.1/6.2 agreement checks (E3_scope_item, E3_engine_hf)"}
   tpu_models_and_bf16:   {where: "Kaggle TPU",       unit: tpu_hours, low: 10, high: 20, cash_usd: 0}
   bf16_reruns_fallback:  {where: "Modal L4",         unit: l4_hours,  low: 5,  high: 15, cash_usd: 0, note: "card on file; ~37 free L4-h/month"}
-  api_runs:              {where: "Gemini, Groq free tiers", unit: api_calls, low: 12300, high: 12300, tokens: 6000000, cash_usd: 0, note: "plan: ~12,000 calls (4 models x up to ~3,000); the matrix above sums to 12,300 exactly (each API line is a fixed count)"}
+  api_runs:              {where: "Gemini, Groq free tiers", unit: api_calls, low: 12300, high: 12300, tokens: 6900000, cash_usd: 0, note: "plan: ~12,000 calls (4 models x up to ~3,000); the matrix above sums to 12,300 calls and 6.9M tokens exactly (each API line is a fixed count; tests/test_cloud.py checks both sums). Gemini's unpaid tier trains on inputs, so its models are refused on every core-derived line until the author decides (DD 11.2 / 13.18)"}
   optional_fifth_api:    {where: "OpenRouter free models", unit: api_calls, low: 3000, high: 3000, cash_usd: 10}
 gpu_subtotal: {low: 70, high: 150, note: "2.5-5 weeks of Kaggle's ~30 free GPU-hours a week"}
 quota:

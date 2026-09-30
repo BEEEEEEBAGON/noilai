@@ -41,7 +41,7 @@ def _prepare(df: pd.DataFrame) -> pd.DataFrame:
     `tps_w`, derive split / tps_w / align_w with `e2.prepare_covariates` (alignment among
     split syllables from `align_among_split`; the legacy `boundary_alignment_mean` is refused
     there)."""
-    from .e2 import prepare_covariates      # local import: e2 is the primary module
+    from .e2 import prepare_covariates  # local import: e2 is the primary module
 
     d = df.copy()
     if "tps_w" not in d and "tokens_per_syllable" in d:

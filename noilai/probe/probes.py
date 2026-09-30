@@ -47,7 +47,7 @@ def group_split(groups: Sequence, test_frac: float = 0.3, seed: int = 0) -> tupl
     uniq = np.unique(g)
     rng = np.random.default_rng(seed)
     rng.shuffle(uniq)
-    n_test = max(1, int(round(test_frac * len(uniq))))
+    n_test = max(1, round(test_frac * len(uniq)))
     test_groups = set(uniq[:n_test].tolist())
     test_mask = np.array([x in test_groups for x in g])
     return np.where(~test_mask)[0], np.where(test_mask)[0]
@@ -64,8 +64,8 @@ def nested_group_split(groups: Sequence, fracs: Sequence[float] = constants.PROB
     rng = np.random.default_rng(seed)
     rng.shuffle(uniq)
     n = len(uniq)
-    n_test = max(1, int(round(fracs[2] * n)))
-    n_dev = max(1, int(round(fracs[1] * n)))
+    n_test = max(1, round(fracs[2] * n))
+    n_dev = max(1, round(fracs[1] * n))
     if n_test + n_dev >= n:
         raise ValueError(f"too few groups ({n}) for a nested split")
     test_g = set(uniq[:n_test].tolist())
@@ -203,5 +203,5 @@ def excess_over_structural(H_layer: np.ndarray, token_ids, coda_class, labels, g
     hit_s = (pred_s == y[te]).astype(float)
     ci = cluster_bootstrap(hit - hit_s, g[te], n_boot=n_boot, seed=seed, level=level, small_cell_rule=False)
     return {"acc": float(hit.mean()), "structural_baseline": float(hit_s.mean()), "excess": float(ci.estimate),
-            "lo": ci.lo, "hi": ci.hi, "n_test": int(len(te)), "n_test_groups": int(ci.n_clusters), "ci_method": ci.method,
+            "lo": ci.lo, "hi": ci.hi, "n_test": len(te), "n_test_groups": int(ci.n_clusters), "ci_method": ci.method,
             "excludes_zero": bool(ci.lo > 0 or ci.hi < 0)}

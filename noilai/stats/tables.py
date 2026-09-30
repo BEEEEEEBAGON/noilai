@@ -36,7 +36,7 @@ def runner_arm_name(arm: str) -> str:
     """docs/DATA_FORMAT.md arm name -> the runner's (noilai.vi.reencode) name."""
     try:
         from ..eval.prompts import ARM_ALIASES
-    except Exception:  # pragma: no cover - the eval package needs yaml templates
+    except ImportError:  # pragma: no cover - the eval package needs yaml templates
         ARM_ALIASES = _ARM_ALIASES_FALLBACK
     return ARM_ALIASES.get(arm, arm)
 
@@ -166,14 +166,13 @@ def to_latex_interventions(tab: pd.DataFrame, caption: str, label: str, normaliz
         extra = f" & {'yes' if normalizes.get(model) else 'no'}" if normalizes else ""
         size = f" & {int(fam[model])}" if fam is not None else " & --"
         lines.append(f"{_tex(model)} & {task} & " + " & ".join(cells) + extra + size + " \\\\")
-    lines += ["\\bottomrule", "\\end{tabular}",
-              f"\\caption{{{caption} Effects are accuracy differences (points) against the NFC baseline on the same "
+    footer = (f"\\caption{{{caption} Effects are accuracy differences (points) against the NFC baseline on the same "
               "items, with 95\\% base-pair cluster-bootstrap intervals; $^{*}$ Holm-adjusted $p<0.05$ within each model "
               "row over its defined cells (\\emph{Family} = realized family size out of "
               f"{constants.HOLM_FAMILY_TABLE3_CELLS}); $p$ from the base-pair paired $t$ (cells with $\\geq$ "
               f"{constants.PAIRED_T_MIN_BASE_PAIRS} base pairs) or the clustered bootstrap; $^{{\\dagger}}$ small cell "
-              f"(fewer than {constants.SMALL_CELL_MAX_BASE_PAIRS} base pairs). McNemar (ignores clustering) is in the appendix.}}",
-              f"\\label{{{label}}}", "\\end{table}"]
+              f"(fewer than {constants.SMALL_CELL_MAX_BASE_PAIRS} base pairs). McNemar (ignores clustering) is in the appendix.}}")
+    lines += ["\\bottomrule", "\\end{tabular}", footer, f"\\label{{{label}}}", "\\end{table}"]
     return "\n".join(lines)
 
 

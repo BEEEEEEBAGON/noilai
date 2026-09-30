@@ -20,7 +20,7 @@ def git_info(root: Path = ROOT) -> dict:
     def run(*args):
         try:
             return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=True).stdout.strip()
-        except Exception:
+        except (subprocess.CalledProcessError, OSError):
             return None
 
     commit = run("rev-parse", "HEAD")

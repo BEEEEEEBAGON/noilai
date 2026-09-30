@@ -27,7 +27,15 @@ Cell conventions
     staying a flagged parameter until the smoke tests pin it; every run_eval.py process is
     launched with the engine's interpreter (RUN_PYTHON);
   * a notebook never rewrites a file under configs/: session overrides (GEMINI_RPD_OVERRIDE)
-    are applied to the in-memory models_cfg the driver receives and recorded in the ledger.
+    are applied to the in-memory models_cfg the driver receives and recorded in the ledger;
+  * every run notebook RESTORES the persisted runs tree (outputs.jsonl, manifest.json,
+    unchanged.jsonl, api_ledger.json, compute_log.csv) from the private dataset / Drive into
+    PROJECT/data/runs before the item gate, so that `--resume` and the API ledger continue where
+    the previous session stopped (DD 7.3 "a hit never re-calls", 7.6 "resume from the chunk
+    manifests"); the clone itself is ephemeral;
+  * the run cells pass the account holder's ROLE (never a name; DD 11.2) as --account-holder,
+    refuse unpinned revisions unless ALLOW_UNPINNED_REVISION (DD 7.1), and push the outputs
+    every PUSH_EVERY_MINUTES while a model runs, not only after it.
 """
 from __future__ import annotations
 
@@ -46,14 +54,22 @@ NOTEBOOKS = ("kaggle_eval_t4", "kaggle_eval_tpu", "colab_probe_gemma3", "api_run
 RUN_TAG = "run"
 E4_TAG = "e4"
 
-# The activation-patching pair of DESIGN_DECISIONS 9.3 (readout B): the varying syllable is the
-# SECOND input syllable, so that under V3 (swap tones) the two gold answers diverge at their
-# FIRST syllable (bí mà -> bì má vs bí mạ -> bị má; pseudo-phrases, medium, [NATIVE-CHECK]).
-# The plan's bí mật / bí mất is NOT a legal V3 pair (equal tones make V3 the identity) and is the
-# V4 pair (bí mật -> bật mí). The cell recomputes every output with noilai.gen.variants; the
-# answers below are what the test expects the engine to produce.
-E4_PATCH_PAIR = {"variant": "V3", "partner": "bí", "clean": "mà", "corrupt": "mạ",
-                 "answer_clean": "bì má", "answer_corrupt": "bị má", "source": "DESIGN_DECISIONS 9.3"}
+# The activation-patching pair (DESIGN_DECISIONS 9.3 protocol, readout B): the varying syllable is
+# the SECOND input syllable, so that under V3 (swap tones) the two gold answers diverge at their
+# FIRST syllable (công tử -> cổng tư vs công tự -> cộng tư; pseudo-phrases, [NATIVE-CHECK]: công
+# "public / labour", tử "son / death", tự "self / temple", ordinary syllables). This is the pair the
+# paper uses: under the Gemma 3 tokenizer both inputs tokenize to the same number of pieces and
+# differ in exactly one (c | ông | ▁tử vs c | ông | ▁tự) and the readouts ▁cổng / ▁cộng are single
+# pieces, so the pair passes alignment filter (1). DD 9.3's own example bí mà / bí mạ does NOT:
+# `mạ` splits into ▁m | ạ while `mà` is one piece, so the spans differ (tests/test_cloud.py checks
+# both facts with the tokenizer model when it is present). The plan's bí mật / bí mất is NOT a
+# legal V3 pair (equal tones make V3 the identity) and is the V4 pair (bí mật -> bật mí). The cell
+# recomputes every output with noilai.gen.variants; the answers below are what the test expects.
+E4_PATCH_PAIR = {"variant": "V3", "partner": "công", "clean": "tử", "corrupt": "tự",
+                 "answer_clean": "cổng tư", "answer_corrupt": "cộng tư",
+                 "source": "DESIGN_DECISIONS 9.3 protocol (the paper's aligned pair; DD 9.3's bí mà / bí mạ fails filter 1 under Gemma 3)"}
+# DD 9.3's example pair, kept so that the notebook and the test can show WHY it is not used.
+E4_DD_EXAMPLE_PAIR = {"variant": "V3", "partner": "bí", "clean": "mà", "corrupt": "mạ"}
 
 
 def md(text: str) -> nbformat.NotebookNode:
@@ -172,11 +188,11 @@ import os, stat, subprocess, sys
 from pathlib import Path
 
 clone_dir = Path(CLONE_DIR)
-env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
 bundle = Path(BUNDLE_PATH) if BUNDLE_PATH else None
 if bundle is not None and not bundle.exists():
     print(f"bundle {bundle} not found; falling back to {REPO_URL}")
     bundle = None
+askpass = None
 if bundle is None:
     if "OWNER/REPO" in REPO_URL:
         raise SystemExit("set REPO_URL (or provide BUNDLE_PATH) in the parameters cell")
@@ -184,7 +200,10 @@ if bundle is None:
         askpass = Path.home() / ".noilai_askpass.sh"
         askpass.write_text("#!/bin/sh\\necho \\"$" + GITHUB_TOKEN_SECRET + "\\"\\n")
         askpass.chmod(stat.S_IRWXU)
-        env["GIT_ASKPASS"] = str(askpass)
+# the environment git runs in is built AFTER the export, so the askpass helper finds the token in it
+env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
+if askpass is not None:
+    env["GIT_ASKPASS"] = str(askpass)
 source = str(bundle) if bundle else REPO_URL
 if (clone_dir / ".git").exists():
     subprocess.run(["git", "-C", str(clone_dir), "fetch", "--tags", source, "+refs/heads/*:refs/remotes/origin/*"], check=True, env=env)
@@ -206,6 +225,43 @@ os.chdir(PROJECT)
 sys.path.insert(0, str(PROJECT / "scripts"))
 print("HEAD", HEAD)
 print("project", PROJECT)
+'''
+
+RESTORE = '''
+# (b') restore: the clone is ephemeral, so the runs tree persisted by the previous session (the private
+# Kaggle dataset `noilai-runs` attached as input, or the Drive folder the API notebook copies to) is
+# copied back into PROJECT/data/runs BEFORE anything runs: outputs.jsonl / manifest.json / unchanged.jsonl
+# per run directory (so `--resume` continues at the first undone row instead of item 0), api_ledger.json
+# (so a day's quota is not re-spent on rows already answered; DD 7.3 "a hit never re-calls") and the
+# compute log (so the session's rows append to the campaign's). Nothing here overwrites a newer local file.
+import shutil
+from pathlib import Path
+RESTORED = {"from": None, "run_dirs": 0, "ledger": False, "compute_log": False}
+_src = Path(RUNS_RESTORE_DIR) if RUNS_RESTORE_DIR else None
+if _src is not None and _src.exists():
+    runs_src = _src / "runs" if (_src / "runs").is_dir() else _src        # the dataset holds runs/ + compute_log.csv, or the runs tree itself
+    runs_dst = PROJECT / "data" / "runs"
+    runs_dst.mkdir(parents=True, exist_ok=True)
+    for child in sorted(runs_src.iterdir()):
+        if child.name in ("__pycache__", ".ipynb_checkpoints"):
+            continue
+        if child.is_dir():
+            shutil.copytree(child, runs_dst / child.name, dirs_exist_ok=True)
+            RESTORED["run_dirs"] += 1
+        elif child.name == "api_ledger.json":
+            shutil.copy2(child, runs_dst / child.name)
+            RESTORED["ledger"] = True
+        elif child.suffix in (".json", ".jsonl", ".txt", ".csv"):
+            shutil.copy2(child, runs_dst / child.name)
+    for cand in (_src / "compute_log.csv", runs_src / "compute_log.csv"):
+        if cand.exists() and not (PROJECT / "data" / "compute_log.csv").exists():
+            shutil.copy2(cand, PROJECT / "data" / "compute_log.csv")
+            RESTORED["compute_log"] = True
+            break
+    RESTORED["from"] = str(runs_src)
+    print("restored", RESTORED)
+else:
+    print("nothing to restore (first session, or RUNS_RESTORE_DIR", RUNS_RESTORE_DIR, "is not attached): every run starts at item 0")
 '''
 
 INSTALL_GPU = '''
@@ -388,10 +444,14 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
         * Kaggle Secrets: `GITHUB_TOKEN` (repository read, only if no bundle), `HF_TOKEN`
           (gated Gemma/Llama/Vistral), `KAGGLE_USERNAME` + `KAGGLE_KEY` (dataset push);
         * a private dataset holding `noilai-main.bundle` (`git bundle create noilai-main.bundle main`)
-          and one holding the frozen `data/release/` (never public: the test split is gated).
+          and one holding the frozen `data/release/` (never public: the test split is gated);
+        * from the second session on, the private runs dataset (`noilai-runs`, written by (g)) as an
+          input, so that (b') restores `outputs.jsonl`, the manifests and the API ledger and `--resume`
+          continues where the last session stopped instead of restarting every model at item 0.
 
-        Cells: (a) environment · (b) clone · (c) pinned install (vLLM in a venv, DD 7.3) · (d) resources +
-        item-file gate · (e) smoke test · (f) **RUN** · (g) outputs → dataset · (h) GPU-hours log.
+        Cells: (a) environment · (b) clone · (b') restore the persisted runs tree (`--resume` + ledger) ·
+        (c) pinned install (vLLM in a venv, DD 7.3) · (d) resources + item-file gate · (e) smoke test ·
+        (f) **RUN** · (g) outputs → dataset · (h) GPU-hours log.
         The flag mapping to `run_eval.py` lives in `scripts/kaggle_run_plan.py`; adjust flags there
         or through `EXTRA_ARGS`. Kaggle's own environment (nvidia driver, CUDA) is recorded by (c).
         """),
@@ -408,6 +468,7 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
         WORK_DIR = "/kaggle/working"                        # ~20 GB, saved with the notebook
         HF_HOME = "/kaggle/tmp/hf"                          # model cache outside the working dir [UNCERTAIN: verify the quota of /kaggle/tmp]
         ITEMS_DATASET_DIR = "/kaggle/input/noilai-release"  # private dataset with the frozen data/release/<version>/ tree (or that tree's parent); None if the clone has it
+        RUNS_RESTORE_DIR = "/kaggle/input/noilai-runs"      # the private runs dataset (KAGGLE_DATASET_SLUG) attached as input: restored into data/runs by (b') so --resume and the ledger continue; None on the very first session
         VERIFY_ITEM_KEYS = None          # None = derived from RUN_ID and the smoke run by (d); or list keys of configs/run_plan.yaml item_files
 
         INSTALL_MODE = "venv"            # "venv": vLLM into /kaggle/tmp (DD 7.3: vLLM 0.30 pins torch 2.13, Kaggle ships 2.10); "kaggle_vllm": the Kaggle-built wheel; "system"
@@ -424,6 +485,9 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
         SMOKE_RUN_IDS = ["smoke_20"]     # (e) the smoke line, 20 items on SMOKE_MODEL before the run
         SMOKE_MODEL = "gemma-3-1b-it"
         EXTRA_ARGS = ""                  # extra run_eval.py flags, one shell-quoted string, e.g. "--seed 7"
+        ACCOUNT_HOLDER_ROLE = ""         # ROLE of the person holding the compute / hub accounts (e.g. "author", "adult collaborator"); never a name (DD 11.2); recorded in every manifest
+        ALLOW_UNPINNED_REVISION = False  # DD 7.1: a paper run needs `revision` pinned in configs/models.yaml; True only for a rehearsal, recorded in the manifest as null
+        PUSH_EVERY_MINUTES = 30          # push the outputs to the dataset this often WHILE a model runs (a killed session keeps the last push)
         DRY_RUN = False                  # True prints the commands and runs nothing
 
         PLATFORM, GPU_TYPE, N_GPUS = "kaggle", "t4", 2
@@ -440,6 +504,7 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
         code(SECRET_HELPER),
         code(GPU_CHECK),
         code(CLONE),
+        code(RESTORE),
         code(INSTALL_GPU),
         code(FETCH_VERIFY),
         code(PUSH_HELPER),
@@ -454,15 +519,18 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
         # the process runs on the engine's interpreter (RUN_PYTHON) and the session guards apply.
         import shlex
         import kaggle_run_plan as KRP
+        RUN_EXTRA = shlex.split(EXTRA_ARGS) + (["--account-holder", ACCOUNT_HOLDER_ROLE] if ACCOUNT_HOLDER_ROLE else [])   # role only, never a name (DD 11.2)
+        if not ACCOUNT_HOLDER_ROLE:
+            print("WARNING: ACCOUNT_HOLDER_ROLE is empty; the manifests will record account_holder 'unknown' (DD 11.2 asks for the role)")
         SMOKE_RESULTS = []
         for smoke_id in SMOKE_RUN_IDS:
             SMOKE_RESULTS += KRP.execute(smoke_id, models=[SMOKE_MODEL], platform=PLATFORM, dry_run=DRY_RUN,
-                                         continue_on_error=False, extra=shlex.split(EXTRA_ARGS), python=RUN_PYTHON,
+                                         continue_on_error=False, extra=RUN_EXTRA, python=RUN_PYTHON,
                                          session_hardware=SESSION_HARDWARE, allow_hardware_mismatch=ALLOW_HARDWARE_MISMATCH,
                                          session_t0=SESSION_T0, max_session_hours=MAX_SESSION_HOURS)
         for r in SMOKE_RESULTS:
             print(r["run"], r["model"], "->", r["status"])
-        if any(str(r["status"]).startswith(("failed", "skipped")) for r in SMOKE_RESULTS):
+        if any(str(r["status"]).startswith(("failed", "skipped", "refused")) for r in SMOKE_RESULTS):
             raise SystemExit("smoke test failed or was skipped: fix the environment, the model entry or SESSION_HARDWARE before the run cell")
         ''', tags=[RUN_TAG]),
         md("""
@@ -470,19 +538,40 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
         Loops over `MODELS` (or every model of `RUN_ID` that `SESSION_HARDWARE` can run) calling
         `scripts/run_eval.py --model-config <name> --items ... --tasks ... --arms ... --resume --run-id <RUN_ID>__<name> --out-root data/runs`
         on the engine's interpreter. `--resume` makes a re-run after a session timeout continue where it
-        stopped; no new model starts past `MAX_SESSION_HOURS`; the outputs are pushed after every model.
-        Each model's wall time is appended to `data/compute_log.csv` with THIS session's device type and
-        count (2 × T4), whatever hardware the model is configured for.
+        stopped — provided (b') restored the previous session's `data/runs` from the runs dataset; no new
+        model starts past `MAX_SESSION_HOURS`; the outputs are pushed every `PUSH_EVERY_MINUTES` while a
+        model runs and after every model; a self-hosted model whose `revision` is unpinned is skipped
+        (DD 7.1) unless `ALLOW_UNPINNED_REVISION`. Each model's wall time is appended to
+        `data/compute_log.csv` (a provisional 0-hour row at its start, the final row at its end) with THIS
+        session's device type and count (2 × T4), whatever hardware the model is configured for.
         """),
         code('''
         # RUN CELL (f): the run matrix line RUN_ID over MODELS, with --resume. Adjust flags in
         # scripts/kaggle_run_plan.py (build_command) or through EXTRA_ARGS; the CLI is owned by noilai/eval.
-        import json, shlex
+        # A background thread pushes the outputs every PUSH_EVERY_MINUTES while a model runs (outputs.jsonl is
+        # flushed per row, so the pushed copy is resumable); the driver writes a provisional 0-hour compute-log
+        # row at each model's start, so a session killed mid-model leaves its start on record.
+        import json, threading
         import kaggle_run_plan as KRP
-        RESULTS = KRP.execute(RUN_ID, models=MODELS or None, platform=PLATFORM, dry_run=DRY_RUN, continue_on_error=True,
-                              extra=shlex.split(EXTRA_ARGS), python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
-                              allow_hardware_mismatch=ALLOW_HARDWARE_MISMATCH, session_t0=SESSION_T0,
-                              max_session_hours=MAX_SESSION_HOURS, after_each=after_each_model)
+        _stop_push = threading.Event()
+
+        def _periodic_push():
+            while not _stop_push.wait(PUSH_EVERY_MINUTES * 60):
+                try:
+                    push_outputs("periodic")
+                except Exception as e:      # a failed periodic push never stops the run
+                    print("periodic push failed:", repr(e))
+        _pusher = threading.Thread(target=_periodic_push, daemon=True)
+        _pusher.start()
+        try:
+            RESULTS = KRP.execute(RUN_ID, models=MODELS or None, platform=PLATFORM, dry_run=DRY_RUN, continue_on_error=True,
+                                  extra=RUN_EXTRA, python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
+                                  allow_hardware_mismatch=ALLOW_HARDWARE_MISMATCH, session_t0=SESSION_T0,
+                                  max_session_hours=MAX_SESSION_HOURS, after_each=after_each_model,
+                                  allow_unpinned_revision=ALLOW_UNPINNED_REVISION)
+        finally:
+            _stop_push.set()
+            _pusher.join(timeout=5)
         print(json.dumps([{"model": r["model"], "status": r["status"], "hours": r.get("hours"),
                            "new_outputs": r.get("new_outputs"), "logged_device": r.get("logged_device")} for r in RESULTS], indent=1))
         ''', tags=[RUN_TAG]),
@@ -506,9 +595,10 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
         `phogpt-4b-chat--bf16` is configured for the Modal L4 and skipped here by the session guard)
         and the 27B reasoning sub-study (`reasoning_500_tpu`). Sessions last 9 h (~20 TPU-h/week),
         one at a time; the vLLM-TPU startup takes 6–22 minutes per model, so keep `MODELS` short
-        per session and rely on `--resume`; outputs are pushed after every model. Attach:
-        accelerator **TPU VM v5e-8**, internet on, the same secrets and private datasets as the
-        T4 notebook.
+        per session and rely on `--resume` (cell (b') restores the previous session's runs tree from
+        the `noilai-runs` dataset first); outputs are pushed every `PUSH_EVERY_MINUTES` and after every
+        model. Attach: accelerator **TPU VM v5e-8**, internet on, the same secrets and private
+        datasets as the T4 notebook (including `noilai-runs` from the second session on).
 
         Every TPU-hosted model must load under vLLM-TPU and return prompt log-probabilities before its
         full run (plan §3): the smoke cell checks that.
@@ -526,6 +616,7 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
         WORK_DIR = "/kaggle/working"
         HF_HOME = "/kaggle/tmp/hf"                          # 27B bf16 weights are ~54 GB: not in the 20 GB working dir [UNCERTAIN: verify]
         ITEMS_DATASET_DIR = "/kaggle/input/noilai-release"
+        RUNS_RESTORE_DIR = "/kaggle/input/noilai-runs"      # the private runs dataset attached as input; restored by (b') so --resume continues
         VERIFY_ITEM_KEYS = None          # None = derived from RUN_IDS and SMOKE_RUN_IDS by (d)
 
         VLLM_TPU_PACKAGE = "vllm-tpu"    # [UNCERTAIN: verify] the TPU build's package name for the pinned version (kaggle-tpu-lab documents the working recipe)
@@ -539,6 +630,9 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
         SMOKE_RUN_IDS = ["smoke_20_tpu"] # (e) the TPU smoke line on SMOKE_MODEL
         SMOKE_MODEL = "gemma-3-12b-it"
         EXTRA_ARGS = ""
+        ACCOUNT_HOLDER_ROLE = ""         # role only, never a name (DD 11.2); recorded in every manifest
+        ALLOW_UNPINNED_REVISION = False  # DD 7.1
+        PUSH_EVERY_MINUTES = 30
         DRY_RUN = False
 
         PLATFORM, GPU_TYPE, N_GPUS = "kaggle", "tpu-v5e-8", 1
@@ -555,6 +649,7 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
         code(SECRET_HELPER),
         code(TPU_CHECK),
         code(CLONE),
+        code(RESTORE),
         code(INSTALL_TPU),
         code(FETCH_VERIFY),
         code(PUSH_HELPER),
@@ -568,15 +663,18 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
         # RUN CELL (e): smoke test (smoke_20_tpu) on the TPU model.
         import shlex
         import kaggle_run_plan as KRP
+        RUN_EXTRA = shlex.split(EXTRA_ARGS) + (["--account-holder", ACCOUNT_HOLDER_ROLE] if ACCOUNT_HOLDER_ROLE else [])   # role only (DD 11.2)
+        if not ACCOUNT_HOLDER_ROLE:
+            print("WARNING: ACCOUNT_HOLDER_ROLE is empty; the manifests will record account_holder 'unknown' (DD 11.2 asks for the role)")
         SMOKE_RESULTS = []
         for smoke_id in SMOKE_RUN_IDS:
             SMOKE_RESULTS += KRP.execute(smoke_id, models=[SMOKE_MODEL], platform=PLATFORM, dry_run=DRY_RUN,
-                                         continue_on_error=False, extra=shlex.split(EXTRA_ARGS), python=RUN_PYTHON,
+                                         continue_on_error=False, extra=RUN_EXTRA, python=RUN_PYTHON,
                                          session_hardware=SESSION_HARDWARE, allow_hardware_mismatch=ALLOW_HARDWARE_MISMATCH,
                                          session_t0=SESSION_T0, max_session_hours=MAX_SESSION_HOURS)
         for r in SMOKE_RESULTS:
             print(r["run"], r["model"], "->", r["status"])
-        if any(str(r["status"]).startswith(("failed", "skipped")) for r in SMOKE_RESULTS):
+        if any(str(r["status"]).startswith(("failed", "skipped", "refused")) for r in SMOKE_RESULTS):
             raise SystemExit("smoke test failed or was skipped: the TPU route for this model is not ready (fallback: 2xT4 4-bit, labelled quantized)")
         ''', tags=[RUN_TAG]),
         md("""
@@ -586,15 +684,31 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
         model starts past `MAX_SESSION_HOURS`.
         """),
         code('''
-        # RUN CELL (f): each run id in RUN_IDS over MODELS (or all of the run's TPU-runnable models), --resume.
-        import json, shlex
+        # RUN CELL (f): each run id in RUN_IDS over MODELS (or all of the run's TPU-runnable models), --resume;
+        # the outputs are pushed every PUSH_EVERY_MINUTES while a model runs (see the T4 notebook's run cell).
+        import json, threading
         import kaggle_run_plan as KRP
+        _stop_push = threading.Event()
+
+        def _periodic_push():
+            while not _stop_push.wait(PUSH_EVERY_MINUTES * 60):
+                try:
+                    push_outputs("periodic")
+                except Exception as e:
+                    print("periodic push failed:", repr(e))
+        _pusher = threading.Thread(target=_periodic_push, daemon=True)
+        _pusher.start()
         RESULTS = []
-        for run_id in RUN_IDS:
-            RESULTS += KRP.execute(run_id, models=MODELS or None, platform=PLATFORM, dry_run=DRY_RUN, continue_on_error=True,
-                                   extra=shlex.split(EXTRA_ARGS), python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
-                                   allow_hardware_mismatch=ALLOW_HARDWARE_MISMATCH, session_t0=SESSION_T0,
-                                   max_session_hours=MAX_SESSION_HOURS, after_each=after_each_model)
+        try:
+            for run_id in RUN_IDS:
+                RESULTS += KRP.execute(run_id, models=MODELS or None, platform=PLATFORM, dry_run=DRY_RUN, continue_on_error=True,
+                                       extra=RUN_EXTRA, python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
+                                       allow_hardware_mismatch=ALLOW_HARDWARE_MISMATCH, session_t0=SESSION_T0,
+                                       max_session_hours=MAX_SESSION_HOURS, after_each=after_each_model,
+                                       allow_unpinned_revision=ALLOW_UNPINNED_REVISION)
+        finally:
+            _stop_push.set()
+            _pusher.join(timeout=5)
         print(json.dumps([{"run": r["run"], "model": r["model"], "status": r["status"], "hours": r.get("hours"),
                            "logged_device": r.get("logged_device")} for r in RESULTS], indent=1))
         ''', tags=[RUN_TAG]),
@@ -619,12 +733,14 @@ def build_colab_probe() -> nbformat.NotebookNode:
         check. The notebook extracts residual-stream states at each syllable's last sub-token under
         NFC and NFD with `noilai.probe.extract`, fits layer-wise probes with control tasks
         (`noilai.probe.probes`), and holds the patching skeleton (`noilai.probe.patching`) for the
-        DESIGN_DECISIONS 9.3 pair *bí mà* (clean) vs *bí mạ* (corrupt) under V3 with E1's frozen
-        prompt. Results go to Drive (Colab) or the working directory (Kaggle). Secrets: `HF_TOKEN`
+        DESIGN_DECISIONS 9.3-protocol pair *công tử* (clean) vs *công tự* (corrupt) under V3 with E1's
+        frozen prompt (the pair the paper uses: it passes alignment filter (1) under Gemma 3, where
+        DD 9.3's own example *bí mà* / *bí mạ* does not, because *mạ* splits into two pieces). Results go to Drive (Colab) or the working directory (Kaggle). Secrets: `HF_TOKEN`
         (gated Gemma), `GITHUB_TOKEN` if no bundle.
 
         The two cells tagged `e4` are the experiment and are meant to be edited as E4 takes shape
-        (plan §2.6, weeks of Nov 23 – Dec 6; Gate 4 keeps probing only if patching is clean).
+        (plan §2.6, weeks of Nov 23 – Dec 6). E4 is reported regardless of outcome (DD 8.8, item 26):
+        "clean" patching is a feasibility criterion for the main text, never a result criterion.
         """),
         code('''
         # ---- parameters: edit this cell only; nothing below asks for input ------------------------------
@@ -763,10 +879,12 @@ def build_colab_probe() -> nbformat.NotebookNode:
                    "position": POSITION, "seed": SEED, "head": HEAD}, open(Path(OUT_DIR) / f"probe_{MODEL_CONFIG}_manifest.json", "w"), indent=2)
         ''', tags=[E4_TAG]),
         md("""
-        ### E4 CELL — activation patching (DESIGN_DECISIONS 9.3 pair *bí mà* / *bí mạ*, readout B)
+        ### E4 CELL — activation patching (DESIGN_DECISIONS 9.3 protocol; pair *công tử* / *công tự*, readout B)
         The varying syllable is the SECOND input syllable, so under V3 (swap tones) the two gold
-        answers diverge at their FIRST syllable: *bí mà* → *bì má* (clean) and *bí mạ* → *bị má*
-        (corrupt), read at the pieces `▁bì` vs `▁bị`. Every output is recomputed by the rule engine
+        answers diverge at their FIRST syllable: *công tử* → *cổng tư* (clean) and *công tự* → *cộng tư*
+        (corrupt), read at the pieces `▁cổng` vs `▁cộng`. This is the paper's pair; DD 9.3's example
+        *bí mà* / *bí mạ* fails alignment filter (1) under Gemma 3 (*mạ* → `▁m` `ạ`, *mà* → `▁mà`), and
+        the cell below prints that check for both pairs. Every output is recomputed by the rule engine
         (`noilai.gen.variants`) and checked for legality; the prompt is E1's frozen V3 template with
         its three rule-engine demonstrations and the IT chat template, the answer teacher-forced from
         the `Đáp án:` line. (The plan's *bí mật* / *bí mất* is not a legal V3 pair — equal tones make V3
@@ -778,7 +896,9 @@ def build_colab_probe() -> nbformat.NotebookNode:
         # E4 CELL: activation patching on the {E4_PATCH_PAIR["source"]} pair with E1's exact {E4_PATCH_PAIR["variant"]} prompt (frozen
         # template p0, three rule-engine demonstrations, the IT chat template): readout B. The pair, its outputs
         # and their legality come from the rule engine; nothing below is a typed-out example. [NATIVE-CHECK] the
-        # three syllables are ordinary (bí "gourd/secret", mà "but", mạ "rice seedling"); the outputs are pseudo-phrases.
+        # three syllables are ordinary (công "public / labour", tử "son / death", tự "self / temple"); the outputs are
+        # pseudo-phrases. DD 9.3's example pair (E4_DD_EXAMPLE_PAIR in the generator) is checked alongside so that
+        # the notebook shows why it is not used: under Gemma 3 its inputs tokenize to different lengths.
         import json, torch
         from pathlib import Path
         from noilai.eval import prompts as P
@@ -802,6 +922,11 @@ def build_colab_probe() -> nbformat.NotebookNode:
 
         CLEAN, ANSWER_CLEAN = _pair(CLEAN_SYL)
         CORRUPT, ANSWER_CORRUPT = _pair(CORRUPT_SYL)
+        # alignment filter (1) on the raw inputs, for this pair and for DD 9.3's example, before any prompt is built
+        for _label, _a, _b in (("this pair", CLEAN, CORRUPT), ("DD 9.3 example", "{E4_DD_EXAMPLE_PAIR["partner"]} {E4_DD_EXAMPLE_PAIR["clean"]}", "{E4_DD_EXAMPLE_PAIR["partner"]} {E4_DD_EXAMPLE_PAIR["corrupt"]}")):
+            _ia, _ib = tok(_a, add_special_tokens=False)["input_ids"], tok(_b, add_special_tokens=False)["input_ids"]
+            _ok = len(_ia) == len(_ib) and sum(x != y for x, y in zip(_ia, _ib)) == 1
+            print(f"filter (1) {{_label}}: {{_a}} -> {{len(_ia)}} pieces, {{_b}} -> {{len(_ib)}} pieces: {{'aligned' if _ok else 'NOT aligned'}}")
         first_clean, first_corrupt = ANSWER_CLEAN.split()[0], ANSWER_CORRUPT.split()[0]
         assert first_clean != first_corrupt, "the two gold answers must diverge at their first syllable"
         print(f"clean {{CLEAN}} -> {{ANSWER_CLEAN}} | corrupt {{CORRUPT}} -> {{ANSWER_CORRUPT}} | readout {{first_clean}} vs {{first_corrupt}}")
@@ -855,13 +980,19 @@ def build_colab_probe() -> nbformat.NotebookNode:
 def build_api_runs() -> nbformat.NotebookNode:
     cells = [
         md("""
-        # NóiLái — API runs (Gemini and Groq free tiers), core set only
+        # NóiLái — API runs (Gemini and Groq free tiers)
 
         Runs the API lines of `configs/run_plan.yaml` (`E1_api_core`, `E1_api_paraphrase`,
-        `E3_api_core`, `reasoning_500_api`) on the four API-served models. Guards in
-        `scripts/kaggle_run_plan.py` make every API command `--in-core-only` and refuse the sealed
-        split. Keys come from the environment / Colab userdata / Kaggle Secrets (`GEMINI_API_KEY`,
-        `GROQ_API_KEY`) and are never printed.
+        `E3_api_core`, `reasoning_500_api`) on the API-served models. Guards in
+        `scripts/kaggle_run_plan.py` make every API command `--in-core-only`, refuse the sealed split,
+        and refuse every canary-bearing (test-split) item file for a provider whose tier trains on
+        inputs (DD 11.2 / 12.41, item 33): **Gemini's unpaid tier never receives the core.** As shipped
+        the Gemini models are therefore reported as *refused* on every core-derived line and only the
+        Groq models run; Gemini runs once the author has either recorded a paid key with a verified
+        data-use opt-out (`providers.gemini.terms.paid_key_data_use_opt_out: true` in `configs/models.yaml`)
+        or added the dev-derived API set `noilai_api_dev` (DD 4.5) with its own lines, reported
+        separately and never in Table 2 (DD 13.18). Keys come from the environment / Colab userdata /
+        Kaggle Secrets (`GEMINI_API_KEY`, `GROQ_API_KEY`) and are never printed.
 
         **Daily-quota loop.** Groq's free plan allows 1,000 requests and 200K tokens a day; at
         ~500 tokens a call the TOKEN cap binds first (~400 calls), so the core takes about four days
@@ -869,13 +1000,20 @@ def build_api_runs() -> nbformat.NotebookNode:
         UTC day, counted from the new rows of `outputs.jsonl`), skips a model whose daily request or
         token budget is spent, and stops a running command (SIGINT, rows kept) the moment the day's
         cap is reached — reported as *parked*, not failed; the backend paces itself at the entry's
-        `requests_per_minute`. Run this notebook once a day with `--resume` until every run is
-        complete. Gemini's free-tier limits are shown only in AI Studio: read them and set
-        `GEMINI_RPD_OVERRIDE`; the override is applied to the in-memory config and recorded in the
-        ledger — no file under `configs/` is ever rewritten by a notebook.
+        `requests_per_minute`. Run this notebook once a day until every run is complete: the clone is
+        ephemeral, so cell (b') first restores the previous day's `data/runs` (outputs, manifests,
+        `api_ledger.json`) from `RUNS_RESTORE_DIR` — the Drive folder the last cell copied to — and
+        `--resume` then continues at the first unanswered row with yesterday's ledger, instead of
+        re-requesting the same rows against a fresh daily allowance. Gemini's free-tier limits are shown
+        only in AI Studio: read them and set `GEMINI_RPD_OVERRIDE` / `GEMINI_TPD_OVERRIDE` (DD 7.2); a
+        provider with no configured cap and no override is refused unless `ALLOW_UNCAPPED_API`; the
+        override is applied to the in-memory config and recorded in the ledger — no file under
+        `configs/` is ever rewritten by a notebook.
 
-        Terms: Gemini's free tier trains on inputs and requires users to be 18+; only the core reaches
-        an API, never annotator data, never the sealed split (plan §2.3, §3).
+        Terms: Gemini's free tier trains on inputs and requires users to be 18+; the core reaches only
+        providers with no-training terms (Groq); never annotator data, never the sealed split (DD 11.2).
+        Set `ACCOUNT_HOLDER_ROLE` (a role, never a name) so that every manifest records who held the
+        API accounts (DD 11.2).
         """),
         code('''
         # ---- parameters: edit this cell only; nothing below asks for input ------------------------------
@@ -889,16 +1027,19 @@ def build_api_runs() -> nbformat.NotebookNode:
         CLONE_DIR = "/content/repo"
         WORK_DIR = "/content"
         ITEMS_DATASET_DIR = "/content/drive/MyDrive/noilai/release"        # the frozen data/release tree; None if the clone has it
+        RUNS_RESTORE_DIR = "/content/drive/MyDrive/noilai/runs_api"        # where the last cell copied data/runs (+ the ledger) to; restored by (b') so --resume and the ledger continue; on Kaggle: /kaggle/input/noilai-runs
         VERIFY_ITEM_KEYS = None          # None = derived from RUN_IDS by (d)
 
         GITHUB_TOKEN_SECRET = "GITHUB_TOKEN"
         API_KEY_SECRETS = ["GEMINI_API_KEY", "GROQ_API_KEY"]   # names only; values stay in the secret store
         GEMINI_RPD_OVERRIDE = None       # requests/day read in AI Studio; None = no ledger cap for Gemini [UNCERTAIN: verify]; applied in memory, recorded in the ledger
         GEMINI_TPD_OVERRIDE = None       # tokens/day read in AI Studio, same handling [UNCERTAIN: verify]
+        ALLOW_UNCAPPED_API = False       # DD 7.2 / 7.3: a selected provider with neither a configured daily cap nor an override is refused unless True (recorded in the ledger)
 
         RUN_IDS = ["E1_api_core", "E1_api_paraphrase", "E3_api_core"]   # add "reasoning_500_api" for the cost curve
-        MODELS = []                      # subset of the run's models; [] = all four
+        MODELS = []                      # subset of the run's models; [] = every model of the line (the Gemini ones are refused on core-derived files until DD 13.18 is decided)
         EXTRA_ARGS = ""
+        ACCOUNT_HOLDER_ROLE = ""         # ROLE of the API account holder (e.g. "author", "adult collaborator"); never a name (DD 11.2); recorded in every manifest
         DRY_RUN = False
 
         PLATFORM, GPU_TYPE, N_GPUS = "api", "api", 0
@@ -921,6 +1062,7 @@ def build_api_runs() -> nbformat.NotebookNode:
                 print("not on Colab: no Drive; set BUNDLE_PATH / ITEMS_DATASET_DIR to local paths")
         '''),
         code(CLONE),
+        code(RESTORE),
         code(INSTALL_API),
         code('''
         # API keys into the environment (names from configs/models.yaml providers.*.api_key_env); found / not found only.
@@ -939,12 +1081,22 @@ def build_api_runs() -> nbformat.NotebookNode:
         if GEMINI_TPD_OVERRIDE:
             MODELS_CFG["providers"]["gemini"]["free_tier"]["tokens_per_day"] = int(GEMINI_TPD_OVERRIDE)
             OVERRIDES["gemini.tokens_per_day"] = int(GEMINI_TPD_OVERRIDE)
-        if OVERRIDES:
-            lpath = KRP.ledger_path(PLAN)
-            ledger = KRP.ledger_load(lpath)
-            ledger.setdefault("_overrides", {})[KRP.utc_day()] = OVERRIDES
-            KRP.ledger_save(lpath, ledger)
-            print("session overrides (in memory, recorded in the ledger):", OVERRIDES)
+        # DD 7.2 / 7.3: the ledger can only park a model at a cap it knows. Every provider of the selected models
+        # must have a daily request or token cap (configured or overridden) unless ALLOW_UNCAPPED_API says so.
+        _selected = set(MODELS) or {n for rid in RUN_IDS for n in KRP.expand_models(KRP.find_run(PLAN, rid), PLAN, MODELS_CFG)}
+        _uncapped = sorted({MODELS_CFG["by_name"][n]["provider"] for n in _selected
+                            if MODELS_CFG["by_name"][n].get("provider") and os.environ.get(MODELS_CFG["providers"][MODELS_CFG["by_name"][n]["provider"]]["api_key_env"])
+                            and not (MODELS_CFG["providers"][MODELS_CFG["by_name"][n]["provider"]]["free_tier"].get("requests_per_day")
+                                     or MODELS_CFG["providers"][MODELS_CFG["by_name"][n]["provider"]]["free_tier"].get("tokens_per_day"))})
+        OVERRIDES["allow_uncapped_api"] = bool(ALLOW_UNCAPPED_API)
+        if _uncapped and not ALLOW_UNCAPPED_API:
+            raise SystemExit(f"provider(s) {_uncapped} have no daily cap in configs/models.yaml and no override: read the live quota in "
+                             "AI Studio and set GEMINI_RPD_OVERRIDE / GEMINI_TPD_OVERRIDE (DD 7.2), or set ALLOW_UNCAPPED_API = True")
+        lpath = KRP.ledger_path(PLAN)
+        ledger = KRP.ledger_load(lpath)
+        ledger.setdefault("_overrides", {})[KRP.utc_day()] = OVERRIDES
+        KRP.ledger_save(lpath, ledger)
+        print("session overrides (in memory, recorded in the ledger):", OVERRIDES)
         '''),
         code(FETCH_VERIFY),
         md("""
@@ -952,13 +1104,17 @@ def build_api_runs() -> nbformat.NotebookNode:
         For each run id and model: skip if today's ledger says the daily request OR token budget is
         spent, else `run_eval.py ... --in-core-only --resume` under the budget watchdog (the command
         is interrupted at the cap and reported as *parked*). Models whose key is missing are skipped
-        with a message. Re-run tomorrow; `--resume` continues.
+        with a message; a training-tier provider on a test-split file is reported as *refused* and the
+        loop goes on. Re-run tomorrow: (b') restores today's outputs and ledger, `--resume` continues.
         """),
         code('''
         # RUN CELL: quota-aware loop over RUN_IDS x MODELS through scripts/kaggle_run_plan.py (in-core-only enforced there);
         # the in-memory MODELS_CFG carries the session overrides.
         import json, shlex
         import kaggle_run_plan as KRP
+        RUN_EXTRA = shlex.split(EXTRA_ARGS) + (["--account-holder", ACCOUNT_HOLDER_ROLE] if ACCOUNT_HOLDER_ROLE else [])   # role only, never a name (DD 11.2)
+        if not ACCOUNT_HOLDER_ROLE:
+            print("WARNING: ACCOUNT_HOLDER_ROLE is empty; every API manifest will record account_holder 'unknown' (DD 11.2 asks for the role)")
         RESULTS = []
         for run_id in RUN_IDS:
             run = KRP.find_run(PLAN, run_id)
@@ -972,7 +1128,7 @@ def build_api_runs() -> nbformat.NotebookNode:
                 else:
                     runnable.append(name)
             RESULTS += KRP.execute(run_id, models=runnable, platform=PLATFORM, dry_run=DRY_RUN, continue_on_error=True,
-                                   extra=shlex.split(EXTRA_ARGS), plan=PLAN, models_cfg=MODELS_CFG, python=RUN_PYTHON,
+                                   extra=RUN_EXTRA, plan=PLAN, models_cfg=MODELS_CFG, python=RUN_PYTHON,
                                    session_hardware=SESSION_HARDWARE)
         print(json.dumps([{"run": r["run"], "model": r["model"], "status": r["status"], "new_outputs": r.get("new_outputs"),
                            "new_tokens": r.get("new_tokens"), "budget": r.get("api_budget_today")} for r in RESULTS], indent=1))
@@ -980,10 +1136,11 @@ def build_api_runs() -> nbformat.NotebookNode:
         print("ledger (requests and tokens per model per UTC day):", json.dumps(ledger, indent=1))
         ''', tags=[RUN_TAG]),
         code('''
-        # keep the outputs: copy data/runs, the ledger and the compute log to Drive (Colab) or the working dir
+        # keep the outputs: copy data/runs, the ledger and the compute log to Drive (Colab) or the working dir; the
+        # Drive path is RUNS_RESTORE_DIR, which (b') reads back tomorrow (runs/ + compute_log.csv, the layout (b') expects)
         import shutil
         from pathlib import Path
-        dest = Path("/content/drive/MyDrive/noilai/runs_api") if Path("/content/drive/MyDrive").exists() else Path(WORK_DIR) / "noilai_runs_out"
+        dest = Path(RUNS_RESTORE_DIR) if (RUNS_RESTORE_DIR and Path(RUNS_RESTORE_DIR).parent.exists() and Path("/content/drive/MyDrive").exists()) else Path(WORK_DIR) / "noilai_runs_out"
         shutil.copytree(PROJECT / "data" / "runs", dest / "runs", dirs_exist_ok=True)
         import compute_log as CL
         LOG = PROJECT / "data" / "compute_log.csv"
