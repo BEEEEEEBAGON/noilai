@@ -1621,7 +1621,7 @@ def test_a_chunk_may_only_narrow_its_line_and_writes_its_own_run_directory(plan)
 
 
 # ----------------------------------------------------------------------------- compute chunks (docs/COMPUTE_PLAN.md)
-import plan_chunks as PC  # noqa: E402
+import plan_chunks as PC
 
 
 @pytest.fixture(scope="module")
@@ -1718,7 +1718,7 @@ def test_chunk_notebooks_preset_exactly_the_chunk_jobs(chunk_spec):
         assert nb.metadata["noilai"]["chunk"] == c["id"]
         param = next(cell for cell in nb.cells if cell.cell_type == "code" and "# ---- parameters" in cell.source)
         ns: dict = {}
-        exec(compile(param.source, c["id"], "exec"), ns)              # the parameters cell runs on its own
+        exec(compile(param.source, c["id"], "exec"), ns)  # noqa: S102 -- the generated parameters cell runs on its own
         assert ns["RUN_LABEL"] == c["id"]
         if c["queue"] == "cpu":
             assert ns["RUN_IDS"] == [j["run"] for j in c["jobs"]] and ns["MODELS"] == c["jobs"][0]["models"]
