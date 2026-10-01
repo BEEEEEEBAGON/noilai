@@ -1,6 +1,6 @@
 {
  "tokenizer": "gemma3",
- "model_file": "/home/user/ntcf/noilai/data/external/gemma3_tokenizer.model",
+ "model_file": "/home/user/noilai-migrate/data/external/gemma3_tokenizer.model",
  "normalizer_info": {
   "type": "sentencepiece",
   "model_type": "BPE",
@@ -189,5 +189,5 @@
   }
  },
  "note": "Under NFC \\vi{mèo}, \\vi{cái} and \\vi{kéo} are single tokens and \\vi{mài} is cut at the onset$|$rime seam (alignment 1.00). Under NFD every syllable gains a boundary between a base letter and its combining tone mark, which is never linguistic, so alignment falls to 0.50 for \\vi{mèo} and \\vi{kéo}, whose tone mark becomes a token of its own, leaving one aligned boundary at the nucleus$|$coda seam, and to 0.00 for \\vi{cái} and \\vi{mài}, whose tone mark stays attached to the following letter.",
- "generated": "2026-09-30 17:30Z"
+ "generated": "2026-10-01 13:09Z"
 }

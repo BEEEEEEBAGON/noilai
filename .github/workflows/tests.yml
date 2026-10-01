@@ -1,0 +1,23 @@
+name: tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Fetch the hash-pinned third-party resources (Hunspell vi_VN, Viet74K, XCOPA-vi, Gemma tokenizers)
+        run: python scripts/fetch_resources.py
+      - name: Lint
+        run: python -m ruff check noilai scripts tests
+      # The release item files are private (git-ignored); release-dependent tests skip here and run locally
+      # against data/release/v0.3 (see docs/DATA_FORMAT.md and docs/MIGRATION.md).
+      - run: python -m pytest -q -p no:cacheprovider -o addopts=""

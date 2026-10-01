@@ -460,7 +460,7 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
         import time
         SESSION_T0 = time.time()
 
-        REPO_URL = "https://github.com/OWNER/REPO.git"     # [UNCERTAIN: verify] the repository that holds noilai/ (or the split-out noilai repo)
+        REPO_URL = "https://github.com/BEEEEEEBAGON/noilai.git"   # the split-out repository (docs/MIGRATION.md); BUNDLE_PATH wins when set
         REPO_REF = "main"                                   # pin a commit hash for a paper run; recorded in every manifest
         REPO_SUBDIR = "noilai"                              # "" once noilai is a repository of its own
         BUNDLE_PATH = "/kaggle/input/noilai-bundle/noilai-main.bundle"   # git bundle in a private dataset; preferred over a token
@@ -608,7 +608,7 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
         import time
         SESSION_T0 = time.time()
 
-        REPO_URL = "https://github.com/OWNER/REPO.git"     # [UNCERTAIN: verify]
+        REPO_URL = "https://github.com/BEEEEEEBAGON/noilai.git"   # the split-out repository (docs/MIGRATION.md); BUNDLE_PATH wins when set
         REPO_REF = "main"
         REPO_SUBDIR = "noilai"
         BUNDLE_PATH = "/kaggle/input/noilai-bundle/noilai-main.bundle"
@@ -747,7 +747,7 @@ def build_colab_probe() -> nbformat.NotebookNode:
         import time
         SESSION_T0 = time.time()
 
-        REPO_URL = "https://github.com/OWNER/REPO.git"     # [UNCERTAIN: verify]
+        REPO_URL = "https://github.com/BEEEEEEBAGON/noilai.git"   # the split-out repository (docs/MIGRATION.md); BUNDLE_PATH wins when set
         REPO_REF = "main"
         REPO_SUBDIR = "noilai"
         DRIVE_DIR = "/content/drive/MyDrive/noilai"         # bundle, release and outputs live here
@@ -764,7 +764,7 @@ def build_colab_probe() -> nbformat.NotebookNode:
         GITHUB_TOKEN_SECRET = "GITHUB_TOKEN"
         HF_TOKEN_SECRET = "HF_TOKEN"
 
-        MODEL_CONFIG = "gemma-3-1b-it"    # entry of configs/models.yaml (hf_id read from it); "gemma-3-4b-it" needs N_GPUS = 2 (Kaggle 2xT4, fp32 sharded)
+        MODEL_CONFIG = "gemma-3-1b-it"    # entry of configs/models.yaml (hf_id read from it; [UNCERTAIN: verify] its hf_id/revision pin before the run); "gemma-3-4b-it" needs N_GPUS = 2 (Kaggle 2xT4, fp32 sharded)
         DTYPE = "float32"                 # "bfloat16" only on a bf16-capable GPU; never "float16" for Gemma 3
         TEXT_ONLY = True                  # multimodal checkpoints (4B/12B): load Gemma3ForCausalLM, the text tower only (DD 9.5)
         N_SYLLABLES = 600                 # tone-bearing syllables sampled from the inventory (train/test split by syllable)
@@ -1020,7 +1020,7 @@ def build_api_runs() -> nbformat.NotebookNode:
         import time
         SESSION_T0 = time.time()
 
-        REPO_URL = "https://github.com/OWNER/REPO.git"     # [UNCERTAIN: verify]
+        REPO_URL = "https://github.com/BEEEEEEBAGON/noilai.git"   # the split-out repository (docs/MIGRATION.md); BUNDLE_PATH wins when set
         REPO_REF = "main"
         REPO_SUBDIR = "noilai"
         BUNDLE_PATH = "/content/drive/MyDrive/noilai/noilai-main.bundle"   # Colab; on Kaggle use /kaggle/input/noilai-bundle/noilai-main.bundle

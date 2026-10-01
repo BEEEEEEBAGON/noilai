@@ -346,3 +346,9 @@ per the ARR policy on generative assistance.
   pins vLLM 0.30.0 and llama-cpp-python 0.3.35; the Makefile builds v0.3 with the sampled files and
   refuses the superseded 20 × 40 baseline forms; `data/validation/` and `data/human/` are ignored.
   Still no model run.
+
+## Origin
+
+This repository was split out of a branch of `BEEEEEEBAGON/ntcf` (an unrelated paper) on 1 October 2026
+with its full history; `docs/MIGRATION.md` records the original head (`83c9bb6`) and the commit map.
+Documents and manifests that cite commit hashes cite the original ones.
