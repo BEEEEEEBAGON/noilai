@@ -134,6 +134,12 @@ def test_validation_packet_and_score(release, tmp_path):
                     row.update(correct="no" if key[row["row_id"]]["control"] else "yes", spelling="yes", offensive="no")
                 elif sheet == "C_attested":
                     row.update(valid="yes", known="no", offensive="no")
+            if v == "A":                                  # A flags one sampled B row and one C row offensive
+                b_row = next(r_ for r_ in rows if sheet == "B_items" and not key[r_["row_id"]]["control"]) if sheet == "B_items" else None
+                if b_row:
+                    b_row["offensive"], flagged_b = "yes", b_row
+                if sheet == "C_attested":
+                    rows[0]["offensive"], flagged_c = "yes", rows[0]
             with open(ret / f"{sheet}_{v}.csv", "w", newline="", encoding="utf-8") as g:
                 w = csv.DictWriter(g, fieldnames=rows[0].keys())
                 w.writeheader()
@@ -145,6 +151,14 @@ def test_validation_packet_and_score(release, tmp_path):
     assert b["generator_precision"]["pooled"]["weighted_precision"] == 1.0 and b["generator_precision"]["pooled"]["n"] == 36
     assert all(x["control_catch_rate"] == 1.0 for x in b["validators"].values())
     assert rep["C"]["n_verified"] == rep["C"]["n_rows"] > 0
+    # DD 11.5: the flags file names the flagged item and the flagged texts by hash only (DD 11.1: no test-split text)
+    from noilai.eval.run import load_validator_flags, text_digest
+    raw = (out / "report" / "validator_flags.json").read_text(encoding="utf-8")
+    flags = load_validator_flags(out / "report" / "validator_flags.json")
+    assert flags["item_ids"] == {key[flagged_b["row_id"]]["item_id"]}
+    assert {text_digest(flagged_b["candidate"]), text_digest(flagged_c["input"]), text_digest(flagged_c["output"])} <= flags["text_sha256"]
+    assert all(re.fullmatch(r"[0-9a-f]{64}", h) for h in flags["text_sha256"])
+    assert flagged_b["candidate"] not in raw and flagged_c["output"] not in raw and '"A"' not in raw
 
 
 def test_human_baseline_forms(release, tmp_path):

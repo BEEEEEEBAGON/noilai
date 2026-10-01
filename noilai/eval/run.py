@@ -238,27 +238,35 @@ def is_vulgar(item: dict) -> bool:
 VALIDATOR_FLAGS = AUDIT_DIR / "validator_flags.json"
 
 
+def text_digest(text: str) -> str:
+    """SHA-256 of a phrase's canonical form: how the validator-flag file names a flagged text, so that a committed file
+    never holds test-split text (DESIGN_DECISIONS 11.1: test items live only in the gated repository)."""
+    return hashlib.sha256(R.canonical_text(text).encode("utf-8")).hexdigest()
+
+
 def load_validator_flags(path: str | Path | None = None) -> dict:
     """The native validators' offensive flags (DESIGN_DECISIONS 10.1 / 11.5: one validator's "Có" flags an item), as
-    written by `scripts/make_validation_forms.py score`: item ids and canonical texts, no validator letters. Absent
-    file (before Gate 1) = nothing flagged; the source path is recorded in the run manifest."""
+    written by `scripts/make_validation_forms.py score`: item ids and the SHA-256 of each flagged text's canonical form
+    (never the text, never a validator letter). Absent file (before Gate 1) = nothing flagged; the source path is
+    recorded in the run manifest."""
     p = Path(path) if path else VALIDATOR_FLAGS
     if not p.exists():
-        return {"item_ids": set(), "texts": set(), "source": None}
+        return {"item_ids": set(), "text_sha256": set(), "source": None}
     d = json.loads(p.read_text(encoding="utf-8"))
     return {"item_ids": set(d.get("offensive_item_ids") or []),
-            "texts": {R.canonical_text(t) for t in d.get("offensive_texts") or [] if t},
+            "text_sha256": set(d.get("offensive_text_sha256") or []),
             "source": str(p.relative_to(ROOT)) if p.is_relative_to(ROOT) else str(p)}
 
 
 def flagged_by_validators(item: dict, flags: dict) -> bool:
-    """An item the validators flagged (by id), or one whose input, candidate, gold or attested output is a flagged text."""
+    """An item the validators flagged (by id), or one whose input, candidate, gold or attested output is a flagged text
+    (compared by the SHA-256 of the canonical form)."""
     if item.get("item_id") in flags["item_ids"]:
         return True
-    if not flags["texts"]:
+    if not flags["text_sha256"]:
         return False
     texts = [item.get("input"), item.get("candidate"), item.get("attested_output"), item.get("output"), *(item.get("gold") or [])]
-    return any(isinstance(t, str) and t and R.canonical_text(t) in flags["texts"] for t in texts)
+    return any(isinstance(t, str) and t and text_digest(t) in flags["text_sha256"] for t in texts)
 
 
 def attested_eligible(item: dict, policy: str = "exact2") -> tuple[bool, str | None]:

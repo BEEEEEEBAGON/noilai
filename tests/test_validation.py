@@ -271,7 +271,9 @@ def test_baseline_forms_leave_out_validator_flagged_items(tmp_path):
     p = tmp_path / "items.jsonl"
     p.write_text("\n".join(json.dumps(x, ensure_ascii=False) for x in _synthetic_items()), encoding="utf-8")
     flags = tmp_path / "validator_flags.json"
-    flags.write_text(json.dumps({"offensive_item_ids": ["T1-V1-000000"], "offensive_texts": ["b a3"]}), encoding="utf-8")
+    from noilai.eval.run import text_digest
+    flags.write_text(json.dumps({"offensive_item_ids": ["T1-V1-000000"], "offensive_text_sha256": [text_digest("b a3")]}),
+                     encoding="utf-8")
     out = tmp_path / "human"
     r = subprocess.run([sys.executable, "scripts/make_validation_forms.py", "baseline", "--items", str(p), "--out", str(out),
                         "--n-forms", "4", "--per-form", "24", "--no-model-prompt", "--exclude-flags", str(flags)],
@@ -296,7 +298,7 @@ def test_natural_block_one_row_per_original_no_uncertain_rows_verified_only():
              {"item_id": "ATT-0104", "input": "đi học", "attested_output": "đọc hi", "source": "folk", "vulgar": True}]
     block = MVF.natural_block(rows, 10, 1)
     assert sorted(r["expected"] for r in block) == ["hiện đại", "trò chơi"]           # one per original; uncertain, illustration, vulgar out
-    flagged = {"item_ids": set(), "texts": {MVF.VA.canonical_text("hại điện")}}
+    flagged = {"item_ids": set(), "text_sha256": {MVF.RN.text_digest("hại điện")}}
     assert [r["expected"] for r in MVF.natural_block(rows, 10, 1, flagged)] == ["trò chơi"]
     verified = {(MVF.VA.canonical_text("hiện đại"), MVF.VA.canonical_text("hại điện"))}
     assert [r["expected"] for r in MVF.natural_block(rows, 10, 1, None, verified)] == ["hiện đại"]

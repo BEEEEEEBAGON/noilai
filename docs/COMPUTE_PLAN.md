@@ -40,7 +40,7 @@ say anything about the 7–27B models (fp32 weights exceed the CPU session's RAM
 Per pilot model: smoke_20 + pilot_t1_200 (both arms, generation and forced choice) + pilot_xcopa_200 (bounded by a
 520-token prompt):
 
-| model | scale (≈ parameters / gemma-3-1b-it) | worst-case hours | sessions |
+| model | scale (`params_b` in `configs/models.yaml` / gemma-3-1b-it's) | worst-case hours | sessions |
 |---|---|---|---|
 | gemma-3-1b-it | 1.0 | 2.3 | 1 |
 | qwen3.5-2b | 2.0 [UNCERTAIN: size unverified] | 4.6 | 1 |
@@ -232,3 +232,13 @@ queued.
 3. When it ends: if any job is not `ok`, run the same notebook again (it resumes). Then `python scripts/compute_log.py`
    for the hours actually used; after the first chunk of each tier, re-run `plan_chunks.py --write` if the measured
    hours change the packing (DD 8.5 re-pricing).
+
+## 8. Questions for the author (cited above as Q-C1 to Q-C4)
+
+| # | question | options | recommendation |
+|---|---|---|---|
+| Q-C1 | PhoGPT's bf16 reference (§6; memo N9) | (a) drop it from the bf16 drift appendix and name it; (b) an fp32 reference on a Kaggle CPU session through HF, logged as a precision deviation; (c) bf16 through HF on the T4 (no native bf16) | **(a)**, as memo N9 |
+| Q-C2 | Which model of a family is "second" in the DD 7.1 cut order (§4) | (a) the generator's rule: the pilot model leads its family, else the first entry of `configs/models.yaml`; (b) your list; in particular, does `qwen-sea-lion-v4.5-27b-it`, whose tokenizer is Qwen's, count as the second model of the `sea-lion-v4.5` family? | **(a)**, and treat the Qwen-based SEA-LION 27B as its own tokenizer family (it then leads, tier 1) if you agree; one line in `configs/models.yaml` (`family`) and `plan_chunks.py --write` |
+| Q-C3 | Where the lines the cut order does not name sit (§4, tier 2: ablations, reasoning, bf16 drift) | (a) before the cut stages, as now: the pre-registration names only models and paraphrases as cuttable, so cutting these would be a deviation; (b) after the second models, accepting a DEVIATIONS row if quota runs out | **(a)** for the ablations; reasoning and bf16 drift are appendix lines (DD 12.36), so if the quota is short you may prefer (b) for those two |
+| Q-C4 | The unbooked TPU share (§4): the TPU models' share of gpu_hours lines is booked on no plan line | (a) accept it (the TPU quota is not binding); (b) add a `plan_lines` entry for it in `configs/run_plan.yaml` | **(a)**; it changes no schedule, only the bookkeeping |
+

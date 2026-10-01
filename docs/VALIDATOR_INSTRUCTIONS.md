@@ -631,7 +631,7 @@ agreement and adjudication). Commands, from the repository root:
   released (§10 tells validators only the count of author decisions is reported).
 - **Offensive flags:** §10 tells validators that a flagged item is kept out of API prompts and out of the
   human-baseline form. `make validation-score` writes `data/audit/validator_flags.json` (the flagged items' ids and
-  texts, no validator letters; commit it): the API screen of `noilai/eval/run.py` drops every item it names from every
+  the SHA-256 of the flagged texts, never the texts or a validator letter; commit it): the API screen of `noilai/eval/run.py` drops every item it names from every
   API run (counted in the run manifest's `api_safety`), and `make baseline` leaves those items and attested rows off the
   forms (`--exclude-flags`). Re-run `make validation-score` after every batch of returns, before `make baseline` and
   before the first API run.

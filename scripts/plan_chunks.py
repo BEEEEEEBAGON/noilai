@@ -85,8 +85,7 @@ TIER_LABEL = {
 WINDOW = {0: "now - 25 Oct (Gate 1 on 18 Oct; panel freeze 25 Oct)",
           **{t: "after the stage-2 commit (DD 8.8) - 22 Nov (Gate 3, results freeze)" for t in range(1, 6)}}
 STAGE2_SCENARIOS = (("8 Nov (DD 8.8 latest)", 2), ("1 Nov", 3), ("25 Oct (right after the panel freeze: the earliest)", 4))
-CPU_PARAM_SCALE = {"gemma-3-1b-it": 1.0, "qwen3.5-2b": 2.0, "phogpt-4b-chat": 3.7}   # ~ parameter count / gemma-3-1b-it's
-                                                                                    # [UNCERTAIN: Qwen3.5-2B's size unverified]
+CPU_REFERENCE_MODEL = "gemma-3-1b-it"     # the benchmarked shape; other models scale by params_b of configs/models.yaml
 
 
 # --------------------------------------------------------------------------------------------- model roles
@@ -247,14 +246,15 @@ def tier0_chunks(plan: dict, mc: dict) -> list[dict]:
             "params": {"MODE": "first_run", "MODELS": ["gemma-3-1b-it"], "FORCED_CHOICE": True},
             "jobs": [{"run": "smoke_20", "models": ["gemma-3-1b-it"], "overrides": None, "tag": "cpu"}],
             "hours": [cpu["smoke_20"], cpu["smoke_20"]], "basis": "RL-2026-10-01-06 CPU benchmark, worst case"}]
+    ref = mc["by_name"][CPU_REFERENCE_MODEL]["params_b"]
     for m in pilot:
-        s = CPU_PARAM_SCALE[m]
+        s = round(mc["by_name"][m]["params_b"] / ref, 2)     # ~ compute per token; params_b as configured [UNCERTAIN for uncertain ids]
         hi = s * (cpu["smoke_20"] + cpu["pilot_t1_200"] + cpu["pilot_t1_200_forced_choice"] + cpu["pilot_xcopa_200"])
         out.append({"queue": "cpu", "tier": 0, "label": f"Gate 1 pilot on CPU: {m}",
                     "params": {"MODE": "pilot", "MODELS": [m], "FORCED_CHOICE": True},
                     "jobs": [{"run": r, "models": [m], "overrides": None, "tag": "cpu"}      # the CPU notebook's RUN_DIR_TAG
                              for r in ("smoke_20", "pilot_t1_200", "pilot_xcopa_200")],
-                    "hours": [hi, hi], "basis": f"RL-2026-10-01-06 CPU benchmark x {s} (parameter ratio), worst case"})
+                    "hours": [hi, hi], "basis": f"RL-2026-10-01-06 CPU benchmark x {s} (params_b ratio, configs/models.yaml), worst case"})
     gp = [KRP.find_run(plan, r) for r in ("pilot_t1_200", "pilot_xcopa_200")]
     out.append({"queue": "gpu", "tier": 0, "label": "Gate 1 pilot on the T4 (the alternative to the CPU chunks; free quota "
                                                      "before the smoke week)",

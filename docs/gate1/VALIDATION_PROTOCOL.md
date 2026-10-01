@@ -136,7 +136,8 @@ Part B rows (controls included); the sample-only figures are reported beside it.
 **Low control catch rate** (pre-specified): a validator who labels fewer than 75% of the planted controls Không (`VALIDATION_CONTROL_CATCH_MIN`) is re-briefed after the first weekly return and the rate is reported in the paper; no validator's labels are excluded or down-weighted on it.
 
 **Offensive**: one validator's "Có" flags the item (union rule; conservative). `score` writes the flagged Part B items'
-ids and candidate texts and the flagged Part C rows' input and output texts to `data/audit/validator_flags.json` (no
+ids, and the SHA-256 of the canonical form of their candidates and of the flagged Part C rows' inputs and outputs, to
+`data/audit/validator_flags.json` (never the texts, which would publish test-split strings once committed, DD 11.1; no
 validator letters); the API screen of `noilai/eval/run.py` drops every item it names from every API run and the
 baseline builder (`--exclude-flags`) keeps them off the human forms (DD 11.5). **Dialect**: the union of the mergers named. **`RULE?` comments**: every one is checked by the author against
 the rule tables; a confirmed bug → fix + full regeneration before any model run.

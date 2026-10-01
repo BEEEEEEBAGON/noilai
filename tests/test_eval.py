@@ -2000,7 +2000,9 @@ def test_api_guard_drops_items_the_validators_flagged_offensive(item_file, tmp_p
     a, b = core[0], core[1]
     gold_b = b["gold"][0] if isinstance(b["gold"], list) and isinstance(b["gold"][0], str) else b["input"]
     flags = tmp_path / "validator_flags.json"
-    flags.write_text(json.dumps({"offensive_item_ids": [a["item_id"]], "offensive_texts": [gold_b]}), encoding="utf-8")
+    flags.write_text(json.dumps({"offensive_item_ids": [a["item_id"]], "offensive_text_sha256": [RN.text_digest(gold_b)]}),
+                     encoding="utf-8")
+    assert gold_b not in flags.read_text(encoding="utf-8")                  # the committed file never holds test-split text
     entry = {"name": "grq", "backend": "scripted", "provider": "y", "provider_terms": {"trains_on_inputs": False}}
     api = B.ScriptedBackend(default="Đáp án: x", is_api=True)
     kept, rep = RN.check_api_safety(api, core, RN.RunOptions(validator_flags=str(flags)), path, RN.provider_privacy(entry))
@@ -2010,4 +2012,4 @@ def test_api_guard_drops_items_the_validators_flagged_offensive(item_file, tmp_p
     assert all(not RN.flagged_by_validators(it, RN.load_validator_flags(flags)) for it in kept)
     kept_open, rep_open = RN.check_api_safety(B.EchoBackend(), core, RN.RunOptions(validator_flags=str(flags)), path)
     assert len(kept_open) == len(core) and rep_open["n_excluded_validator_flag"] == 0     # open models: nothing dropped
-    assert RN.load_validator_flags(tmp_path / "absent.json") == {"item_ids": set(), "texts": set(), "source": None}
+    assert RN.load_validator_flags(tmp_path / "absent.json") == {"item_ids": set(), "text_sha256": set(), "source": None}

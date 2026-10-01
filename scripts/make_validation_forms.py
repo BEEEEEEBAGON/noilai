@@ -367,7 +367,7 @@ def cmd_score(args) -> int:
                 if not key.get(rid, {}).get("control"):          # a control's item is not the text shown
                     flagged_ids.add(fl["item_id"])
                 if cand.get(rid):
-                    flagged_texts.add(VA.canonical_text(cand[rid]))
+                    flagged_texts.add(RN.text_digest(cand[rid]))
     # Part C
     if (d / "C_rows.json").exists() and "C_attested" in returned:
         rows = json.loads((d / "C_rows.json").read_text(encoding="utf-8"))
@@ -383,7 +383,7 @@ def cmd_score(args) -> int:
                             json.dumps(r["valid"], ensure_ascii=False), r["known_any"], r["spelling_disputed"],
                             " | ".join(r["your_forms"]), r["offensive_any"], ",".join(r["dialect"]), ",".join(r["validators"])])
                 if r["offensive_any"]:
-                    flagged_texts.update(VA.canonical_text(t) for t in (r["input"], r["output"]) if t)
+                    flagged_texts.update(RN.text_digest(t) for t in (r["input"], r["output"]) if t)
     # Part D: returned as is, classified by the engine for D1
     if "D1_production" in returned and (d / "D_engine.json").exists():
         eng = {r["row_id"]: r for r in json.loads((d / "D_engine.json").read_text(encoding="utf-8"))["D1"]}
@@ -411,13 +411,15 @@ def cmd_score(args) -> int:
         (rep_dir / "t2_validated_gold.json").write_text(json.dumps(e["validated_gold"], ensure_ascii=False, indent=1), encoding="utf-8")
     if "B" in report or "C" in report:
         # DD 10.1 / 11.5: one validator's "Có" in `offensive` flags the item; the API screen of noilai.eval.run and the
-        # baseline builder read this file (item ids and canonical texts only, no validator letters). `make validation-score`
-        # writes it to data/audit/validator_flags.json, the path the runs read.
+        # baseline builder read this file: item ids and the SHA-256 of each flagged text's canonical form -- never the text
+        # (it would publish test-split strings once committed; DD 11.1) and never a validator letter. `make
+        # validation-score` writes it to data/audit/validator_flags.json, the path the runs read.
         flags_out = Path(args.flags_out) if args.flags_out else rep_dir / "validator_flags.json"
         flags_out.parent.mkdir(parents=True, exist_ok=True)
         flags_out.write_text(json.dumps({"generated_by": "scripts/make_validation_forms.py score", "created_utc": report["created_utc"],
                                          "rule": "one validator's offensive = yes flags the item (union; DESIGN_DECISIONS 10.1 / 11.5)",
-                                         "offensive_item_ids": sorted(flagged_ids), "offensive_texts": sorted(flagged_texts)},
+                                         "offensive_item_ids": sorted(flagged_ids),
+                                         "offensive_text_sha256": sorted(flagged_texts)},
                                         ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
         report["validator_flags"] = {"path": str(flags_out), "n_item_ids": len(flagged_ids), "n_texts": len(flagged_texts)}
     (rep_dir / "validation_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
@@ -509,7 +511,7 @@ def natural_block(attested: list[dict], n: int, seed: int, flags: dict | None = 
     original (a textbook's six forms of one phrase would otherwise fill the block), rows whose source or note is
     uncertain or a mere illustration skipped, validator-flagged rows skipped, and -- once Part C is scored -- only
     native-verified rows (`verified`: canonical (input, output) pairs from attested_verified.tsv)."""
-    flags = flags or {"item_ids": set(), "texts": set()}
+    flags = flags or {"item_ids": set(), "text_sha256": set()}
     rows = [r for r in attested if not r.get("vulgar") and len((r.get("input") or "").split()) == 2
             and len((r.get("attested_output") or r.get("output") or "").split()) == 2
             and not any(m.lower() in f"{r.get('source') or ''} {r.get('note') or ''}".lower() for m in NATURAL_SKIP_MARKS)
