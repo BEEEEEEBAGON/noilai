@@ -1969,3 +1969,23 @@ def test_runner_refuses_an_arm_whose_census_verdict_is_corrupts(item_file, tmp_p
     RN.check_census_arms({"status": "censused", "verdict_nfd": "normalizes"}, ("nfd", "win1258"))
     with pytest.raises(RN.CorruptingCensusError):
         RN.check_census_arms({"status": "censused", "verdict_nfd": "corrupts"}, ("nfd",))
+
+
+def test_hf_logprobs_share_the_prompt_cache_and_equal_the_full_computation(tiny_hf):
+    """1 Oct 2026: HFBackend.logprobs runs the prompt once and reuses its cache for every continuation (one full-length
+    forward per candidate cost 10-35 s on CPU); the values must equal the full-sequence computation."""
+    import torch
+    model, ft = tiny_hf
+    be = B.HFBackend(model=model, tokenizer=ft, batch_size=2, seed=1, name="tiny")
+    prompt = be.chat_to_text([{"role": "user", "content": "Cụm từ: mèo cái. " * 6}]) + "Đáp án:"
+    conts = [" mài kéo", " Có", " Không", " mái kèo nha"]
+    lp = be.logprobs(prompt, conts)
+    for c, got in zip(conts, lp):
+        ids_p = ft(prompt, add_special_tokens=False).input_ids
+        ids_f = ft(prompt + c, add_special_tokens=False).input_ids
+        if ids_f[: len(ids_p)] != ids_p:
+            continue                                          # a violated continuation takes the fallback path
+        with torch.no_grad():
+            lg = model(torch.tensor([ids_f])).logits.float().log_softmax(-1)
+        manual = sum(lg[0, i - 1, ids_f[i]].item() for i in range(len(ids_p), len(ids_f)))
+        assert abs(manual - got) < 1e-4, (c, manual, got)

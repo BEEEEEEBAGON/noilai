@@ -452,13 +452,39 @@ class HFBackend(Backend):
             self.last_n_tokens.append(len(c_ids))
             seqs.append(p_ids + c_ids)
             spans.append((len(p_ids), len(p_ids) + len(c_ids)))
-        # One sequence per forward pass, keeping only the logits of the positions that predict the continuation:
-        # the earlier batched version materialized (n_continuations x length x vocab) float32 logits and their
-        # log-softmax, which for Gemma 3's 262,144-piece vocabulary is ~8 GB per array at 8 candidates x 1,000
-        # tokens and was killed for lack of memory on the first CPU run (1 Oct 2026). Values are unchanged: the
-        # summed log-probability of the continuation tokens given everything before them.
-        out = []
-        for s, (a, b) in zip(seqs, spans):
+        # The prompt is run ONCE and its key/value cache is reused for every continuation whose tokenization
+        # extends the prompt's (prefix property, asserted above): continuation token 0 is predicted by the prompt's
+        # last logits, token i >= 1 by the logits after feeding tokens 0..i-1 on a copy of the cache. Only the
+        # positions that predict continuation tokens produce logits. The first CPU run (1 Oct 2026) showed why:
+        # a batched full-length forward materialized (continuations x length x 262,144) float32 arrays and was killed
+        # for lack of memory, and re-running a ~1,000-token prompt per candidate costs ~10-35 s each on 4 CPU cores.
+        # A continuation that violated the prefix property is scored on its own full sequence (the recorded fallback).
+        import copy
+
+        out = [0.0] * len(seqs)
+        p_ids = seqs[0][: spans[0][0]] if seqs else []
+        shared = [i for i, v in enumerate(self.last_prefix_violations) if not v and seqs[i][: spans[i][0]] == p_ids]
+        if shared and p_ids:
+            ids = torch.tensor([p_ids], dtype=torch.long, device=self.device)
+            with torch.no_grad():
+                po = self.model(input_ids=ids, use_cache=True, logits_to_keep=1)
+            first_logp = torch.log_softmax(po.logits[0, -1].float(), dim=-1)
+            for i in shared:
+                a, b = spans[i]
+                cont = seqs[i][a:b]
+                tot = float(first_logp[cont[0]].item())
+                if len(cont) > 1:
+                    cache = copy.deepcopy(po.past_key_values)
+                    cids = torch.tensor([cont[:-1]], dtype=torch.long, device=self.device)
+                    with torch.no_grad():
+                        co = self.model(input_ids=cids, past_key_values=cache, use_cache=True)
+                    lp = torch.log_softmax(co.logits[0].float(), dim=-1)
+                    for j in range(1, len(cont)):
+                        tot += float(lp[j - 1, cont[j]].item())
+                out[i] = tot
+        for i, (s, (a, b)) in enumerate(zip(seqs, spans)):
+            if i in shared and p_ids:
+                continue
             ids = torch.tensor([s], dtype=torch.long, device=self.device)
             keep = b - a + 1                       # positions a-1 .. b-1 predict tokens a .. b-1 (and one spare)
             with torch.no_grad():
@@ -470,7 +496,7 @@ class HFBackend(Backend):
             tot = 0.0
             for pos in range(a, b):
                 tot += float(logp[pos - 1 - (b - keep), s[pos]].item())
-            out.append(tot)
+            out[i] = tot
         return out
 
     def info(self):
