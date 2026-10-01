@@ -110,7 +110,7 @@ def render(manifest: dict, manifest_path: str, attested: tuple[int | None, int |
                      "is smaller than the paper's ~10,000 items. Re-run this script on the frozen release.")
     if note:
         lines.append(f"% note: {note}")
-    lines.append(r"\begin{table}[t]")
+    lines.append(r"\begin{table*}[t]")   # seven columns: full width (one column overflows by 150pt)
     lines.append(r"\centering\small")
     lines.append(r"\begin{tabular}{@{}llrrrrr@{}}")
     lines.append(r"\toprule")
@@ -157,7 +157,7 @@ def render(manifest: dict, manifest_path: str, attested: tuple[int | None, int |
                  r"\vi{n\'{o}i l\'{a}i}; items flagged vulgar never reach an API or the human-baseline form."
                  + smoke_note + "}")
     lines.append(r"\label{tab:counts}")
-    lines.append(r"\end{table}")
+    lines.append(r"\end{table*}")
     return "\n".join(lines) + "\n"
 
 
