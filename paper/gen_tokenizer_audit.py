@@ -82,7 +82,7 @@ def table(counts: dict, audit_dir: Path, src: str, stamp: str) -> tuple[str, dic
            "\\midrule"]
     tex += body
     tex += ["\\bottomrule", "\\end{tabular}",
-            "\\caption{Tokenizer audit over the 6,595 standard syllables in running-text position (preceded by a space). "
+            "\\caption{Tokenizer audit over the 6,595 parsable syllables of the Hunspell list in running-text position (preceded by a space). "
             "Tok./syll.: mean tokens per syllable; Single: share of single-token syllables; Align.\\ all: boundary alignment "
             "with a single-token syllable counted as 1.0; Align.\\ split: alignment among split syllables, with their number; "
             "Onset$|$rime: share of syllables with a token boundary exactly at the onset--rime seam; Tone isolated: share whose "

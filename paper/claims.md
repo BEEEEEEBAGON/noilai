@@ -84,7 +84,7 @@ commits as placeholders until PR1/PR2 exist.
 | C3 | orthographic counterfactuals: meaning- and information-preserving re-encodings (NFC→NFD, NFC→partially composed, old→new placement) on deployed models, with a census of which tokenizers pass through, normalize or corrupt | DD §6; census implemented (`noilai/audit/tokenizers.py`; Gemma 3 and Gemma 2 verdicts in `gemma3.json`/`gemma2.json`); effects **pending E3** | "re-encodings that change only the code points of the prompt, hence the token sequence, with meaning and information fixed; the within-item contrast is identified without assumptions beyond representativeness (DD §6.4); which tokenizers normalize, pass through or corrupt is a result of the census" | "causal effect of tokenization on model competence" in general; "mediation through token count" (DD §12.7: not estimated); "the first study of Unicode normalization in LLMs" (TokSuite, Ghosh & Jyothi, the Arabic-diacritics paper are near neighbours) | §1 contribution 3, §6 |
 | C3a | first comparison of canonically equivalent encodings, and of tone-placement conventions, of a tonal Latin script on deployed LLMs | NS §3(b): no paper found; near neighbours TokSuite (CITE-U, arXiv 2512.20757), Ghosh & Jyothi 2026 (CITE-U, 2607.26831), Inoue et al. 2026 (CITE-V `2026-findings-eacl-22`), Gambardella et al. 2025 (CITE-V `2025-acl-short-75`), Gorman & Pinter 2025 (CITE-V `2025-naacl-short-25`) | "no study we know of compares canonically equivalent encodings, or tone-placement conventions, of a tonal Latin script on deployed models" with the neighbours cited in the same paragraph | "first Unicode study"; "first to show tokenizers are not normalization-invariant" | §2/§8 |
 | C4 | mechanistic localization of tone in Gemma 3 1B/4B with control-validated probes, structural baselines and activation patching with two readouts | DD §9 protocol; code under `noilai/probe/`; results **pending E4** | protocol in the present tense; "E4 is reported regardless of outcome (DD §8.8)" | any claim about where tone lives; "decodable earlier under NFD" (DD §9.1 deletes it) | §1 contribution 4, §7 |
-| C5 | reusable tooling: NFC/NFD/PC re-encoder and diacritic strippers (script-general), a Vietnamese syllable parser, speller and generator (Vietnamese-specific) | code exists (`noilai/vi/`, `noilai/gen/`); release terms **pending L** | "the re-encoding and stripping tools apply to any diacritic-heavy Latin script; the parser, speller and placement arms encode Vietnamese phonotactics and spelling and are not script-general" (DD §14 item 35; `tests/test_paper.py` checks this split) | "a toolkit for diacritic-heavy scripts" without the split | §1 contribution 5, Limitations |
+| C5 | reusable tooling: NFC/NFD re-encoder and diacritic strippers (script-general); the partially composed (PC) re-encoder, a Vietnamese syllable parser, speller, placement arm and generator (Vietnamese-specific) | code exists (`noilai/vi/`, `noilai/gen/`); release terms **pending L** | "the re-encoding and stripping tools apply to any diacritic-heavy Latin script; the parser, speller and placement arms encode Vietnamese phonotactics and spelling and are not script-general" (DD §14 item 35; `tests/test_paper.py` checks this split) | "a toolkit for diacritic-heavy scripts" without the split | §1 contribution 5, Limitations |
 
 ## 2. Novelty and positioning (what the gap sentence may say)
 
@@ -131,15 +131,15 @@ commits as placeholders until PR1/PR2 exist.
 | D10 | attested strings frozen before the build (SHA `d3fe35…`); later rows never trigger regeneration (`attested_overlap`) | manifest `attested_strings_sha256`; DD §4.1 item 57 | as DD | — | §3.4 |
 | D11 | lexical base pairs: 47,535 distinct canonical pairs from 49,103 two-syllable entries of a 73,901-entry list | `counts.json` `wordlist.*`; manifest `n_lexical_pairs_available` | quote | "the lexicon" as a corpus | §3.3 |
 | D12 | release terms: code Apache-2.0; dev CC BY 4.0; test gated + encrypted CC BY-NC-ND 4.0; look-up lists GPLv2 consulted at build time; N Viet74K entries reproduced verbatim under permission or GPLv2 fallback | DD §4.1, §11.1; **pending L** | protocol with the fallback stated (`\placeholder`) | "released under CC BY" as a fact | §3.6, Ethics |
-| D13 | XCOPA-vi: 500 test items, pure NFC, old-style placement majority (test: 51 old / 2 new of 53 affected tokens in 43 items; 9,594 syllable tokens; test+val: 60/2 of 62, 96.8%) | `placement_xcopa_test.json`, `placement_xcopa.json` (RL-2026-09-30-04) | "touches 43 of the 500 items (0.5% of syllable tokens)" | H4 on XCOPA | §6 |
+| D13 | XCOPA-vi: 500 test items, pure NFC, old-style placement majority (test: 51 old / 2 new of 53 affected tokens in 43 items; 9,594 syllable tokens; test+val: 60/2 of 62, 96.8%) | `placement_xcopa_test.json`, `placement_xcopa.json` (RL-2026-09-30-04) | "touches 43 of the 500 items (0.55% of syllable tokens (53 of 9,594))" | H4 on XCOPA | §6 |
 
 ## 5. Tokenizer audit and census (Gemma 3 unless stated)
 
 | id | claim | evidence | strongest wording | overclaim | where |
 |---|---|---|---|---|---|
-| T1 | over the 6,595 standard syllables in running-text position: NFC 1.78 tokens/syllable, 29.5% single-token, alignment 0.94 over all syllables and 0.917 among the 4,652 split ones, onset–rime split in 51.5%; NFD 2.83, 7.1%, 0.27 / 0.215 among 6,130, tone mark isolated in 41.6%, onset–rime split 6.8% | `counts.json` `tokenizer_audit.gemma3.summary`; `gemma3_rows.csv`; RL-2026-09-30-01/06; `tests/test_paper.py` recomputes the among-split means | "splits 70% of syllables under NFC, half of all syllables exactly at the onset–rime seam" | "92% longer" (superseded); 2.90 for Gemma 3 (that is Gemma 2) | §1, §4 |
+| T1 | over the 6,595 parsable syllables of the Hunspell list in running-text position: NFC 1.78 tokens/syllable, 29.5% single-token, alignment 0.94 over all syllables and 0.917 among the 4,652 split ones, onset–rime split in 51.5%; NFD 2.83, 7.1%, 0.27 / 0.215 among 6,130, tone mark isolated in 41.6%, onset–rime split 6.8% | `counts.json` `tokenizer_audit.gemma3.summary`; `gemma3_rows.csv`; RL-2026-09-30-01/06; `tests/test_paper.py` recomputes the among-split means | "splits 70% of syllables under NFC, half of all syllables exactly at the onset–rime seam" | "92% longer" (superseded); 2.90 for Gemma 3 (that is Gemma 2) | §1, §4 |
 | T2 | Gemma 2: NFC 1.77 / 29.9% / 0.94 (0.912 among 4,624) / 50.7%; NFD 2.90 / 7.3% / 0.29 (0.234 among 6,115) / tone isolated 50.4% | `counts.json` `tokenizer_audit.gemma2` | appendix table | — | App. F |
-| T3 | census on the fixed 1,000-string probe set (500 Viet74K multi-syllable words + 500 main-sample inputs, seed 0): Gemma 3 passes through NFD and PC (round trip exact 100%); NFD ids identical for 1.3% of strings, longer for 91.0%; PC identical 5.7%, longer 79.4%; Gemma 2 passes through, 1.5% identical, longer 91.7% | `gemma3.json` `normalization_census`; `gemma2.json`; RL-2026-10-01-02 | "the identity normalizer leaves NFD ids identical for 1.3% of the census strings" (replaces the stale "96.6% different" sentence of the earlier draft, a 500-string figure) | "3.4% identical ids"; "96.6%" | §4 |
+| T3 | census on the fixed 1,000-string probe set (500 Viet74K multi-syllable words + 500 main-sample inputs, seed 0): Gemma 3 passes through NFD and PC (round trip exact 100%); NFD ids identical for 1.3% of strings, longer for 91.0%; PC identical 5.7%, longer 79.4%; Gemma 2 passes through NFD and PC (round trip exact 100%): NFD ids identical 1.3%, longer 92.9%; PC identical 5.7%, longer 82.9% | `gemma3.json` `normalization_census`; `gemma2.json`; RL-2026-10-01-02 | "the identity normalizer leaves NFD ids identical for 1.3% of the census strings" (replaces the stale "96.6% different" sentence of the earlier draft, a 500-string figure) | "3.4% identical ids"; "96.6%" | §4 |
 | T4 | NFD tokens per syllable are 59% above NFC (2.83/1.78 − 1 = 58.8%) | `counts.json`; test `test_nfd_length_figures_in_the_h3_row_reproduce` asserts the exact phrase in `sec_counterfactuals.tex` | "longer for 91% of words, carries 59% more tokens per syllable" (exact phrase required) | "92% longer" | §6 |
 | T5 | single-token share by tone (NFC): ngang 50.8%, sắc 28.3%, hỏi 23.2%, huyền 23.0%, nặng 22.4%, ngã 18.4% → token count predicts tone, hence the structural baseline | `counts.json` `single_token_by_tone`; RL-2026-09-30-06 | "under NFC token count itself predicts tone (51% vs 18–28%)" | — | §7 |
 | T6 | 14 of 69 old-style placement forms are whole pieces in the Gemma 3 vocabulary against 2 new-style forms | DD §2.5 (reviewer computation, no RL id; not in `counts.json`) | do not quote in the paper until a script emits it | — | — |
@@ -279,7 +279,7 @@ egress-blocked) and remain CITE-U unless the previous round verified them throug
 
 **Unverified (placeholder file; cited in the draft; R before submission)**: grammars and phonology (Thompson 1965; Đoàn Thiện Thuật 1977; Nguyễn Đình-Hoà 1997; Kirby 2011; Pham 2003), the Hunspell resource, the vlstudies blog (not cited in the paper), Lê Trung Hoa & Hồ Lê 1990, Nguyễn Văn Hiệp (year and venue unknown), Krippendorff 2011, McNemar 1947, Holm 1979, Connor 1987, Meng et al. 2022 (ROME), Heimersheim & Nanda 2024, Gemma 3 report, Gemma Scope (Lieberum et al. 2024), Gemma Scope 2 blog, BIG-bench (Srivastava et al. 2023), lm-evaluation-harness, Petrov et al. 2023 (NeurIPS), PACUTE (arXiv 2606.15144), TokSuite (2512.20757), Ghosh & Jyothi (2607.26831), UGTPhon (2609.27205).
 
-**Numbers attributed to sources that may appear only inside `\placeholder{}`**: Bean et al. 16.0% of 445 benchmarks; Ghosh & Jyothi relative drops 9.9–23.7%; Pham & Pham ~300 sentences and F1 95.47%; Sclar et al. "76 points" (the paper says "tens of points"); EXECUTE's language count; SEA-HELM's diagnostic coverage; MultiBLiMP's exclusion of Vietnamese; KoWit-24's 2,700 headlines (now CITE-V via the abstract: "2,700 Russian news headlines" — may be typed); PhonologyBench's 17%/45% gaps (abstract-level, not needed).
+**Numbers attributed to sources that may appear only inside `\placeholder{}`**: Bean et al. 16.0% (the share; the count of 445 benchmarks is search-confirmed and may be typed); Ghosh & Jyothi relative drops 9.9–23.7%; Pham & Pham ~300 sentences and F1 95.47%; Sclar et al. "76 points" (the paper says "tens of points"); EXECUTE's language count; SEA-HELM's diagnostic coverage; MultiBLiMP's exclusion of Vietnamese; KoWit-24's 2,700 headlines (now CITE-V via the abstract: "2,700 Russian news headlines" — may be typed); PhonologyBench's 17%/45% gaps (abstract-level, not needed).
 
 ## 10. ARR compliance (CFP wording fetched 1 October 2026 from `acl-org/aclrollingreview` `cfp.md`, `authors.md`, `authorchecklist.md`)
 
@@ -301,26 +301,26 @@ egress-blocked) and remain CITE-U unless the previous round verified them throug
 <!-- pages:begin -->
 | section | starts on page | measured length (pages) | budget (`main.tex`) |
 |---|---|---|---|
-| 1 Introduction | 1.7 | 0.76 | 1.00 |
-| 2 Background | 2.5 | 1.13 | 0.75 |
-| 3 Benchmark | 3.6 | 2.90 | 1.50 |
-| 4 Experimental Design | 6.5 | 1.20 | 1.00 |
-| 5 Results | 7.7 | 2.05 | 1.25 |
-| 6 Counterfactuals | 9.7 | 0.98 | 1.00 |
-| 7 Tone | 10.7 | 1.81 | 0.75 |
-| 8 Related Work | 12.5 | 0.94 | 0.50 |
-| 9 Discussion | 13.5 | 0.18 | 0.25 |
-| **content (1–9)** | 1 | **12.7** | **8.00** |
-| Limitations + Ethics | 13.7 | 3.01 | not counted |
-| References | 16.7 | 5.32 | not counted |
-| Appendices | 22.0 | 11.01 | not counted |
+| 1 Introduction | 1.7 | 0.77 | 1.00 |
+| 2 Background | 2.5 | 1.21 | 0.75 |
+| 3 Benchmark | 3.7 | 3.04 | 1.50 |
+| 4 Experimental Design | 6.7 | 1.63 | 1.00 |
+| 5 Results | 8.4 | 1.23 | 1.25 |
+| 6 Counterfactuals | 9.6 | 1.13 | 1.00 |
+| 7 Tone | 10.7 | 2.08 | 0.75 |
+| 8 Related Work | 12.8 | 0.87 | 0.50 |
+| 9 Discussion | 13.7 | 0.43 | 0.25 |
+| **content (1–9)** | 1 | **13.1** | **8.00** |
+| Limitations + Ethics | 14.1 | 3.07 | not counted |
+| References | 17.2 | 5.45 | not counted |
+| Appendices | 22.6 | 11.37 | not counted |
 
-Sections 1-4 and 8: 6.93 pages (budget 4.75); Sections 5-7 and 9: 5.02 pages (budget 3.25); total pages in PDF: 32
+Sections 1-4 and 8: 7.52 pages (budget 4.75); Sections 5-7 and 9: 4.88 pages (budget 3.25); total pages in PDF: 33
 <!-- pages:end -->
 
-Sections 1–4 and 8 (this workstream) carry Figure 1, Table 1 and the model table (≈1.2 pages of floats) and ≈4,600 words of text after the condensation of 1 October 2026 (intro ≈660, background ≈760, benchmark ≈1,500, setup ≈1,140, related work ≈560 words; every protocol sentence they dropped is in Appendices A, C, D, E and H). Sections 5–7 and 9 are results-dependent and were not redrafted. The draft therefore does **not** fit the 8-page limit yet; the cut list for when the numbers land, in order of least damage to the self-contained main text:
+Sections 1–4 and 8 (this workstream) carry Figure 1, Table 1 and the model table (≈1.2 pages of floats) and ≈4,700 words of text after the condensation and the two review rounds of 1 October 2026 (intro ≈660, background ≈760, benchmark ≈1,500, setup ≈1,140, related work ≈560 words; every protocol sentence they dropped is in Appendices A, C, D, E and H). Sections 5–7 and 9 are results-dependent and were not redrafted. The draft therefore does **not** fit the 8-page limit yet; the cut list for when the numbers land, in order of least damage to the self-contained main text:
 
-1. Sections 5–7 and 9: 5.0 pages against 3.25 (results workstream; most of it is placeholder tables at full width).
+1. Sections 5–7 and 9: 4.9 pages against 3.25 (results workstream; most of it is placeholder tables at full width).
 2. §3 Validation and human baseline → three sentences in the body, the protocol in Appendix D (≈0.3 page).
 3. §4 Tokenizer profile → the definitions stay, the Gemma 3 numbers move into the caption of the audit table (≈0.15 page; `tests/test_paper.py` pins two of the numbers to `sec_setup.tex`, so the sentence that carries them must stay or the test be amended).
 4. The model table → Appendix H, with the panel described in one sentence (≈0.25 page).
@@ -333,7 +333,7 @@ Every number that appears outside a `\placeholder{}` and is not a generated macr
 
 | number | where | source |
 |---|---|---|
-| 6,595 standard syllables; 6,611 lower-case entries; 16 unparsed; 3 stop-coda rejects | §1, §2, §3.1 | `counts.json` `hunspell.*` (`parsable`, `lowercase_letter_entries`, `unparsed`, `rejected_phonotactics`) |
+| 6,595 parsable syllables of the Hunspell list; 6,611 lower-case entries; 16 unparsed; 3 stop-coda rejects | §1, §2, §3.1 | `counts.json` `hunspell.*` (`parsable`, `lowercase_letter_entries`, `unparsed`, `rejected_phonotactics`) |
 | 69 placement pairs | §2, App. B | `counts.json` `hunspell.placement_differing_syllables`; `tests/test_vi.py`, `tests/test_paper.py` |
 | 24 onsets, 18 nuclei, 11 codas, 6 tones | §2 | `noilai.vi.syllable` constants; `tables/rules_components.tex` |
 | 162 rimes; 261 additions | §3.1 | `counts.json` `inventory.rimes`, `inventory.extension_added` |
@@ -341,7 +341,7 @@ Every number that appears outside a `\placeholder{}` and is not a generated macr
 | 1.78, 29.5%, 0.92 (0.94), 51.5%, 2.83, 7.1%, 0.21 (0.27), 41.6%, 1.3% identical ids, 91% longer | §4 | same; `gemma3.json` `normalization_census` (`nfd_same_ids_frac` 0.013, `nfd_longer_frac` 0.91) |
 | 59% more tokens per syllable | §6 | `counts.json` (2.8308/1.7826 − 1); test-asserted phrase |
 | 51% vs 18–28% single-token by tone | §7 | `counts.json` `single_token_by_tone` |
-| 43 of 500 XCOPA items; 0.5% of syllable tokens; 51 old / 2 new of 53 | §6 | `placement_xcopa_test.json` |
+| 43 of 500 XCOPA items; 0.55% of syllable tokens (53 of 9,594); 51 old / 2 new of 53 | §6 | `placement_xcopa_test.json` |
 | 47,535 candidate pairs | §3.3 | macro `\releaseNLexicalPairsAvailable` |
 | 4,200 / 350 per cell; 1,496 core; 125 per cell / 62 pairs; 20% dev | §3.3, §4 | macros; DD §4.5–4.6 |
 | 2,000 bootstrap replicates; 50 pairs (BCa); 200 pairs (paired t); 20 pairs (Wilson); 14 cells; 300 misaligned syllables; 4 families; δ_sel 0.15; 50 pairs (readout fallback); 25% (H5 condition); L/2; 2-point TOST | §4, §6, §7 | `noilai/constants.py`; DD §1, §8, §9 |
@@ -352,6 +352,7 @@ Every number that appears outside a `\placeholder{}` and is not a generated macr
 | 3 demonstrations; 64 tokens; 3 paraphrases; 500-item scope check; 200-item bf16 drift; 5 points drift threshold | §4 | DD §7.3–7.4, §6.1, PREREG §5 |
 | 300 per tone; ≥ 4 carriers; 60/10/30; 5 × 3 seeds; 600 candidate pairs → 200; 1 nat | §7 | DD §9.2–9.3; `noilai/constants.py` |
 | 0.980 / 0.788 / 0.978 and 0.961 / 0.645 / 0.956 | §3.5 | RL-2026-09-30-06 (simulation; test reproduces) |
+| 445 reviewed LLM benchmarks | §8 | `docs/RELATED_WORK_VERIFICATION.md` row arXiv 2511.04703 (count confirmed; the 16.0% share unchecked at page level, kept in `\placeholder{}`) |
 
 ## 12. Drafting decisions taken in this round (1 October 2026) and open author decisions
 
