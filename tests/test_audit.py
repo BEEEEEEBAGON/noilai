@@ -384,7 +384,7 @@ def _coverage(out: Path):
     rows = []
     for f in forms:
         with f.open(encoding="utf-8") as fh:
-            rows.append(list(csv.DictReader(fh)))
+            rows.append([r for r in csv.DictReader(fh) if r.get("block", "main") == "main"])   # the model items only
     return forms, rows, Counter(r["item_id"] for fm in rows for r in fm)
 
 
@@ -394,7 +394,7 @@ def test_baseline_forms_follow_the_246_item_design(tmp_path):
     items_path = tmp_path / "main.jsonl"
     items_path.write_text("\n".join(json.dumps(it, ensure_ascii=False) for it in _synthetic_items()) + "\n", encoding="utf-8")
     out = tmp_path / "human"
-    r = _run_script("scripts/make_validation_forms.py", "baseline", "--items", str(items_path), "--out", str(out))
+    r = _run_script("scripts/make_validation_forms.py", "baseline", "--items", str(items_path), "--out", str(out), "--no-model-prompt")
     info = json.loads(r.stdout.strip().splitlines()[-1])
     forms, rows, cover = _coverage(out)
     assert len(forms) == 20 and all(len(fm) == 30 and len({r["item_id"] for r in fm}) == 30 for fm in rows)
@@ -422,41 +422,56 @@ def test_baseline_forms_follow_the_246_item_design(tmp_path):
     # the seed is the public sampling seed, and the same seed reproduces the same forms
     assert info["seed"] == 20261102
     out2 = tmp_path / "human2"
-    _run_script("scripts/make_validation_forms.py", "baseline", "--items", str(items_path), "--out", str(out2))
+    _run_script("scripts/make_validation_forms.py", "baseline", "--items", str(items_path), "--out", str(out2), "--no-model-prompt")
     assert [f.read_text(encoding="utf-8") for f in sorted(out2.glob("*.csv"))] == [f.read_text(encoding="utf-8") for f in forms]
     # a smaller design keeps the invariants (4 forms x 24 = 6 anchors + 36 items on exactly two forms)
     out3 = tmp_path / "small"
-    _run_script("scripts/make_validation_forms.py", "baseline", "--items", str(items_path), "--out", str(out3), "--n-forms", "4", "--per-form", "24")
+    _run_script("scripts/make_validation_forms.py", "baseline", "--items", str(items_path), "--out", str(out3), "--n-forms", "4", "--per-form", "24",
+                "--no-model-prompt")
     _forms3, rows3, cover3 = _coverage(out3)
     assert len(rows3) == 4 and all(len(fm) == 24 for fm in rows3) and sorted(set(cover3.values())) == [2, 4] and len(cover3) == 42
     # sizes that do not fit are refused, not rounded
     import subprocess
     bad = subprocess.run([sys.executable, "scripts/make_validation_forms.py", "baseline", "--items", str(items_path), "--out", str(tmp_path / "bad"),
-                          "--n-forms", "20", "--per-form", "40"], cwd=ROOT, capture_output=True, text=True, check=False)
+                          "--n-forms", "20", "--per-form", "40", "--no-model-prompt"], cwd=ROOT, capture_output=True, text=True, check=False)
     assert bad.returncode != 0 and "cells" in bad.stderr
 
 
 def test_validation_score_reports_ac1_and_marginals(tmp_path):
+    """DD 10.1 / 12.21 (amended 1 Oct 2026): alpha beside raw agreement, AC1 and the label marginals, on the
+    Part B sheet layout of docs/gate1/VALIDATION_PROTOCOL.md (opaque row ids, the author's key kept apart)."""
     import csv
 
-    ret = tmp_path / "returned"
-    ret.mkdir()
-    fields = ["item_id", "task", "variant", "input", "candidate", "question_vi", "correct", "spelling", "lexical", "offensive", "comment"]
+    d = tmp_path / "val"
+    ret = d / "returned"
+    ret.mkdir(parents=True)
+    key = {f"B-{i + 1:04d}": {"item_id": f"T1-V1-{i:06d}", "cell": "T1-V1", "stratum": "T1|V1|lexicon", "base_pair_id": f"bp{i}",
+                              "split": "test", "control": False, "control_kind": None, "expected_correct": "yes",
+                              "validators": ["A", "B"], "weight": 10.0, "stratum_population": 500} for i in range(50)}
+    (d / "B_key.json").write_text(json.dumps(key), encoding="utf-8")
+    fields = ["row_id", "task", "kind", "input", "candidate", "system_verdict", "question_vi", "question_en", "correct", "spelling",
+              "lexical_input", "lexical_candidate", "offensive", "dialect", "comment"]
     for coder in ("A", "B"):
-        with open(ret / f"validation_form_{coder}.csv", "w", newline="", encoding="utf-8") as f:
+        with open(ret / f"B_items_{coder}.csv", "w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=fields)
             w.writeheader()
             for i in range(50):
                 # 96% prevalence, coder B disagrees on two items: alpha low, AC1 high (design 10.1)
-                correct = "no" if i < 2 else "yes"
+                correct = "Không" if i < 2 else "Có"
                 if coder == "B" and i in (2, 3):
-                    correct = "no"
-                w.writerow({"item_id": f"T1-V1-{i:06d}", "task": "T1", "variant": "V1", "input": "x", "candidate": "y", "question_vi": "q",
-                            "correct": correct, "spelling": "yes", "lexical": "no", "offensive": "no", "comment": ""})
-    out = tmp_path / "val"
-    _run_script("scripts/make_validation_forms.py", "score", "--out", str(out), "--returned", str(ret / "*.csv"))
-    rep = json.loads((out / "validation_report.json").read_text(encoding="utf-8"))
-    c = rep["correct"]
+                    correct = "Không"
+                w.writerow({"row_id": f"B-{i + 1:04d}", "task": "T1", "kind": "V1", "input": "x", "candidate": "y", "question_vi": "q",
+                            "correct": correct, "spelling": "yes", "lexical_input": "yes", "lexical_candidate": "no", "offensive": "no",
+                            "dialect": "", "comment": ""})
+    _run_script("scripts/make_validation_forms.py", "score", "--dir", str(d), "--n-boot", "200")
+    rep = json.loads((d / "report" / "validation_report.json").read_text(encoding="utf-8"))
+    c = rep["B"]["agreement"]["correct"]
     assert {"alpha", "alpha_ci", "percent_agreement", "n_ratings", "ac1", "ac1_ci", "marginals"} <= set(c)
     assert c["percent_agreement"] == 0.96 and c["ac1"] > 0.9 > c["alpha"] and c["ac1_ci"][0] <= c["ac1"] <= c["ac1_ci"][1]
-    assert c["marginals"] == {"no": 0.06, "yes": 0.94} and rep["spelling"]["ac1"] == 1.0 and rep["spelling"]["marginals"] == {"yes": 1.0}
+    assert c["marginals"] == {"no": 0.06, "yes": 0.94} and rep["B"]["agreement"]["spelling"]["ac1"] == 1.0
+    assert rep["B"]["agreement"]["spelling"]["marginals"] == {"yes": 1.0}
+    # the two split rows go to the author's adjudication log; the unanimous "no" rows count against precision
+    with open(d / "adjudication.tsv", encoding="utf-8") as fh:
+        adj = list(csv.DictReader(fh, delimiter="\t"))
+    assert sorted(r["row_id"] for r in adj) == ["B-0003", "B-0004"]
+    assert rep["B"]["generator_precision"]["pooled"]["n"] == 48 and rep["B"]["generator_precision"]["pooled"]["n_yes"] == 46

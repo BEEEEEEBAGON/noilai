@@ -31,7 +31,8 @@ Safety guards
   * an API backend refuses an item file whose path contains validation / human / sealed, one
     flagged never_to_api (header, item or sibling manifest), non-core items unless
     allow_noncore_api (the core set and the public attested examples are API-eligible), and
-    never sends an attested item whose `vulgar` flag is set (counted in the manifest);
+    never sends an attested item whose `vulgar` flag is set, nor an item the native validators flagged as offensive
+    (`data/audit/validator_flags.json`, DD 11.5); both counts go to the manifest;
   * a provider whose terms train on inputs, or whose terms are unknown (no explicit
     `trains_on_inputs: false` in the models file), never receives a core item
     (DESIGN_DECISIONS 11.2 / 12.41): run it on the dev-derived API set, or pass
@@ -157,6 +158,7 @@ class RunOptions:
     allow_demo_overlap: bool = False          # override the phrase-level refusal (dev pilots only)
     demo_overlap_policy: str = "flag"         # syllable-level overlap: flag | drop | refuse
     attested_policy: str = "exact2"           # exact2 | all
+    validator_flags: str | None = None        # validators' offensive flags (DD 11.5); None = data/audit/validator_flags.json if present
     max_new_tokens: int = 64
     batch_size: int = 8
     logprobs: bool = True                 # when the backend supports them (T3 forced choice, XCOPA)
@@ -169,6 +171,7 @@ class RunOptions:
     system_prompt: str | None = None
     n_accelerators: int | None = None  # override for TPUs, which torch.cuda cannot count
     xcopa_logprob_mode: str = "choice"    # 'choice' (candidate continuations) or 'none'
+    t1_forced_choice: bool = False        # EXPLORATORY T1 multi-distractor forced choice (noilai.eval.forced_choice)
     account_holder: str | None = None     # ROLE of the API / compute / hub account holder, never a name (11.2)
     require_census: bool = False          # fail when no normalization census exists for the model
     notes: dict = field(default_factory=dict)
@@ -230,6 +233,40 @@ def read_canary(path: Path, items: list[dict]) -> str | None:
 def is_vulgar(item: dict) -> bool:
     v = item.get("vulgar")
     return v is True or (isinstance(v, str) and v.strip().lower() in ("yes", "true", "1"))
+
+
+VALIDATOR_FLAGS = AUDIT_DIR / "validator_flags.json"
+
+
+def text_digest(text: str) -> str:
+    """SHA-256 of a phrase's canonical form: how the validator-flag file names a flagged text, so that a committed file
+    never holds test-split text (DESIGN_DECISIONS 11.1: test items live only in the gated repository)."""
+    return hashlib.sha256(R.canonical_text(text).encode("utf-8")).hexdigest()
+
+
+def load_validator_flags(path: str | Path | None = None) -> dict:
+    """The native validators' offensive flags (DESIGN_DECISIONS 10.1 / 11.5: one validator's "Có" flags an item), as
+    written by `scripts/make_validation_forms.py score`: item ids and the SHA-256 of each flagged text's canonical form
+    (never the text, never a validator letter). Absent file (before Gate 1) = nothing flagged; the source path is
+    recorded in the run manifest."""
+    p = Path(path) if path else VALIDATOR_FLAGS
+    if not p.exists():
+        return {"item_ids": set(), "text_sha256": set(), "source": None}
+    d = json.loads(p.read_text(encoding="utf-8"))
+    return {"item_ids": set(d.get("offensive_item_ids") or []),
+            "text_sha256": set(d.get("offensive_text_sha256") or []),
+            "source": str(p.relative_to(ROOT)) if p.is_relative_to(ROOT) else str(p)}
+
+
+def flagged_by_validators(item: dict, flags: dict) -> bool:
+    """An item the validators flagged (by id), or one whose input, candidate, gold or attested output is a flagged text
+    (compared by the SHA-256 of the canonical form)."""
+    if item.get("item_id") in flags["item_ids"]:
+        return True
+    if not flags["text_sha256"]:
+        return False
+    texts = [item.get("input"), item.get("candidate"), item.get("attested_output"), item.get("output"), *(item.get("gold") or [])]
+    return any(isinstance(t, str) and t and text_digest(t) in flags["text_sha256"] for t in texts)
 
 
 def attested_eligible(item: dict, policy: str = "exact2") -> tuple[bool, str | None]:
@@ -321,8 +358,8 @@ def check_api_safety(backend: Backend, items: list[dict], opts: RunOptions,
     False (True, a string, or unknown = not cleared) never receives a core item unless
     `opts.core_to_training_provider_opt_out` documents a key with a data-use opt-out."""
     privacy = privacy or {}
-    report = {"is_api": backend.is_api, "n_excluded_vulgar": 0, "n_noncore": 0, "n_core": 0,
-              "trains_on_inputs": privacy.get("trains_on_inputs"),
+    report = {"is_api": backend.is_api, "n_excluded_vulgar": 0, "n_excluded_validator_flag": 0, "validator_flags": None,
+              "n_noncore": 0, "n_core": 0, "trains_on_inputs": privacy.get("trains_on_inputs"),
               "core_to_training_provider_opt_out": bool(opts.core_to_training_provider_opt_out)}
     if not backend.is_api:
         return items, report
@@ -337,10 +374,15 @@ def check_api_safety(backend: Backend, items: list[dict], opts: RunOptions,
     if noncore and not opts.allow_noncore_api:
         raise ApiSafetyError(f"{len(noncore)} items are not in the core set; an API backend receives the core only "
                              f"(pass --allow-noncore-api to override for a dev-set pilot)")
+    flags = load_validator_flags(opts.validator_flags)
+    report["validator_flags"] = flags["source"]
     kept = []
     for it in items:
         if is_vulgar(it):
             report["n_excluded_vulgar"] += 1
+            continue
+        if flagged_by_validators(it, flags):      # DD 11.5: validator-flagged items never reach a hosted model
+            report["n_excluded_validator_flag"] += 1
             continue
         kept.append(it)
     core = [it for it in kept if it.get("in_core")]
@@ -529,6 +571,16 @@ def t3_logprobs(backend: Backend, req: Request, messages: list[dict], opts: RunO
         out["prefix_property_violation"] = True
     out["candidate_context_hash"] = P.prompt_hash(ctx_messages)
     return out
+
+
+def t1_forced_choice(backend: Backend, req: Request, messages: list[dict], opts: RunOptions) -> dict:
+    """EXPLORATORY (docs/FORCED_CHOICE_EXPLORATORY.md): the summed log-probability of the gold and of the rule-built
+    near misses as continuations of the rendered T1 prompt + answer marker, the boundary convention of t3_logprobs."""
+    from noilai.eval import forced_choice as FC
+    arm, scope = req.arm, opts.arm_scope
+    encode = R.meaning_preserving(arm) and scope == "whole_prompt"
+    context = backend.chat_to_text(messages) + _marker_for(arm, scope)
+    return FC.score_candidates(backend, context, FC.t1_candidates(req.item), arm, encode)
 
 
 def _violations(backend: Backend, n: int) -> list[bool | None]:
@@ -975,6 +1027,8 @@ def run(backend: Backend, entry: dict, items: list[dict], item_path: Path, opts:
                     try:
                         if req.item["task"] == "T3":
                             row["logprobs"] = t3_logprobs(backend, req, msgs, opts)
+                        elif req.item["task"] == "T1" and opts.t1_forced_choice and req.arm not in P.STRIP_ARMS:
+                            row["forced_choice"] = t1_forced_choice(backend, req, msgs, opts)
                         elif req.item["task"] == X.XCOPA_TASK and opts.xcopa_logprob_mode == "choice":
                             row["logprobs"] = xcopa_logprobs(backend, req)
                     except NotImplementedError:

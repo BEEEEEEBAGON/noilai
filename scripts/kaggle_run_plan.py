@@ -92,7 +92,10 @@ CONFIGS = ROOT / "configs"
 API_BACKENDS = {"openai_compat", "gemini"}
 # hardware key of models.yaml -> (compute-log device type, device count)
 HARDWARE_DEVICES = {"t4": ("t4", 1), "2xt4": ("t4", 2), "tpu": ("tpu-v5e-8", 1), "api": ("api", 0),
-                    "p100": ("p100", 1), "l4": ("l4", 1), "mixed": (None, None)}
+                    "p100": ("p100", 1), "l4": ("l4", 1), "cpu": ("cpu", 0), "mixed": (None, None)}
+# "cpu": a Kaggle CPU session (no GPU quota). No entry is configured for it: a CPU run passes
+# --allow-hardware-mismatch and `--backend hf --device cpu --dtype float32` (notebooks/kaggle_cpu_pilot.ipynb),
+# and the compute log records device "cpu" x 0 accelerators, i.e. zero GPU-hours.
 # entry hardware -> the sessions that can host it (a 1xT4 entry runs on a 2xT4 session; nothing else crosses)
 SESSION_COMPATIBLE = {"t4": {"t4", "2xt4"}, "2xt4": {"2xt4"}, "tpu": {"tpu"}, "l4": {"l4"}, "p100": {"p100"},
                       "api": {"t4", "2xt4", "tpu", "l4", "p100", "api", "cpu"}}
@@ -194,7 +197,33 @@ def expand_models(run: dict, plan: dict, models_cfg: dict) -> list[str]:
 
 # ------------------------------------------------------------------ commands
 def run_dir(plan: dict, run: dict, model: str) -> str:
-    return f"{plan.get('runs_root', 'data/runs')}/{run['id']}__{model}"
+    suffix = f"__{run['chunk_tag']}" if run.get("chunk_tag") else ""
+    return f"{plan.get('runs_root', 'data/runs')}/{run['id']}__{model}{suffix}"
+
+
+NARROWABLE = ("paraphrases", "arms", "tasks", "variants")
+
+
+def narrow_run(run: dict, overrides: dict | None, tag: str | None = None) -> dict:
+    """A compute chunk's view of a run line (docs/COMPUTE_PLAN.md): it may only NARROW the line's paraphrases, arms,
+    tasks or variants (never add one), and writes to its own run directory `<run>__<model>__<tag>` so that a manifest
+    always describes exactly the rows beside it. The analysis pools the directories of a line by its run id. A tag
+    without overrides keeps the line whole in a directory of its own (the CPU notebook's `cpu` tag: an engine apart)."""
+    if not overrides:
+        return run if not tag else {**run, "chunk_tag": tag}
+    bad = set(overrides) - set(NARROWABLE)
+    if bad:
+        raise ValueError(f"a chunk may only narrow {NARROWABLE}, not {sorted(bad)}")
+    out = dict(run)
+    for k, v in overrides.items():
+        wider = set(v) - set(run.get(k) or [])
+        if wider:
+            raise ValueError(f"chunk override widens {k} of {run['id']!r} by {sorted(wider)}")
+        if not v:
+            raise ValueError(f"chunk override empties {k} of {run['id']!r}")
+        out[k] = list(v)
+    out["chunk_tag"] = tag or "-".join(f"{k}-{'+'.join(v)}" for k, v in sorted(overrides.items()))
+    return out
 
 
 def is_api(entry: dict) -> bool:
@@ -240,6 +269,29 @@ def revision_pinned(entry: dict) -> bool:
     return isinstance(rev, str) and any(p.fullmatch(rev.strip()) for p in REVISION_PATTERNS)
 
 
+# DESIGN_DECISIONS 6.2: for a tokenizer whose census verdict for an arm is "normalizes" (identical token ids), that arm
+# is not run: its effect is 0 by construction and the analysis emits a "0 by construction" row (DEVIATIONS 1 Oct 2026:
+# the runner used to run these arms anyway, ~2/5 of E3 on the normalizing families).
+CENSUS_SKIPPABLE_ARMS = {"nfd": "verdict_nfd", "pc": "verdict_pc", "win1258": "verdict_pc"}
+
+
+def census_skipped_arms(run: dict, entry: dict) -> dict[str, str]:
+    """{arm: reason} for the run's arms that the model's tokenizer census makes 0 by construction (DD 6.2). Empty when
+    the model is not censused (data/audit/<family or tokenizer_audit>.json absent): nothing is skipped on a guess."""
+    arms = [a for a in run.get("arms") or [] if a in CENSUS_SKIPPABLE_ARMS]
+    if not arms:
+        return {}
+    from noilai.eval.run import normalization_census_for
+    census = normalization_census_for(entry, {})
+    if census.get("status") != "censused":
+        return {}
+    out = {}
+    for a in arms:
+        if census.get(CENSUS_SKIPPABLE_ARMS[a]) == "normalizes":
+            out[a] = f"0 by construction: {CENSUS_SKIPPABLE_ARMS[a]} = normalizes ({census.get('source')})"
+    return out
+
+
 def build_command(run: dict, model: str, plan: dict, models_cfg: dict, project_root: Path = ROOT,
                   python: str = sys.executable, extra: Sequence[str] = ()) -> list[str]:
     """The run_eval.py argv for one (run, model). Raises on a guarded combination."""
@@ -266,7 +318,11 @@ def build_command(run: dict, model: str, plan: dict, models_cfg: dict, project_r
         cmd += ["--variants", *run["variants"]]
     if run.get("paraphrases"):
         cmd += ["--paraphrases", *run["paraphrases"]]
-    cmd += ["--shots", str(run.get("shots", 0)), "--arms", *run["arms"]]
+    skipped = census_skipped_arms(run, entry)
+    arms = [a for a in run["arms"] if a not in skipped]
+    if not arms:
+        raise ValueError(f"run {run['id']!r}: every arm is 0 by construction for {model} ({skipped})")
+    cmd += ["--shots", str(run.get("shots", 0)), "--arms", *arms]
     for key, flag in ABLATION_FLAGS:
         if run.get(key):
             cmd += [flag, str(run[key])]
@@ -707,7 +763,8 @@ def execute(run_id: str, models: Sequence[str] | None = None, platform: str = "k
             python: str = sys.executable, session_hardware: str | None = None, allow_hardware_mismatch: bool = False,
             session_t0: float | None = None, max_session_hours: float | None = None,
             after_each: Callable[[dict], None] | None = None, verify: bool = True, poll_s: float = 5.0,
-            allow_unpinned_revision: bool = False) -> list[dict]:
+            allow_unpinned_revision: bool = False, line_overrides: dict | None = None,
+            chunk_tag: str | None = None) -> list[dict]:
     """Run every (run, model) command in order; return one result dict per model.
 
     Statuses: 'dry-run', 'ok', 'failed (<rc>)', 'parked: ...' (an API day's cap reached; resume
@@ -718,7 +775,7 @@ def execute(run_id: str, models: Sequence[str] | None = None, platform: str = "k
     """
     plan = plan or load_plan()
     models_cfg = models_cfg or load_models()
-    run = find_run(plan, run_id)
+    run = narrow_run(find_run(plan, run_id), line_overrides, chunk_tag)
     names = list(models) if models else expand_models(run, plan, models_cfg)
     log_path = Path(log_path) if log_path else Path(project_root) / plan.get("compute_log", "data/compute_log.csv")
     lpath = ledger_path(plan, project_root)
@@ -737,6 +794,7 @@ def execute(run_id: str, models: Sequence[str] | None = None, platform: str = "k
         out_dir = Path(project_root) / run_dir(plan, run, name)
         res = {"run": run_id, "model": name, "cmd": None, "out": str(out_dir), "status": "dry-run",
                "hardware": entry.get("hardware"), "session_hardware": session_hardware}
+        res["census_skipped_arms"] = census_skipped_arms(run, entry)
         try:
             cmd = build_command(run, name, plan, models_cfg, project_root=project_root, python=python, extra=extra)
         except ValueError as e:               # a guard of build_command: report, go on with the next model

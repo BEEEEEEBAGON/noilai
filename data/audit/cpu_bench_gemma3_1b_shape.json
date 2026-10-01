@@ -1,0 +1,23 @@
+{
+ "model": "Gemma3ForCausalLM with gemma-3-1b-it's dimensions, random weights, float32",
+ "cpus": 4,
+ "torch": "2.14.1+cu130",
+ "load_avg_start": [
+  0.705078125,
+  1.1513671875,
+  1.017578125
+ ],
+ "prefill_520_s": 2.95,
+ "continuation_3tok_on_cache_520_s": 0.16,
+ "generate_bs1_520p_24new_s": 5.61,
+ "generate_bs8_520p_24new_s": 29.16,
+ "prefill_950_s": 5.58,
+ "continuation_3tok_on_cache_950_s": 0.14,
+ "generate_bs1_950p_24new_s": 7.96,
+ "generate_bs8_950p_24new_s": 51.28,
+ "load_avg_end": [
+  3.79150390625,
+  2.27392578125,
+  1.4619140625
+ ]
+}

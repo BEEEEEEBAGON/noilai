@@ -22,8 +22,21 @@ HUMAN_BASELINE_PEOPLE = 20
 HUMAN_BASELINE_ITEMS_PER_PERSON = 30
 HUMAN_BASELINE_ANCHORS = 6
 HUMAN_BASELINE_DOUBLE_CODED = 240
-VALIDATION_ITEMS = 1000
-VALIDATION_OVERLAP = 200
+# native validation (design 10.1 as amended 1 Oct 2026, docs/DEVIATIONS.md; sized by scripts/validation_sizing.py):
+# a probability sample of VALIDATION_PER_CELL generated items per task x variant cell (weights recorded per stratum)
+# plus VALIDATION_CONTROLS_PER_CELL planted control items per cell (a corrupted gold; excluded from generator precision),
+# every item judged by two validators, VALIDATION_OVERLAP items by all three when three take part.
+VALIDATION_PER_CELL = 30
+VALIDATION_CONTROLS_PER_CELL = 4
+VALIDATION_ITEMS = 12 * (VALIDATION_PER_CELL + VALIDATION_CONTROLS_PER_CELL)   # 408 (was 1,000 before the amendment)
+VALIDATION_OVERLAP = 60            # items every validator sees when three take part (was 200 of 1,000)
+VALIDATION_CALIBRATION_ITEMS = 16  # keyed calibration round before the main sheet; never in any estimate
+VALIDATION_CALIBRATION_PASS = 0.8  # share of calibration `correct` answers matching the key below which the validator is
+                                   # re-briefed and given a second calibration set before Part B (never excluded on it)
+VALIDATION_CONTROL_CATCH_MIN = 0.75  # a validator catching fewer planted controls is reported and re-briefed; never excluded or
+                                     # down-weighted on it (pre-specified, docs/gate1/VALIDATION_PROTOCOL.md section 6)
+VALIDATION_T2_GOLD_OVERLAP = 50    # Part E: core T2 items every validator sees (the rest are split, one validator each)
+VALIDATION_SECONDS_PER_ITEM = 35   # planning figure for the generated sheet (the instructions' 30-40 s)
 ATTESTED_EXACT_FLOOR_FOR_H6 = 100   # verified exact two-syllable rows from >= 3 collections, else H6 is descriptive
 ATTESTED_MIN_COLLECTIONS = 3
 

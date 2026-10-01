@@ -165,7 +165,8 @@ def _bca_bounds(boots: np.ndarray, est: float, jack: np.ndarray, level: float) -
 
 def cluster_bootstrap(values: Sequence[float], clusters: Sequence, stat: Callable[[np.ndarray, np.ndarray], float] | None = None,
                       n_boot: int = constants.BOOTSTRAP_B, level: float = 0.95, seed: int = 0,
-                      strata: Sequence | None = None, bca: bool | None = None, small_cell_rule: bool = True) -> CI:
+                      strata: Sequence | None = None, bca: bool | None = None, small_cell_rule: bool = True,
+                      proportion: bool = True) -> CI:
     """Bootstrap CI of a weighted statistic (default: the mean) over items, resampling
     clusters (within `strata` when given). `stat(values, weights)` must accept per-item
     weights. `bca=None` follows design 8.2: BCa from constants.BCA_MIN_CLUSTERS clusters,
@@ -179,7 +180,7 @@ def cluster_bootstrap(values: Sequence[float], clusters: Sequence, stat: Callabl
     if stat is None:
         stat = _mean_stat
     est = stat(v, np.ones_like(v))
-    binary = _is_binary(v) and stat is _mean_stat
+    binary = proportion and _is_binary(v) and stat is _mean_stat      # a difference vector is never a proportion
     small = k < constants.SMALL_CELL_MAX_BASE_PAIRS or (binary and est in (0.0, 1.0))
     if small_cell_rule and small and binary:
         return wilson_deff_ci(v, inv, k, level)
@@ -214,11 +215,16 @@ def accuracy_ci(correct: Sequence[bool], clusters: Sequence, **kw) -> CI:
 
 
 def paired_difference_ci(correct_a: Sequence[bool], correct_b: Sequence[bool], clusters: Sequence, **kw) -> CI:
-    """CI of mean(b) - mean(a) on the same items (e.g. arm minus baseline)."""
+    """CI of mean(b) - mean(a) on the same items (e.g. arm minus baseline). The small-cell Wilson rule of design 8.2
+    is a rule for PROPORTIONS: a difference vector whose values happen to lie in {0, 1} (b never below a, or no
+    discordant item at all) is not a proportion, and a Wilson interval on it excludes negative differences by
+    construction (found on the first end-to-end run, 1 Oct 2026). Differences therefore keep the bootstrap interval
+    unless the caller asks otherwise (the small-cell flag is still set)."""
     a = np.asarray(correct_a, dtype=float)
     b = np.asarray(correct_b, dtype=float)
     if a.shape != b.shape:
         raise ValueError("paired conditions must have the same items in the same order")
+    kw.setdefault("proportion", False)
     return cluster_bootstrap(b - a, clusters, **kw)
 
 

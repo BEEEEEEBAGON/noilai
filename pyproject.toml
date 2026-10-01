@@ -21,7 +21,7 @@ dependencies = [
 eval = ["transformers>=4.45", "torch>=2.2", "sentencepiece>=0.2", "tokenizers>=0.20", "protobuf>=4", "accelerate>=0.30", "openai>=1.40", "google-genai>=1.0", "groq>=0.11"]
 vllm = ["vllm==0.30.0"]                       # DESIGN_DECISIONS 7.3: one vLLM version for the whole campaign (the notebooks' VLLM_VERSION; tests/test_cloud.py keeps the three equal)
 llama_cpp = ["llama-cpp-python==0.3.35"]      # DESIGN_DECISIONS 7.3: the GGUF fallback engine (PhoGPT, T4 fallbacks)
-dev = ["pytest>=8", "hypothesis>=6", "ruff>=0.6", "nbformat>=5.10", "matplotlib>=3.8", "scikit-learn>=1.4"]
+dev = ["pytest>=8", "hypothesis>=6", "ruff>=0.6", "nbformat>=5.10", "matplotlib>=3.8", "scikit-learn>=1.4", "openpyxl>=3.1", "krippendorff>=0.6"]
 
 [tool.setuptools.packages.find]
 include = ["noilai*"]

@@ -580,6 +580,9 @@ def score_output(item: dict, out: dict, inv: Inventory | None = None) -> dict:
         answer, method = extract_answer(out.get("raw"), task)
     if task in ("T1", "attested"):
         row = score_t1(item, answer, method, inv)
+        if out.get("forced_choice") is not None:          # EXPLORATORY columns (noilai.eval.forced_choice)
+            from noilai.eval.forced_choice import fc_metrics
+            row.update(fc_metrics(out["forced_choice"]))
     elif task == "T2":
         row = score_t2(item, answer, method, out.get("raw"), inv)
     elif task == "T3":
@@ -735,6 +738,12 @@ def aggregate(rows: list[dict]) -> dict:
             d["paired_accuracy"] = _rate(sub, "paired_correct")
             d["paired_accuracy_norm"] = _rate(sub, "paired_correct_norm")
             d["pair_both_correct_rate"] = _rate(sub, "pair_both_correct")
+        fc1 = [r for r in sub if r["task"] == "T1" and r.get("fc_correct") is not None]
+        if fc1:                                   # EXPLORATORY T1 forced choice (noilai.eval.forced_choice); own columns
+            d["t1_fc_accuracy"] = _rate(fc1, "fc_correct")
+            d["t1_fc_accuracy_mean"] = _rate(fc1, "fc_correct_mean")
+            d["t1_fc_chance"] = sum(r["fc_chance"] for r in fc1) / len(fc1)
+            d["t1_fc_n"] = len(fc1)
         if any(r["task"] == "T2" for r in sub):
             d["named_variant_class_accuracy"] = _rate(sub, "named_variant_correct")
             d["gold_order_reversed_rate"] = (sum(1 for r in sub if r.get("gold_order") == "reversed") / len(sub)
@@ -784,6 +793,8 @@ def summary_table(agg: dict) -> str:
                 extra += f" bal={c['balanced_accuracy']:.3f} d'={c['d_prime']:.2f}"
             if c.get("forced_choice_accuracy") is not None:
                 extra += f" fc={c['forced_choice_accuracy']:.3f}"
+            if c.get("t1_fc_accuracy") is not None:
+                extra += f" t1fc={c['t1_fc_accuracy']:.3f} (chance {c['t1_fc_chance']:.3f})"
             if c.get("paired_accuracy") is not None:
                 extra += f" paired={c['paired_accuracy']:.3f}"
             if c.get("paired_accuracy_norm") is not None:
