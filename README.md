@@ -57,6 +57,7 @@ scripts/
   plan_chunks.py          the run plan cut into Kaggle sessions in the reverse of the pre-registered cut order:
                           configs/compute_chunks.yaml + notebooks/chunks/*.ipynb + the tables of docs/COMPUTE_PLAN.md (--check)
   cpu_bench.py            CPU cost of a Gemma-3-1B-sized model (random weights) for the CPU pilot estimates
+  corpus_count_kit.sh     the C2 placement count on Wikipedia + CC-100 vi (streamed; DD 6.3, BLOCKED.md)
   colab_setup.py          Drive mount, token-safe clone (GIT_ASKPASS), project dir, pinned pip, environment record, secrets
   compute_log.py          GPU-hours CSV for checklist C1 (append / totals / show)
 configs/
