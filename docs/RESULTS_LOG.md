@@ -196,3 +196,19 @@ validator (≈ 2.8 h on the generated sheet), expected α on `correct` 0.76 with
 cell appears in its sample) 0.96 / 0.79. The vectorized α and AC1 are asserted equal to `noilai.stats.agreement` on the first
 replicate of every design.
 
+## 2026-10-01 — Prompt lengths under the real Gemma 3 tokenizer, and the stand-in harness smoke (no model outputs) [RL-2026-10-01-05]
+
+Engineering record, not a result about any model. (1) Prompt lengths: 1,200 items of a THROWAWAY scratch build (seed
+999001, never committed; the same generator and sizes as v0.3, whose item files are private) rendered with
+`noilai.eval.prompts.render` (3 shots, explained instruction, whole-prompt scope) under a stand-in of the Gemma 3 chat
+template and tokenized with the real Gemma 3 SentencePiece model through HF `tokenizers` (ids identical to the native
+`sentencepiece` ids on four probe strings). Maximum tokens per prompt, p0 / p1 / p2: NFC T1 522 / 535 / 529, T2 521 /
+548 / 535, T3 576 / 602 / 598; PC T1 815 / 840 / 832, T2 833 / 882 / 860, T3 905 / 946 / 946; NFD T1 968 / 1,003 / 991,
+T2 1,020 / 1,076 / 1,056, T3 1,078 / 1,126 / 1,131; explicit onset–rime–tone input (NFC p0) T1 683, T2 677, T3 845.
+Every NFD T2/T3 prompt and 98 of 413 NFD T1 prompts exceed the 960-token budget of `max_model_len` 1,024 −
+64 → `max_model_len` 2,048 (DEVIATIONS). (2) `scripts/standin_smoke.py`: a random-weight 2-layer Gemma3ForCausalLM with the
+real tokenizer ran 20 dev items × {nfc, nfd} through `run_eval.py --t1-forced-choice --score` and `scripts/check_run.py`
+on CPU in 34 s (item gate, deterministic rescoring, statistics and results hashes all pass; `--verify` passes and
+catches a one-byte change). Two defects found and fixed on the way (DEVIATIONS rows of 1 October: HF log-probability
+memory, paired-difference interval). Its accuracies are those of random weights and are not reported anywhere.
+

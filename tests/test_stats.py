@@ -293,3 +293,13 @@ def test_intervention_table_grows_the_family_across_tasks_and_uses_the_paired_t_
     inter = tables.intervention_table(df, n_boot=200)
     assert set(zip(inter["arm"], inter["task"])) == {("nfd", "T1"), ("nfd", "T3"), ("placement_new", "T1"), ("placement_new", "T3")}
     assert (inter["family_size"] == 4).all() and (inter["p_source"] == "paired_t").all() and (inter["n_base_pairs"] == 400).all()
+
+
+def test_a_paired_difference_is_never_given_a_proportion_interval():
+    """First end-to-end run (1 Oct 2026): with no discordant item the difference vector is all 0, which the small-cell
+    rule mistook for a binary proportion and gave Wilson [0, 0.16], an interval that excludes every negative difference.
+    The same happens whenever b >= a on every item. Differences keep the bootstrap interval, flagged when small."""
+    d = bootstrap.paired_difference_ci([0] * 20, [0] * 20, list(range(20)), n_boot=200)
+    assert d.method != "wilson_deff" and d.lo == d.hi == 0.0
+    up = bootstrap.paired_difference_ci([0, 0, 1, 1] * 5, [1, 0, 1, 1] * 5, list(range(20)), n_boot=500)
+    assert up.method != "wilson_deff" and up.lo >= 0 and up.estimate == 0.25

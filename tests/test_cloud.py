@@ -380,7 +380,7 @@ def test_hardware_is_consistent_with_dtype_and_gemma3_is_never_fp16(models_cfg):
             assert m["hardware"] == "api" and m["dtype"] is None and m["quantization"] is None, m["name"]
         else:
             assert isinstance(m["hf_id"], str) and "/" in m["hf_id"], m["name"]
-            assert m["max_model_len"] and m["max_model_len"] >= 1024, m["name"]       # DD 7.3: 1024
+            assert m["max_model_len"] and m["max_model_len"] >= 2048, m["name"]       # DD 7.3 as amended 1 Oct 2026 (NFD prompts reach 1,131 tokens)
             assert "revision" in m, (m["name"], "DD 7.1: every self-hosted entry carries `revision` (null until the freeze)")
         entry = B.get_model_entry(models_cfg, m["name"])
         if m["hardware"] == "tpu":
@@ -401,7 +401,7 @@ def test_hardware_is_consistent_with_dtype_and_gemma3_is_never_fp16(models_cfg):
     _check(models_cfg["by_name"]["gemma-3-1b-it"], hw)      # and the real entry passes
     # DD 7.3 engine defaults
     d = models_cfg["defaults"]
-    assert d["max_model_len"] == 1024 and d["gpu_memory_utilization"] == 0.85
+    assert d["max_model_len"] == 2048 and d["gpu_memory_utilization"] == 0.85    # 1024 before docs/DEVIATIONS.md "DESIGN_DECISIONS 7.3 (max_model_len)"
     assert d["engine_kwargs"] == {"attention_backend": "TRITON_ATTN", "limit_mm_per_prompt": {"image": 0, "audio": 0},
                                   "enable_prefix_caching": True, "max_num_seqs": 64}
     # PhoGPT is not runnable on vLLM 0.30 (DD 7.2 / 12.25)

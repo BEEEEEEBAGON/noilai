@@ -452,22 +452,24 @@ class HFBackend(Backend):
             self.last_n_tokens.append(len(c_ids))
             seqs.append(p_ids + c_ids)
             spans.append((len(p_ids), len(p_ids) + len(c_ids)))
-        pad = self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else 0
-        L = max(len(s) for s in seqs)
-        input_ids = torch.full((len(seqs), L), pad, dtype=torch.long)
-        attn = torch.zeros((len(seqs), L), dtype=torch.long)
-        for i, s in enumerate(seqs):          # right padding: positions stay aligned
-            input_ids[i, : len(s)] = torch.tensor(s)
-            attn[i, : len(s)] = 1
-        input_ids, attn = input_ids.to(self.device), attn.to(self.device)
-        with torch.no_grad():
-            logits = self.model(input_ids=input_ids, attention_mask=attn).logits.float()
-        logp = torch.log_softmax(logits, dim=-1)
+        # One sequence per forward pass, keeping only the logits of the positions that predict the continuation:
+        # the earlier batched version materialized (n_continuations x length x vocab) float32 logits and their
+        # log-softmax, which for Gemma 3's 262,144-piece vocabulary is ~8 GB per array at 8 candidates x 1,000
+        # tokens and was killed for lack of memory on the first CPU run (1 Oct 2026). Values are unchanged: the
+        # summed log-probability of the continuation tokens given everything before them.
         out = []
-        for i, (a, b) in enumerate(spans):
+        for s, (a, b) in zip(seqs, spans):
+            ids = torch.tensor([s], dtype=torch.long, device=self.device)
+            keep = b - a + 1                       # positions a-1 .. b-1 predict tokens a .. b-1 (and one spare)
+            with torch.no_grad():
+                try:
+                    logits = self.model(input_ids=ids, logits_to_keep=keep).logits
+                except TypeError:                  # a model class without logits_to_keep: full logits, sliced
+                    logits = self.model(input_ids=ids).logits[:, -keep:, :]
+            logp = torch.log_softmax(logits[0].float(), dim=-1)      # row j predicts position (b - keep) + j + 1
             tot = 0.0
             for pos in range(a, b):
-                tot += float(logp[i, pos - 1, input_ids[i, pos]].item())
+                tot += float(logp[pos - 1 - (b - keep), s[pos]].item())
             out.append(tot)
         return out
 

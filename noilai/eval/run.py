@@ -169,6 +169,7 @@ class RunOptions:
     system_prompt: str | None = None
     n_accelerators: int | None = None  # override for TPUs, which torch.cuda cannot count
     xcopa_logprob_mode: str = "choice"    # 'choice' (candidate continuations) or 'none'
+    t1_forced_choice: bool = False        # EXPLORATORY T1 multi-distractor forced choice (noilai.eval.forced_choice)
     account_holder: str | None = None     # ROLE of the API / compute / hub account holder, never a name (11.2)
     require_census: bool = False          # fail when no normalization census exists for the model
     notes: dict = field(default_factory=dict)
@@ -529,6 +530,16 @@ def t3_logprobs(backend: Backend, req: Request, messages: list[dict], opts: RunO
         out["prefix_property_violation"] = True
     out["candidate_context_hash"] = P.prompt_hash(ctx_messages)
     return out
+
+
+def t1_forced_choice(backend: Backend, req: Request, messages: list[dict], opts: RunOptions) -> dict:
+    """EXPLORATORY (docs/FORCED_CHOICE_EXPLORATORY.md): the summed log-probability of the gold and of the rule-built
+    near misses as continuations of the rendered T1 prompt + answer marker, the boundary convention of t3_logprobs."""
+    from noilai.eval import forced_choice as FC
+    arm, scope = req.arm, opts.arm_scope
+    encode = R.meaning_preserving(arm) and scope == "whole_prompt"
+    context = backend.chat_to_text(messages) + _marker_for(arm, scope)
+    return FC.score_candidates(backend, context, FC.t1_candidates(req.item), arm, encode)
 
 
 def _violations(backend: Backend, n: int) -> list[bool | None]:
@@ -975,6 +986,8 @@ def run(backend: Backend, entry: dict, items: list[dict], item_path: Path, opts:
                     try:
                         if req.item["task"] == "T3":
                             row["logprobs"] = t3_logprobs(backend, req, msgs, opts)
+                        elif req.item["task"] == "T1" and opts.t1_forced_choice and req.arm not in P.STRIP_ARMS:
+                            row["forced_choice"] = t1_forced_choice(backend, req, msgs, opts)
                         elif req.item["task"] == X.XCOPA_TASK and opts.xcopa_logprob_mode == "choice":
                             row["logprobs"] = xcopa_logprobs(backend, req)
                     except NotImplementedError:

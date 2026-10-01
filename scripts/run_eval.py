@@ -104,6 +104,9 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--max-new-tokens", type=int, default=None)
     ap.add_argument("--batch-size", type=int, default=8)
     ap.add_argument("--no-logprobs", action="store_true", help="skip T3/XCOPA log-probabilities")
+    ap.add_argument("--t1-forced-choice", action="store_true",
+                    help="EXPLORATORY: score the T1 gold against rule-built near misses by log-probability "
+                         "(docs/FORCED_CHOICE_EXPLORATORY.md); open models only")
     ap.add_argument("--input-format", default="raw", choices=P.INPUT_FORMATS)
     ap.add_argument("--instruction", default="explained", choices=P.INSTRUCTIONS)
     ap.add_argument("--language", default="vi", choices=P.LANGUAGES)
@@ -167,7 +170,7 @@ def main(argv=None) -> int:
         allow_demo_overlap=args.allow_demo_overlap, demo_overlap_policy=args.demo_overlap_policy,
         attested_policy=args.attested_policy,
         max_new_tokens=args.max_new_tokens or int(entry.get("max_new_tokens") or 64), batch_size=args.batch_size,
-        logprobs=not args.no_logprobs, input_format=args.input_format, instruction=args.instruction,
+        logprobs=not args.no_logprobs, t1_forced_choice=args.t1_forced_choice, input_format=args.input_format, instruction=args.instruction,
         language=args.language, seed=int(entry.get("seed", 0)), run_id=args.run_id, out_root=args.out_root,
         system_prompt=args.system_prompt, n_accelerators=args.n_accelerators, account_holder=args.account_holder,
         require_census=args.require_census, notes={"smoke": bool(args.smoke)},

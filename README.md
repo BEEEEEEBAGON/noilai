@@ -45,6 +45,9 @@ scripts/
   make_validation_forms.py  the native-validation packet (Parts A-E per validator, docs/gate1/), the human-baseline forms with the
                           models' exact prompt; score returned sheets (agreement, adjudication, weighted generator precision)
   validation_sizing.py    simulation that sized the validation sample (data/audit/validation_sizing.json)
+  pin_panel.py            panel freeze kit: revision hashes, licences, gating, tokenizer SHA-256 -> configs/panel_manifest.json
+  check_run.py            one run end to end: item gate, deterministic rescoring, stats.json, results_hashes.json (--verify)
+  standin_smoke.py        CPU smoke of the whole harness with a random-weight stand-in and the real Gemma 3 tokenizer
   sample_items.py         seeded sub-samples of a release (DD 4.5): noilai_main.jsonl (4,200, 350 per cell) and noilai_c2.jsonl
   kaggle_run_plan.py      configs/run_plan.yaml -> run_eval.py commands; derives the seeded core subsets (--materialize), gates every
                           run on its item file, runs the commands under the session guards, logs hours, keeps the API request+token ledger
@@ -66,7 +69,7 @@ data/           HASHES.json (resource hashes), attested_seed.tsv, audit/ (commit
 docs/           PLAN_2026-09-30.md (founding plan), DATA_FORMAT.md (item, output, score schemas), DESIGN_DECISIONS.md (binding)
 paper/          ACL 2027 LaTeX sources
 tests/          pytest (test_vi, test_gen, test_audit, test_stats, test_constants, test_probe, test_eval, test_scripts,
-                test_release, test_e2, test_paper, test_cloud, test_validation)
+                test_release, test_e2, test_paper, test_cloud, test_validation, test_pins, test_forced_choice)
 ```
 
 ## Quick start
@@ -144,7 +147,7 @@ rerun buffer (`configs/run_plan.yaml`, `plan_lines`).
    backend without `--smoke`, and the run driver skips an unpinned self-hosted model on every
    non-smoke line unless `--allow-unpinned-revision`), family, group, tokenizer
    type, backend, dtype, quantization, hardware (`t4`, `2xt4`, `tpu` with tensor parallel 8, `l4`
-   as the Modal bf16 fallback, `api`), `max_model_len` (1,024 per DD 7.3), `chat_template_kwargs`
+   as the Modal bf16 fallback, `api`), `max_model_len` (2,048: DD 7.3's 1,024 is too small for the whole-prompt NFD arm, whose Gemma 3 prompts reach 1,131 tokens; `docs/DEVIATIONS.md`), `chat_template_kwargs`
    (`enable_thinking: false` for the Qwen families in the main runs), the DD 7.3 engine defaults
    (`gpu_memory_utilization 0.85`, `engine_kwargs`: TRITON_ATTN, zero multimodal limits, prefix
    caching, 64 seqs; the TPU entries drop the attention backend), provider `base_url` and the
