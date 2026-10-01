@@ -178,3 +178,30 @@ def test_attested_file(release):
     assert rows and all(r["task"] == "attested" for r in rows)
     assert sum(1 for r in rows if r["rule_matches_attested"]) >= 10
     assert all(("positions" in r and "exactness" in r and "eligible_h6" in r) for r in rows)
+
+
+def test_run_plan_pins_the_hash_of_every_built_item_file():
+    """Data freeze (PREREGISTRATION 4, DD 4.6): configs/run_plan.yaml records the SHA-256 of every item file of
+    the frozen release and scripts/kaggle_verify_items.py checks it before any run. Every recorded hash must
+    equal the file on disk; a file that exists with no recorded hash is an unfrozen slot."""
+    import hashlib
+    import sys
+
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import kaggle_verify_items as KVI
+
+    plan = KVI.load_plan()
+    rel = ROOT / plan["release"]
+    assert rel.resolve() == REL.resolve(), (rel, REL)
+    checked = []
+    for key, spec in plan["item_files"].items():
+        if not str(spec.get("path", "")).startswith(plan["release"]):
+            continue
+        f = ROOT / spec["path"]
+        if not f.exists():
+            continue
+        assert spec.get("sha256"), f"{key}: built file with no recorded hash (unfrozen slot)"
+        assert spec["sha256"] == hashlib.sha256(f.read_bytes()).hexdigest(), f"{key}: recorded hash differs from the file"
+        checked.append(key)
+    assert {"noilai_test", "noilai_main", "noilai_core", "noilai_dev", "noilai_c2", "attested"} <= set(checked), checked
+

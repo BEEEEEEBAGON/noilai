@@ -335,18 +335,18 @@
     "style": "old",
     "include_qu": false
   },
-  "git_commit": "bf74af052003ad0776c9bb7edfecb6084ac2b6ca",
-  "git_dirty": true,
-  "started_utc": "2026-10-01T00:30:30.597488+00:00",
-  "finished_utc": "2026-10-01T00:30:49.686642+00:00",
+  "git_commit": "f94f655f4d6e04fc548979a4c03010d109da2de5",
+  "git_dirty": false,
+  "started_utc": "2026-10-01T00:40:46.407712+00:00",
+  "finished_utc": "2026-10-01T00:41:06.357015+00:00",
   "n_lexical_pairs_available": 47535,
   "n_attested_syllables": 6830,
-  "canary_sha256": "07fb9d791fee3ad0b00d03393557e78b7924211f0eb2a75297b57bc3addd8ca5",
+  "canary_sha256": "dedff5790cd06605463b4434c5ba8166c637445bd029dec3600202e8b0c1701c",
   "private_manifest": "manifest_private.json",
   "samples": {
     "main": {
       "file": "noilai_main.jsonl",
-      "sha256": "560bfd0faee628813a3d4276d72f05cf1d2a85045c30761ef25bdb9d699fe4c2",
+      "sha256": "9e2165baf004c92aa0cf247cdeddd40ea7fe618144228d8a575d2f2dde9c9d53",
       "seed": 20261201,
       "per_cell": 350,
       "counts": {
@@ -367,7 +367,7 @@
     },
     "c2": {
       "file": "noilai_c2.jsonl",
-      "sha256": "990ac9336fdf6ef642828c695f9f1f1115e9c3123d09da304f6b3cc5743de934",
+      "sha256": "08d6c30ba6aade640019351192a8b933a5e07fcdf70072ab4868a1f9274980a0",
       "seed": 20261202,
       "n_items": 500,
       "counts": {

@@ -1086,7 +1086,7 @@
   "release": "data/release/v0.3",
   "manifest": {
    "content_sha256": "92d332e58b0e4d5d3dbf637900cd574dd2b6aac83ffecc2865c7a274ea208e11",
-   "git_commit": "bf74af052003ad0776c9bb7edfecb6084ac2b6ca",
+   "git_commit": "f94f655f4d6e04fc548979a4c03010d109da2de5",
    "n_items": 10000,
    "degenerate_counts": {
     "T1-V1": 303,

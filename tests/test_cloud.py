@@ -62,9 +62,22 @@ def models_cfg():
     return KRP.load_models()
 
 
+def _unpinned(plan: dict) -> dict:
+    """A deep copy of the plan with the frozen release's item-file hashes cleared: the fixtures below build
+    their own small releases, which the hashes recorded at the data freeze (configs/run_plan.yaml, PREREG 4)
+    would rightly reject. tests/test_release.py checks the recorded hashes against the real files."""
+    import copy
+
+    plan = copy.deepcopy(plan)
+    for spec in plan["item_files"].values():
+        if spec.get("derive") or "{release}" in str(spec.get("path", "")) or str(spec.get("path", "")).startswith((plan["release"], str(ROOT / plan["release"]))):
+            spec["sha256"] = None
+    return plan
+
+
 @pytest.fixture(scope="module")
 def plan():
-    return KRP.load_plan()
+    return _unpinned(KRP.load_plan())
 
 
 PINNED_REVISION = "0123456789abcdef0123456789abcdef01234567"
@@ -1086,12 +1099,16 @@ def test_verify_items_cli_exit_codes(tmp_path):
     assert KVI.main(["--items", str(_items(tmp_path / "plain.jsonl")), "--expect-canary"]) == 1     # header missing
     assert KVI.main(["--key", "noilai_test", "--root", str(tmp_path)]) == 1      # not built here: missing file
     # --materialize derives a plan file inside a root that holds its source
-    plan = KRP.load_plan()
+    plan = _unpinned(KRP.load_plan())
     rel = tmp_path / plan["release"]
     rel.mkdir(parents=True)
     (rel / "manifest.json").write_text(json.dumps({"canary": CANARY}))
     _release_fixture(rel, per_cell=60, core_per_cell=30, name="noilai_core.jsonl")
-    assert KVI.main(["--key", "noilai_bf16_200", "--root", str(tmp_path), "--materialize"]) == 0
+    unpinned_plan = tmp_path / "run_plan_unpinned.yaml"
+    unpinned_plan.write_text(yaml.safe_dump(plan, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    # the frozen plan's hashes rightly reject a fixture release: with them in place the gate exits 1
+    assert KVI.main(["--key", "noilai_bf16_200", "--root", str(tmp_path), "--materialize"]) == 1
+    assert KVI.main(["--key", "noilai_bf16_200", "--root", str(tmp_path), "--materialize", "--plan", str(unpinned_plan)]) == 0
     assert (rel / "noilai_bf16_200.jsonl").exists()
 
 

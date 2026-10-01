@@ -142,7 +142,7 @@ Source: `data/release/v0.3/manifest.json` (public manifest: no seed, no canary G
 `07fb9d791fee3ad0b00d03393557e78b7924211f0eb2a75297b57bc3addd8ca5`; the seed and the GUID are in the git-ignored
 `manifest_private.json`, DESIGN_DECISIONS 4.6 item 51) and `data/release/v0.3/attested.jsonl`; every
 number below is the sum or count over those files and `tests/test_paper.py` recomputes each of them.
-Generator commit bf74af0 (dirty tree: the review follow-ups were uncommitted at build time; rebuilt from the clean freeze commit below); content SHA-256
+Generator commit f94f655 (clean tree: the stage-1 freeze commit); content SHA-256
 `92d332e58b0e4d5d3dbf637900cd574dd2b6aac83ffecc2865c7a274ea208e11`. Built after the adversarial review's generator
 fixes (T2 gold never the input or its reversal, pair-only vulgar screen on inputs, T3 strata recomputed
 for the twin, dictionary-count marginal rimes, five-stratum pseudo quota, reserved-output screen,
