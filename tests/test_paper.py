@@ -809,6 +809,8 @@ def test_data_statement_release_facts_are_generated_and_current():
     manifest = ROOT / "data" / "release" / "v0.3" / "manifest.json"
     if not manifest.exists():
         pytest.skip("no v0.3 manifest")
+    if not (manifest.parent / "attested.jsonl").exists():
+        pytest.skip("no v0.3 attested.jsonl (private, git-ignored; the generated block needs it)")
     r = subprocess.run([PY, "paper/gen_data_statement_facts.py", "--manifest", str(manifest), "--check"],
                        cwd=ROOT, text=True, capture_output=True, check=False)
     assert r.returncode == 0, "docs/DATA_STATEMENT.md release facts are stale; re-run paper/gen_data_statement_facts.py"
