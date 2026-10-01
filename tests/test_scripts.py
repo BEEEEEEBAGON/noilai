@@ -96,49 +96,74 @@ def test_build_attested(tmp_path):
     assert "0 exactness problems" in r.stdout
 
 
-def test_validation_forms_sample_and_score(release, tmp_path):
-    out = tmp_path / "val"
-    run("scripts/make_validation_forms.py", "sample", "--items", str(release / "noilai_test.jsonl"), "--dev",
-        str(release / "noilai_dev.jsonl"), "--out", str(out), "--n", "120", "--overlap", "30", "--validators", "A", "B", "C")
-    forms = sorted(out.glob("validation_form_*.csv"))
-    assert len(forms) == 3
-    meta = json.loads((out / "validation_manifest.json").read_text())
-    assert meta["n_items"] == 120 and meta["overlap"] == 30
-    # every non-overlap item on exactly two forms, overlap items on three
+def test_validation_packet_and_score(release, tmp_path):
+    """docs/gate1/VALIDATION_PROTOCOL.md: Parts A-E per validator, overlap rows on every sheet and the rest on exactly
+    two, the planted controls and the item ids only in the author's key, then fill the sheets and score them."""
     from collections import Counter
+    out = tmp_path / "val"
+    r = run("scripts/make_validation_forms.py", "packet", "--release", str(release), "--out", str(out), "--validators", "A", "B", "C",
+            "--per-cell", "3", "--controls-per-cell", "1", "--overlap", "6", "--t2-overlap", "4",
+            "--candidates", str(tmp_path / "none.tsv"))
+    info = json.loads(r.stdout.strip().splitlines()[-1])
+    assert info["sizes"]["n_sample"] == 36 and info["sizes"]["n_controls"] == 12 and info["sizes"]["calibration"] == 16
+    key = json.loads((out / "B_key.json").read_text())
+    assert len(key) == 48 and sum(k["control"] for k in key.values()) == 12
     c = Counter()
-    for f in forms:
-        with open(f, encoding="utf-8") as fh:
-            for r in csv.DictReader(fh):
-                c[r["item_id"]] += 1
-    assert Counter(c.values()) == {2: 90, 3: 30}
-    # fill in sheets and score
+    for v in "ABC":
+        with open(out / f"B_items_{v}.csv", encoding="utf-8") as fh:
+            rows = list(csv.DictReader(fh))
+        assert "item_id" not in rows[0] and "control" not in rows[0]          # the key never reaches a validator
+        text = (out / f"B_items_{v}.csv").read_text(encoding="utf-8")
+        assert not any(k["item_id"] in text for k in key.values())
+        c.update(row["row_id"] for row in rows)
+    assert Counter(c.values()) == {3: 6, 2: 42}
+    m = json.loads((out / "validation_manifest.json").read_text())
+    assert all(st["n_sampled"] == 0 or abs(st["weight"] * st["n_sampled"] - st["n_population"]) < 1e-6 for st in m["strata"].values())
+    with open(out / "A_calibration_A.csv", encoding="utf-8") as fh:
+        head = next(csv.reader(fh))
+    assert "key" not in head and "explanation_vi" not in head and "manipulation" not in head
+    # fill: everyone right on everything (controls answered "no"), and score
     ret = out / "returned"
     ret.mkdir()
-    for f in forms:
-        with open(f, encoding="utf-8") as fh:
-            rows = list(csv.DictReader(fh))
-        for r in rows:
-            r.update(correct="yes", spelling="yes", lexical="no", offensive="no")
-        with open(ret / f.name, "w", newline="", encoding="utf-8") as g:
-            w = csv.DictWriter(g, fieldnames=rows[0].keys())
-            w.writeheader()
-            w.writerows(rows)
-    r = run("scripts/make_validation_forms.py", "score", "--out", str(out), "--returned", str(ret / "*.csv"))
-    rep = json.loads((out / "validation_report.json").read_text())
-    assert rep["correct"]["percent_agreement"] == 1.0
-    assert rep["generator_precision"]["estimate"] == 1.0
+    for v in "ABC":
+        for sheet in ("B_items", "C_attested", "A_calibration"):
+            with open(out / f"{sheet}_{v}.csv", encoding="utf-8") as fh:
+                rows = list(csv.DictReader(fh))
+            for row in rows:
+                if sheet == "B_items":
+                    row.update(correct="no" if key[row["row_id"]]["control"] else "yes", spelling="yes", offensive="no")
+                elif sheet == "C_attested":
+                    row.update(valid="yes", known="no", offensive="no")
+            with open(ret / f"{sheet}_{v}.csv", "w", newline="", encoding="utf-8") as g:
+                w = csv.DictWriter(g, fieldnames=rows[0].keys())
+                w.writeheader()
+                w.writerows(rows)
+    run("scripts/make_validation_forms.py", "score", "--dir", str(out), "--n-boot", "100")
+    rep = json.loads((out / "report" / "validation_report.json").read_text())
+    b = rep["B"]
+    assert b["agreement"]["correct"]["percent_agreement"] == 1.0 and b["agreement"]["correct"]["alpha"] == 1.0
+    assert b["generator_precision"]["pooled"]["weighted_precision"] == 1.0 and b["generator_precision"]["pooled"]["n"] == 36
+    assert all(x["control_catch_rate"] == 1.0 for x in b["validators"].values())
+    assert rep["C"]["n_verified"] == rep["C"]["n_rows"] > 0
 
 
 def test_human_baseline_forms(release, tmp_path):
+    """DD 10.2: the forms carry the models' exact p0 prompt per item (and its hash), one instruction-check row."""
+    from noilai.eval import prompts as P
+    from noilai.gen.generate import load_items
     out = tmp_path / "human"
     r = run("scripts/make_validation_forms.py", "baseline", "--items", str(release / "noilai_core.jsonl"), "--out", str(out),
             "--n-forms", "4", "--per-form", "24")
     info = json.loads(r.stdout.strip().splitlines()[-1])
-    assert info["forms"] == 4 and len(list(out.glob("baseline_form_*.csv"))) == 4
+    assert info["forms"] == 4 and len(list(out.glob("baseline_form_*.csv"))) == 4 and info["check_items_per_form"] == 1
     with open(out / "baseline_form_01.csv", encoding="utf-8") as fh:
         rows = list(csv.DictReader(fh))
-    assert len(rows) == 24 and {r["task"] for r in rows} == {"T1", "T2", "T3"}
+    main = [r_ for r_ in rows if r_["block"] == "main"]
+    assert len(main) == 24 and {r_["task"] for r_ in main} == {"T1", "T2", "T3"} and sum(r_["block"] == "check" for r_ in rows) == 1
+    items = {it["item_id"]: it for it in load_items(release / "noilai_core.jsonl")}
+    for r_ in main[:5]:
+        msgs = P.render(items[r_["item_id"]], paraphrase="p0", shots=3, arm="nfc")
+        assert r_["prompt_model"] == msgs[-1]["content"] and r_["prompt_hash"] == P.prompt_hash(msgs)
 
 
 def test_audit_script_on_gemma3_if_present(tmp_path):

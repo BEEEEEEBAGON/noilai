@@ -27,6 +27,7 @@ noilai/
   stats/      clustered bootstrap, McNemar + Holm families, mixed models (E2), effect decomposition, power, agreement, tables
   probe/      hidden-state extraction at syllable positions, layer-wise probes with control tasks, patching; steering code
               stays but steering is future work (DD 9.4 / 12.36)
+  validation.py  the validation packet's sampling, planted controls, calibration, adjudication and scoring (docs/gate1/)
   eval/       prompts.py (YAML templates -> chat messages, demos, arms, prompt hash), backends.py (hf | vllm |
               openai_compat | gemini | llama_cpp + echo/scripted test backends), extract.py (the "Đáp án:" line),
               score.py (T1/T2/T3 scoring, error taxonomy, scores.jsonl), xcopa.py (E3 on XCOPA vi), run.py (a run:
@@ -41,7 +42,9 @@ scripts/
   build_attested.py       data/attested_seed.tsv -> the release file attested.jsonl
   audit_items.py          annotate an item file with per-syllable tokenization covariates for one tokenizer
   check_tokenizer_consistency.py  a model's HF tokenizer vs the SentencePiece model file used offline
-  make_validation_forms.py  sample the native-validation set and the human-baseline forms; score returned sheets
+  make_validation_forms.py  the native-validation packet (Parts A-E per validator, docs/gate1/), the human-baseline forms with the
+                          models' exact prompt; score returned sheets (agreement, adjudication, weighted generator precision)
+  validation_sizing.py    simulation that sized the validation sample (data/audit/validation_sizing.json)
   sample_items.py         seeded sub-samples of a release (DD 4.5): noilai_main.jsonl (4,200, 350 per cell) and noilai_c2.jsonl
   kaggle_run_plan.py      configs/run_plan.yaml -> run_eval.py commands; derives the seeded core subsets (--materialize), gates every
                           run on its item file, runs the commands under the session guards, logs hours, keeps the API request+token ledger
@@ -63,7 +66,7 @@ data/           HASHES.json (resource hashes), attested_seed.tsv, audit/ (commit
 docs/           PLAN_2026-09-30.md (founding plan), DATA_FORMAT.md (item, output, score schemas), DESIGN_DECISIONS.md (binding)
 paper/          ACL 2027 LaTeX sources
 tests/          pytest (test_vi, test_gen, test_audit, test_stats, test_constants, test_probe, test_eval, test_scripts,
-                test_release, test_e2, test_paper, test_cloud)
+                test_release, test_e2, test_paper, test_cloud, test_validation)
 ```
 
 ## Quick start

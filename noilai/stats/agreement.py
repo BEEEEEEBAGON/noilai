@@ -151,3 +151,37 @@ def percent_agreement(ratings: Iterable[tuple[Hashable, Hashable, Hashable]]) ->
                 tot += 1
                 agree += labels[i] == labels[j]
     return agree / tot if tot else float("nan")
+
+
+def krippendorff_alpha(ratings: Iterable[tuple[Hashable, Hashable, Hashable]], distance: Callable[[Hashable, Hashable], float]) -> float:
+    """Krippendorff's alpha for any distance function (e.g. MASI or Jaccard over set-valued labels, the T2
+    gold-set judgments of DESIGN_DECISIONS 10.1): alpha = 1 - D_o / D_e, with D_o the mean distance between
+    pairable values within units (each unit's pairs weighted 1 / (m_u - 1)) and D_e the mean distance between
+    all pairable values. Equals `krippendorff_alpha_nominal` when distance is 0/1 inequality."""
+    by_item: dict = defaultdict(list)
+    for item, _coder, label in ratings:
+        by_item[item].append(label)
+    units = [labels for labels in by_item.values() if len(labels) >= 2]
+    if not units:
+        return float("nan")
+    values = [v for labels in units for v in labels]
+    n = len(values)
+    d_o = 0.0
+    for labels in units:
+        m = len(labels)
+        s = 0.0
+        for i in range(m):
+            for j in range(m):
+                if i != j:
+                    s += distance(labels[i], labels[j])
+        d_o += s / (m - 1)
+    d_o /= n
+    d_e = 0.0
+    for i in range(n):
+        for j in range(n):
+            if i != j:
+                d_e += distance(values[i], values[j])
+    d_e /= n * (n - 1)
+    if d_e == 0:
+        return 1.0
+    return float(1 - d_o / d_e)

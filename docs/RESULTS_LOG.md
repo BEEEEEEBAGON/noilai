@@ -182,3 +182,17 @@ Source: `data/audit/counts.json` (`scripts/reconcile_counts.py --release data/re
 `wordlist.distinct_canonical_pairs` (47,535), and the `release_strata` block (per task × variant
 degenerate counts, output-lexical share and C2-affected test counts over the v0.3 dev + test files).
 `data/audit/placement_xcopa*.json` carry per-file token counts (`scripts/count_placement.py`).
+
+## 2026-10-01 — Validation sample sizing by simulation (no data, no model outputs) [RL-2026-10-01-04]
+
+Source: `data/audit/validation_sizing.json` (`scripts/validation_sizing.py --out data/audit/validation_sizing.json --reps 40
+--n-boot 400`, seed 20261001). A simulation of candidate validation designs, not a measurement: a generated item is wrong with
+probability 0.02, a planted control is always wrong, a validator says "no" to a correct item with probability 0.02 and "yes" to a
+wrong one with probability 0.10 (expected scenario; pessimistic: 0.05 / 0.25), independently; 35 s per item (40 s pessimistic).
+Chosen design (30 items + 4 controls per cell, three validators, 60 rows to all three; `noilai.constants`): 408 rows, 292 per
+validator (≈ 2.8 h on the generated sheet), expected α on `correct` 0.76 with a mean 95% bootstrap width of 0.18, AC1 0.93 (width
+0.06); pessimistic scenario α 0.47 (width 0.23). The superseded 1,000-item design without controls: α 0.41–0.44 (width 0.28–0.29),
+≈ 6.5–7 h per validator. Per cell: Wilson 95% lower bound 0.886 when all 30 items are judged correct; P(a bug affecting 10% / 5% of a
+cell appears in its sample) 0.96 / 0.79. The vectorized α and AC1 are asserted equal to `noilai.stats.agreement` on the first
+replicate of every design.
+
