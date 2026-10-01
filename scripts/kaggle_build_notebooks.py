@@ -508,6 +508,7 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
         code(INSTALL_GPU),
         code(FETCH_VERIFY),
         code(PUSH_HELPER),
+        code(CHECK_RUNS),
         md("""
         ### RUN CELL (e) — smoke test
         One small model, 20 items (`smoke_20` in `run_plan.yaml`, the only kind of line allowed a
@@ -575,6 +576,7 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
         print(json.dumps([{"model": r["model"], "status": r["status"], "hours": r.get("hours"),
                            "new_outputs": r.get("new_outputs"), "logged_device": r.get("logged_device")} for r in RESULTS], indent=1))
         ''', tags=[RUN_TAG]),
+        code(CHECK_AFTER_RUN),
         code(OUTPUTS_KAGGLE),
         code(COMPUTE_LOG_TAIL),
     ]
@@ -653,6 +655,7 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
         code(INSTALL_TPU),
         code(FETCH_VERIFY),
         code(PUSH_HELPER),
+        code(CHECK_RUNS),
         md("""
         ### RUN CELL (e) — smoke test on the TPU
         `smoke_20_tpu` on `SMOKE_MODEL` (booked under TPU hours): the model must load under vLLM-TPU
@@ -712,6 +715,7 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
         print(json.dumps([{"run": r["run"], "model": r["model"], "status": r["status"], "hours": r.get("hours"),
                            "logged_device": r.get("logged_device")} for r in RESULTS], indent=1))
         ''', tags=[RUN_TAG]),
+        code(CHECK_AFTER_RUN),
         code(OUTPUTS_KAGGLE),
         code(COMPUTE_LOG_TAIL),
     ]
@@ -1099,6 +1103,7 @@ def build_api_runs() -> nbformat.NotebookNode:
         print("session overrides (in memory, recorded in the ledger):", OVERRIDES)
         '''),
         code(FETCH_VERIFY),
+        code(CHECK_RUNS),
         md("""
         ### RUN CELL — daily API loop
         For each run id and model: skip if today's ledger says the daily request OR token budget is
@@ -1135,6 +1140,7 @@ def build_api_runs() -> nbformat.NotebookNode:
         ledger = KRP.ledger_load(KRP.ledger_path(PLAN))
         print("ledger (requests and tokens per model per UTC day):", json.dumps(ledger, indent=1))
         ''', tags=[RUN_TAG]),
+        code(CHECK_AFTER_RUN),
         code('''
         # keep the outputs: copy data/runs, the ledger and the compute log to Drive (Colab) or the working dir; the
         # Drive path is RUNS_RESTORE_DIR, which (b') reads back tomorrow (runs/ + compute_log.csv, the layout (b') expects)
@@ -1188,6 +1194,9 @@ pins = [p for p in pins if p and p.split("==")[0].strip() not in _skip]
 cpath = Path(WORK_DIR) / "cpu_constraints.txt"
 cpath.write_text("\\n".join(pins) + "\\n")
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-c", str(cpath), "-e", ".[eval]"], check=True)
+if TRANSFORMERS_OVERRIDE:          # the documented PhoGPT fallback (DD 7.2): a 4.x transformers for MPT's remote code
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", f"transformers=={TRANSFORMERS_OVERRIDE}"], check=True)
+    print("transformers overridden to", TRANSFORMERS_OVERRIDE, "(recorded in the environment file)")
 RUN_PYTHON = sys.executable
 os.environ["HF_HOME"] = HF_HOME
 Path(HF_HOME).mkdir(parents=True, exist_ok=True)
@@ -1249,6 +1258,13 @@ def check_runs(results):
 '''
 
 
+CHECK_AFTER_RUN = '''
+# (f') hashed results: scripts/check_run.py on every run directory this session wrote (scores it first if needed; item gate,
+# deterministic rescoring, stats.json, results_hashes.json); the copies pushed in (g) carry them
+CHECKED = check_runs(list(globals().get("SMOKE_RESULTS", [])) + list(globals().get("RESULTS", [])))
+'''
+
+
 def build_kaggle_cpu_pilot() -> nbformat.NotebookNode:
     cells = [
         md("""
@@ -1299,6 +1315,7 @@ def build_kaggle_cpu_pilot() -> nbformat.NotebookNode:
         EXTRA_ARGS = ""                  # further run_eval.py flags, one shell-quoted string
         ACCOUNT_HOLDER_ROLE = ""         # ROLE of the account holder (DD 11.2), never a name
         MIN_RAM_GB = 12                  # fp32 weights: ~4 GB for a 1B, ~8 GB for a 2B, ~16 GB for a 4B model, plus activations
+        TRANSFORMERS_OVERRIDE = None     # e.g. "4.46.3" for phogpt-4b-chat if its MPT remote code fails under the pinned 5.x (DD 7.2) [UNCERTAIN: verify the version]; recorded in the environment file
         PUSH_EVERY_MINUTES = 30
         DRY_RUN = False
 

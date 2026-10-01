@@ -1579,3 +1579,24 @@ def test_makefile_builds_the_plans_release_and_refuses_the_superseded_baseline_d
     assert "exit 1" in baseline and "rm -f data/human/baseline_form_*.csv" in baseline and "HUMAN_BASELINE_FORM.md" in baseline, \
         "forms that are not the 246-item design are deleted, never left to be sent (item 66)"
     assert "--seed 20261102" in baseline           # the public sampling seed of docs/HUMAN_BASELINE_FORM.md, never the build seed
+
+
+def test_normalizing_tokenizers_skip_the_nfd_and_pc_arms_as_zero_by_construction(tmp_path, monkeypatch, plan, models_cfg):
+    """DD 6.2: a tokenizer whose census says `normalizes` for an arm does not run it (0 by construction); a model
+    without a census file skips nothing; a pass-through census (the committed Gemma 3 audit) skips nothing."""
+    import json as _json
+
+    import kaggle_run_plan as KRP
+    from noilai.eval import run as RUN
+    e3 = next(r for r in plan["runs"] if r["id"] == "E3_noilai")
+    monkeypatch.setattr(RUN, "AUDIT_DIR", tmp_path)
+    (tmp_path / "qwen3.5.json").write_text(_json.dumps({"normalization_census": {"verdict_nfd": "normalizes", "verdict_pc": "normalizes"}}))
+    q = models_cfg["by_name"]["qwen3.5-2b"]
+    skipped = KRP.census_skipped_arms(e3, q)
+    assert set(skipped) == {"nfd", "pc"} and all("0 by construction" in v for v in skipped.values())
+    cmd = KRP.build_command(e3, "qwen3.5-2b", plan, models_cfg)
+    arms = cmd[cmd.index("--arms") + 1: cmd.index("--resume")]
+    assert "nfd" not in arms and "pc" not in arms and "strip_tones" in arms and "nfc" in arms
+    assert KRP.census_skipped_arms(e3, models_cfg["by_name"]["llama-3.1-8b-instruct"]) == {}      # not censused: nothing skipped
+    monkeypatch.setattr(RUN, "AUDIT_DIR", ROOT / "data" / "audit")
+    assert KRP.census_skipped_arms(e3, models_cfg["by_name"]["gemma-3-1b-it"]) == {}              # passes through

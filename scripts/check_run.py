@@ -101,6 +101,7 @@ def main(argv=None) -> int:
     ap.add_argument("--plan-key", default=None, help="the run plan's item_files key whose recorded SHA-256 must match")
     ap.add_argument("--n-boot", type=int, default=2000)
     ap.add_argument("--verify", action="store_true")
+    ap.add_argument("--allow-thinking", action="store_true", help="the reasoning sub-study's runs (scripts/score_run.py)")
     args = ap.parse_args(argv)
     run = Path(args.run)
     manifest = json.loads((run / "manifest.json").read_text(encoding="utf-8"))
@@ -112,6 +113,10 @@ def main(argv=None) -> int:
         bad = {k: (rec.get(k), now.get(k)) for k in set(rec) | set(now) if rec.get(k) != now.get(k)}
         print(json.dumps({"verified": not bad, "differences": bad}, ensure_ascii=False))
         return 1 if bad else 0
+    if not (run / "scores.jsonl").exists() or (run / "scores.jsonl").stat().st_mtime < (run / "outputs.jsonl").stat().st_mtime:
+        import score_run                          # score (or rescore after new rows, e.g. a resumed or parked API run)
+        score_run.score_run_dir(run, item_file, quiet=True, allow_thinking=args.allow_thinking)
+        report["scored_here"] = True
     # 1. item gate
     observed = sha256_file(item_file)
     recorded = (manifest.get("data") or {}).get("item_file_sha256")

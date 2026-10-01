@@ -243,6 +243,29 @@ def revision_pinned(entry: dict) -> bool:
     return isinstance(rev, str) and any(p.fullmatch(rev.strip()) for p in REVISION_PATTERNS)
 
 
+# DESIGN_DECISIONS 6.2: for a tokenizer whose census verdict for an arm is "normalizes" (identical token ids), that arm
+# is not run: its effect is 0 by construction and the analysis emits a "0 by construction" row (DEVIATIONS 1 Oct 2026:
+# the runner used to run these arms anyway, ~2/5 of E3 on the normalizing families).
+CENSUS_SKIPPABLE_ARMS = {"nfd": "verdict_nfd", "pc": "verdict_pc", "win1258": "verdict_pc"}
+
+
+def census_skipped_arms(run: dict, entry: dict) -> dict[str, str]:
+    """{arm: reason} for the run's arms that the model's tokenizer census makes 0 by construction (DD 6.2). Empty when
+    the model is not censused (data/audit/<family or tokenizer_audit>.json absent): nothing is skipped on a guess."""
+    arms = [a for a in run.get("arms") or [] if a in CENSUS_SKIPPABLE_ARMS]
+    if not arms:
+        return {}
+    from noilai.eval.run import normalization_census_for
+    census = normalization_census_for(entry, {})
+    if census.get("status") != "censused":
+        return {}
+    out = {}
+    for a in arms:
+        if census.get(CENSUS_SKIPPABLE_ARMS[a]) == "normalizes":
+            out[a] = f"0 by construction: {CENSUS_SKIPPABLE_ARMS[a]} = normalizes ({census.get('source')})"
+    return out
+
+
 def build_command(run: dict, model: str, plan: dict, models_cfg: dict, project_root: Path = ROOT,
                   python: str = sys.executable, extra: Sequence[str] = ()) -> list[str]:
     """The run_eval.py argv for one (run, model). Raises on a guarded combination."""
@@ -269,7 +292,11 @@ def build_command(run: dict, model: str, plan: dict, models_cfg: dict, project_r
         cmd += ["--variants", *run["variants"]]
     if run.get("paraphrases"):
         cmd += ["--paraphrases", *run["paraphrases"]]
-    cmd += ["--shots", str(run.get("shots", 0)), "--arms", *run["arms"]]
+    skipped = census_skipped_arms(run, entry)
+    arms = [a for a in run["arms"] if a not in skipped]
+    if not arms:
+        raise ValueError(f"run {run['id']!r}: every arm is 0 by construction for {model} ({skipped})")
+    cmd += ["--shots", str(run.get("shots", 0)), "--arms", *arms]
     for key, flag in ABLATION_FLAGS:
         if run.get(key):
             cmd += [flag, str(run[key])]
@@ -740,6 +767,7 @@ def execute(run_id: str, models: Sequence[str] | None = None, platform: str = "k
         out_dir = Path(project_root) / run_dir(plan, run, name)
         res = {"run": run_id, "model": name, "cmd": None, "out": str(out_dir), "status": "dry-run",
                "hardware": entry.get("hardware"), "session_hardware": session_hardware}
+        res["census_skipped_arms"] = census_skipped_arms(run, entry)
         try:
             cmd = build_command(run, name, plan, models_cfg, project_root=project_root, python=python, extra=extra)
         except ValueError as e:               # a guard of build_command: report, go on with the next model
