@@ -92,7 +92,10 @@ CONFIGS = ROOT / "configs"
 API_BACKENDS = {"openai_compat", "gemini"}
 # hardware key of models.yaml -> (compute-log device type, device count)
 HARDWARE_DEVICES = {"t4": ("t4", 1), "2xt4": ("t4", 2), "tpu": ("tpu-v5e-8", 1), "api": ("api", 0),
-                    "p100": ("p100", 1), "l4": ("l4", 1), "mixed": (None, None)}
+                    "p100": ("p100", 1), "l4": ("l4", 1), "cpu": ("cpu", 0), "mixed": (None, None)}
+# "cpu": a Kaggle CPU session (no GPU quota). No entry is configured for it: a CPU run passes
+# --allow-hardware-mismatch and `--backend hf --device cpu --dtype float32` (notebooks/kaggle_cpu_pilot.ipynb),
+# and the compute log records device "cpu" x 0 accelerators, i.e. zero GPU-hours.
 # entry hardware -> the sessions that can host it (a 1xT4 entry runs on a 2xT4 session; nothing else crosses)
 SESSION_COMPATIBLE = {"t4": {"t4", "2xt4"}, "2xt4": {"2xt4"}, "tpu": {"tpu"}, "l4": {"l4"}, "p100": {"p100"},
                       "api": {"t4", "2xt4", "tpu", "l4", "p100", "api", "cpu"}}

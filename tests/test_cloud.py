@@ -29,7 +29,7 @@ import kaggle_dataset as KD
 import kaggle_run_plan as KRP
 import kaggle_verify_items as KVI
 
-NOTEBOOK_NAMES = ("kaggle_eval_t4", "kaggle_eval_tpu", "colab_probe_gemma3", "api_runs")
+NOTEBOOK_NAMES = ("kaggle_eval_t4", "kaggle_eval_tpu", "colab_probe_gemma3", "api_runs", "kaggle_cpu_pilot")
 NOTEBOOKS = {n: ROOT / "notebooks" / f"{n}.ipynb" for n in NOTEBOOK_NAMES}
 # literal secret shapes: the task's three plus the GitHub (classic and fine-grained), Groq and Kaggle key shapes
 SECRET_PATTERNS = {

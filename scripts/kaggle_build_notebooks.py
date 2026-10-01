@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Build the four cloud notebooks under notebooks/ from one source of truth.
+"""Build the cloud notebooks under notebooks/ from one source of truth.
 
     python scripts/kaggle_build_notebooks.py --write     # (re)write notebooks/*.ipynb
     python scripts/kaggle_build_notebooks.py --check     # exit 1 if the .ipynb files drifted from this file
@@ -49,7 +49,7 @@ from nbformat.v4 import new_code_cell, new_markdown_cell, new_notebook
 
 ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOK_DIR = ROOT / "notebooks"
-NOTEBOOKS = ("kaggle_eval_t4", "kaggle_eval_tpu", "colab_probe_gemma3", "api_runs")
+NOTEBOOKS = ("kaggle_eval_t4", "kaggle_eval_tpu", "colab_probe_gemma3", "api_runs", "kaggle_cpu_pilot")
 
 RUN_TAG = "run"
 E4_TAG = "e4"
@@ -1157,6 +1157,237 @@ def build_api_runs() -> nbformat.NotebookNode:
 
 
 # =============================================================================== assembly
+CPU_CHECK = '''
+# (a) environment check (CPU session): interpreter, cores, memory, disk; no GPU is used or required
+import json, os, shutil, sys
+print(sys.version.split()[0], "on", sys.platform)
+ENV_CHECK = {"cpus": os.cpu_count(), "ram_gb": None}
+try:
+    with open("/proc/meminfo") as fh:
+        ENV_CHECK["ram_gb"] = round(int(fh.readline().split()[1]) / 2**20, 1)
+except OSError:
+    pass
+du = shutil.disk_usage(WORK_DIR)
+print(f"disk at {WORK_DIR}: {du.free / 2**30:.1f} GB free of {du.total / 2**30:.1f} GB")
+print(json.dumps(ENV_CHECK))
+if ENV_CHECK["ram_gb"] and ENV_CHECK["ram_gb"] < MIN_RAM_GB:
+    raise SystemExit(f"{ENV_CHECK['ram_gb']} GB of RAM: below MIN_RAM_GB ({MIN_RAM_GB}) for the largest model in MODELS (fp32 weights)")
+'''
+
+INSTALL_CPU = '''
+# (c) install for the CPU route: the project with its eval extra under the campaign's pins
+# (configs/env_pins.txt), WITHOUT the engines (vLLM, llama.cpp) and without re-pinning torch (the image's
+# CPU torch is used and recorded). The Hugging Face stack is pinned exactly as for the GPU runs, so a CPU
+# result differs from a GPU result only by device arithmetic.
+import os, subprocess, sys
+from pathlib import Path
+_skip = ("vllm", "torch", "llama-cpp-python")
+pins = [ln.split("#")[0].strip() for ln in (PROJECT / "configs" / "env_pins.txt").read_text().splitlines()
+        if ln.strip() and not ln.startswith("#")]
+pins = [p for p in pins if p and p.split("==")[0].strip() not in _skip]
+cpath = Path(WORK_DIR) / "cpu_constraints.txt"
+cpath.write_text("\\n".join(pins) + "\\n")
+subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-c", str(cpath), "-e", ".[eval]"], check=True)
+RUN_PYTHON = sys.executable
+os.environ["HF_HOME"] = HF_HOME
+Path(HF_HOME).mkdir(parents=True, exist_ok=True)
+_export(HF_TOKEN_SECRET)
+if HF_TOKEN_SECRET != "HF_TOKEN" and os.environ.get(HF_TOKEN_SECRET):
+    os.environ["HF_TOKEN"] = os.environ[HF_TOKEN_SECRET]
+import colab_setup as CS
+ENV_RECORD = CS.record_environment(PROJECT / "data" / "runs" / "env")
+print("environment recorded at", ENV_RECORD)
+'''
+
+PIN_CELL = '''
+# (c') panel pins for the models of this session (DESIGN_DECISIONS 7.1): resolve each model's Hub revision, licence,
+# gating and tokenizer SHA-256 (scripts/pin_panel.py), write the hashes into the clone's configs/models.yaml, verify,
+# and keep the manifest with the outputs. A gated model whose licence the HF account has not accepted fails here,
+# with the reason, before anything runs. The repository's models.yaml is updated from this manifest by the author
+# (the panel-freeze commit), never by the notebook.
+import json, shutil, subprocess, sys
+from pathlib import Path
+if PIN_MODELS:
+    r = subprocess.run([sys.executable, "scripts/pin_panel.py", "--names", *MODELS, "--apply"], capture_output=True, text=True, check=False)
+    print(r.stdout[-2000:], r.stderr[-2000:])
+    man = json.loads((PROJECT / "configs" / "panel_manifest.json").read_text())
+    errors = [(e["name"], e.get("error") or e.get("note")) for e in man["entries"] if e["status"] != "pinned"]
+    out = Path(WORK_DIR) / "noilai_runs_out"
+    out.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(PROJECT / "configs" / "panel_manifest.json", out / "panel_manifest.json")
+    if errors:
+        raise SystemExit(f"not pinned: {errors} (accept the model licence on the Hub with the HF_TOKEN account, or fix the id)")
+    v = subprocess.run([sys.executable, "scripts/pin_panel.py", "--verify"], capture_output=True, text=True, check=False)
+    print(v.stdout)
+    if v.returncode:
+        raise SystemExit("pin manifest does not verify")
+else:
+    print("PIN_MODELS is False: the runs below are rehearsals (ALLOW_UNPINNED_REVISION must be True; manifests record revision null)")
+'''
+
+CHECK_RUNS = '''
+# after each RUN cell: scripts/check_run.py on every finished run directory: item gate, deterministic rescoring,
+# stats.json (accuracy with the base-pair cluster-bootstrap CI, the copy-baseline gain of PREREG section 10, the paired
+# NFD contrast, the EXPLORATORY T1 forced choice against chance) and results_hashes.json
+import json, subprocess, sys
+
+def check_runs(results):
+    summaries = []
+    for r in results:
+        run_dir = PROJECT / "data" / "runs" / f"{r['run']}__{r['model']}"
+        if not (run_dir / "scores.jsonl").exists():
+            print(r["run"], r["model"], "->", r["status"], "(no scores: not checked)")
+            continue
+        c = subprocess.run([sys.executable, "scripts/check_run.py", "--run", str(run_dir)], capture_output=True, text=True, check=False)
+        print(c.stdout.strip() or c.stderr[-1500:])
+        st = json.loads((run_dir / "stats.json").read_text()) if (run_dir / "stats.json").exists() else {}
+        summaries.append({"run": r["run"], "model": r["model"], "status": r["status"],
+                          "by_task_arm": {k: (round(v["accuracy"], 3), [round(x, 3) for x in v["ci"]]) for k, v in st.get("by_task_arm", {}).items()},
+                          "t1_forced_choice": {k: (round(v["accuracy"], 3), round(v["chance"], 3)) for k, v in st.get("t1_forced_choice", {}).items()}})
+    print(json.dumps(summaries, ensure_ascii=False, indent=1))
+    return summaries
+'''
+
+
+def build_kaggle_cpu_pilot() -> nbformat.NotebookNode:
+    cells = [
+        md("""
+        # NóiLái — Kaggle CPU: the first real run and the Gate 1 pilot (no GPU quota)
+
+        Runs panel models on a Kaggle **CPU** session through the Hugging Face backend in float32
+        (`--backend hf --device cpu --dtype float32`): first the 20-item smoke line (`smoke_20`, the first real
+        run: harness → scoring → statistics → hash gate), then, with `MODE = "pilot"`, the two Gate 1 pilot lines
+        of `configs/run_plan.yaml` (`pilot_t1_200`, nfc vs nfd; `pilot_xcopa_200`), with the EXPLORATORY T1
+        forced choice (`docs/FORCED_CHOICE_EXPLORATORY.md`). A CPU session uses no GPU hours; it is slower, so
+        run one model per session (`MODELS`). What a CPU run cannot give is said in `docs/COMPUTE_PLAN.md` (no GPU
+        tokens/s, which DD 8.5 needs to re-price the GPU lines: a short GPU smoke does that).
+
+        Attach before starting: accelerator **None** (CPU); internet on; Kaggle Secrets `HF_TOKEN` (an HF account
+        that has accepted the Gemma licence for gemma-3-1b-it), `GITHUB_TOKEN` only without a bundle,
+        `KAGGLE_USERNAME` + `KAGGLE_KEY` for the dataset push; the private datasets `noilai-bundle` and
+        `noilai-release` (the frozen `data/release/`), and from the second session on `noilai-runs`.
+
+        Cells: (a) environment · (b) clone · (b') restore · (c) install (CPU) · (c') pin this session's models ·
+        (d) resources + item-file gate · (e) **RUN** first run (20 items) · (f) **RUN** pilot · (g) outputs → dataset ·
+        (h) compute log (CPU rows: zero GPU-hours).
+        """),
+        code('''
+        # ---- parameters: edit this cell only; nothing below asks for input ------------------------------
+        import time
+        SESSION_T0 = time.time()
+
+        REPO_URL = "https://github.com/BEEEEEEBAGON/noilai.git"
+        REPO_REF = "main"                                   # pin a commit hash for a recorded run
+        REPO_SUBDIR = "noilai"                              # both layouts resolve (the clone cell checks for pyproject.toml)
+        BUNDLE_PATH = "/kaggle/input/noilai-bundle/noilai-main.bundle"
+        CLONE_DIR = "/kaggle/working/repo"
+        WORK_DIR = "/kaggle/working"
+        HF_HOME = "/kaggle/tmp/hf"
+        ITEMS_DATASET_DIR = "/kaggle/input/noilai-release"
+        RUNS_RESTORE_DIR = "/kaggle/input/noilai-runs"      # None on the very first session
+        VERIFY_ITEM_KEYS = None
+
+        GITHUB_TOKEN_SECRET = "GITHUB_TOKEN"
+        HF_TOKEN_SECRET = "HF_TOKEN"
+
+        MODE = "first_run"               # "first_run": smoke_20 only; "pilot": smoke_20, then pilot_t1_200 and pilot_xcopa_200
+        MODELS = ["gemma-3-1b-it"]       # ONE model per CPU session (docs/COMPUTE_PLAN.md); the pilot set: gemma-3-1b-it, qwen3.5-2b, phogpt-4b-chat
+        RUN_IDS = ["smoke_20"] if MODE == "first_run" else ["smoke_20", "pilot_t1_200", "pilot_xcopa_200"]
+        FORCED_CHOICE = True             # EXPLORATORY T1 forced choice on the T1 pilot line (docs/FORCED_CHOICE_EXPLORATORY.md)
+        PIN_MODELS = True                # (c') resolve and apply revision hashes before running (DD 7.1)
+        ALLOW_UNPINNED_REVISION = False  # True only for a rehearsal with PIN_MODELS = False
+        EXTRA_ARGS = ""                  # further run_eval.py flags, one shell-quoted string
+        ACCOUNT_HOLDER_ROLE = ""         # ROLE of the account holder (DD 11.2), never a name
+        MIN_RAM_GB = 12                  # fp32 weights: ~4 GB for a 1B, ~8 GB for a 2B, ~16 GB for a 4B model, plus activations
+        PUSH_EVERY_MINUTES = 30
+        DRY_RUN = False
+
+        PLATFORM, GPU_TYPE, N_GPUS = "kaggle", "cpu", 0
+        SESSION_HARDWARE = "cpu"
+        MAX_SESSION_HOURS = 10.0         # launch no new model or line past 10 h of a 12-h session [UNCERTAIN: verify] the CPU session limit and RAM (~30 GB) in Kaggle's settings
+        RUN_LABEL = f"cpu-{MODE}-{'+'.join(MODELS)}"
+        PUSH_DATASET = True
+        PUSH_AFTER_EACH_MODEL = True
+        KAGGLE_DATASET_SLUG = "noilai-runs"
+        CREATE_DATASET = False
+        '''),
+        code(SECRET_HELPER),
+        code(CPU_CHECK),
+        code(CLONE),
+        code(RESTORE),
+        code(INSTALL_CPU),
+        code(PIN_CELL),
+        code(FETCH_VERIFY),
+        code(PUSH_HELPER),
+        code(CHECK_RUNS),
+        md("""
+        ### RUN CELL (e) — the first real run: 20 items (`smoke_20`)
+        The plan's smoke line (the only kind of line allowed a `--limit`) on each model of `MODELS`, through the HF
+        backend on CPU, then `scripts/check_run.py` on the result. A failure stops the notebook.
+        """),
+        code('''
+        # RUN CELL (e): the first real run. The CPU route = the HF backend in float32 on a session with no accelerator
+        # (configs carry t4 hardware, hence the documented mismatch flag; the compute log records device "cpu" x 0).
+        import shlex
+        import kaggle_run_plan as KRP
+        CPU_EXTRA = ["--backend", "hf", "--device", "cpu", "--dtype", "float32"]
+        RUN_EXTRA = CPU_EXTRA + shlex.split(EXTRA_ARGS) + (["--account-holder", ACCOUNT_HOLDER_ROLE] if ACCOUNT_HOLDER_ROLE else [])
+        if not ACCOUNT_HOLDER_ROLE:
+            print("WARNING: ACCOUNT_HOLDER_ROLE is empty; the manifests will record account_holder 'unknown' (DD 11.2 asks for the role)")
+        SMOKE_RESULTS = KRP.execute("smoke_20", models=MODELS, platform=PLATFORM, dry_run=DRY_RUN, continue_on_error=False,
+                                    extra=RUN_EXTRA, python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
+                                    allow_hardware_mismatch=True, session_t0=SESSION_T0, max_session_hours=MAX_SESSION_HOURS,
+                                    after_each=after_each_model, allow_unpinned_revision=ALLOW_UNPINNED_REVISION)
+        FIRST_RUN = check_runs(SMOKE_RESULTS)
+        if any(str(r["status"]).startswith(("failed", "skipped", "refused")) for r in SMOKE_RESULTS):
+            raise SystemExit("the first run failed or was skipped: read the status above before the pilot cell")
+        ''', tags=[RUN_TAG]),
+        md("""
+        ### RUN CELL (f) — the Gate 1 pilot lines (`MODE = "pilot"`)
+        `pilot_t1_200` (200 dev items, 50 per variant, nfc vs nfd, p0, three demonstrations) with the exploratory
+        forced choice, and `pilot_xcopa_200` (log-likelihood), then `check_run.py`. The go/no-go itself is decided
+        from these files by the rule of PREREGISTRATION §10, over the three pilot models together; this cell only
+        prints each model's numbers.
+        """),
+        code('''
+        # RUN CELL (f): the pilot lines, one model at a time, resumable (--resume via the driver); a background push
+        # every PUSH_EVERY_MINUTES keeps a killed session's rows.
+        import threading
+        RESULTS = []
+        if MODE == "pilot":
+            _stop_push = threading.Event()
+
+            def _periodic_push():
+                while not _stop_push.wait(PUSH_EVERY_MINUTES * 60):
+                    try:
+                        push_outputs("periodic")
+                    except Exception as e:
+                        print("periodic push failed:", repr(e))
+            _pusher = threading.Thread(target=_periodic_push, daemon=True)
+            _pusher.start()
+            try:
+                for run_id in [r for r in RUN_IDS if r != "smoke_20"]:
+                    extra = RUN_EXTRA + (["--t1-forced-choice"] if FORCED_CHOICE and run_id.startswith("pilot_t1") else [])
+                    RESULTS += KRP.execute(run_id, models=MODELS, platform=PLATFORM, dry_run=DRY_RUN, continue_on_error=True,
+                                           extra=extra, python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
+                                           allow_hardware_mismatch=True, session_t0=SESSION_T0,
+                                           max_session_hours=MAX_SESSION_HOURS, after_each=after_each_model,
+                                           allow_unpinned_revision=ALLOW_UNPINNED_REVISION)
+            finally:
+                _stop_push.set()
+                _pusher.join(timeout=5)
+            PILOT = check_runs(RESULTS)
+        else:
+            print("MODE is", MODE, "- pilot lines not run")
+        ''', tags=[RUN_TAG]),
+        code(OUTPUTS_KAGGLE),
+        code(COMPUTE_LOG_TAIL),
+    ]
+    nb = new_notebook(cells=cells)
+    nb.metadata.update(_metadata("kaggle", "None (CPU)"))
+    return nb
+
+
 def _metadata(platform: str, accelerator: str) -> dict:
     return {
         "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
@@ -1171,6 +1402,7 @@ BUILDERS = {
     "kaggle_eval_tpu": build_kaggle_tpu,
     "colab_probe_gemma3": build_colab_probe,
     "api_runs": build_api_runs,
+    "kaggle_cpu_pilot": build_kaggle_cpu_pilot,
 }
 
 
