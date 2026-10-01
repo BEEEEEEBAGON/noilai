@@ -52,7 +52,7 @@ imports into Google Sheets with the dropdowns) plus CSV copies, and the author's
 | **E** core T2 gold sets | each core T2 item's dictionary readings, accept/reject, add a missing reading | 200 / 275 | 1 each; 50 items by everyone | ≈ 1.1 h / 1.5 h at 20 s |
 
 **Total**: ≈ 5.4 h per validator with three validators, ≈ 6.9 h with two (the manifest prints the figure for the actual
-packet). **Priority if time runs short**: A → B → C → D → E. Parts A–D are the commitment (≈ 4.2 h / 5.4 h); E is asked
+packet). **Priority if time runs short**: A → B → C → D → E. Parts A–D are the commitment (≈ 4.3 h / 5.4 h); E is asked
 for but optional: an unvalidated core T2 item keeps its dictionary gold with `gold_validated = false` and is reported as
 such (DD 5.2 already allows this for non-core items; for the core it is a deviation the paper states).
 

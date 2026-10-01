@@ -610,21 +610,34 @@ def test_consent_form_is_bilingual_adults_only_and_flags_the_parental_variant():
 
 
 def test_validator_instructions_cover_the_four_judgments():
+    """DD 10.1 as amended on 1 October 2026 (docs/gate1/VALIDATION_PROTOCOL.md): the Part B columns of the packet, the
+    worked examples checked against the rule engine, and the hours the packet manifest computes."""
+    from noilai.gen import variants as V
+    from noilai.vi.syllable import spell, try_parse
     t = _doc("VALIDATOR_INSTRUCTIONS.md")
-    for col in ("`correct`", "`spelling`", "`lexical`", "`offensive`"):
+    for col in ("`correct`", "`spelling`", "`lexical_input`", "`lexical_candidate`", "`offensive`", "`dialect`"):
         assert col in t, col
     for vi in ("chính tả", "thô tục", "từ", "Không chắc"):
         assert vi in t, vi
     assert "Krippendorff" in t and "AC1" in t and "disagree" in t.lower() and "NATIVE-CHECK" in t
-    assert "mài céo" in t and "mài kéo" in t
-    assert re.search(r"6[–-]8 (giờ|hours)", t)
+    # the c/k worked example: the rule output is kẻn su, the misspelling cẻn su
+    a, b = (try_parse(w).syllable for w in ("củ", "sen"))
+    assert " ".join(spell(x) for x in V.apply("V1", a, b)) == "kẻn su"
+    assert "*củ sen* → *cẻn su*" in t and "*kẻn su*" in t
+    # hours: Part A 16 and B rows at VALIDATION_SECONDS_PER_ITEM, C 119 rows at 25 s, D 54 at 30 s, E at 20 s
+    from noilai import constants as C
+    for n_b, n_e, h in ((292, 200, "5[.,]4"), (408, 275, "6[.,]9")):
+        hours = (16 * C.VALIDATION_SECONDS_PER_ITEM + n_b * C.VALIDATION_SECONDS_PER_ITEM + 119 * 25 + 54 * 30 + n_e * 20) / 3600
+        assert re.fullmatch(h, f"{hours:.1f}"), hours
+        assert re.search(rf"{h} (giờ|h\b|hours)", t), h
     assert "V5" in t and "V6" in t                      # the six-type taxonomy is explained to validators
 
 
 def test_human_baseline_form_design():
     t = _doc("HUMAN_BASELINE_FORM.md")
-    # DESIGN_DECISIONS 10.2: 20 respondents x 30 items, 6 anchors, 240 double-judged, 246 distinct
-    assert "30 items" in t and "20 minutes" in t and "246" in t and "240" in t and "anchor" in t.lower()
+    # DESIGN_DECISIONS 10.2: 20 respondents x 30 items, 6 anchors, 240 double-judged, 246 distinct; 30-45 minutes since the
+    # 1 October amendment (each row repeats the models' full p0 prompt; the natural block and the closing rows are added)
+    assert "30 items" in t and "30–45 minutes" in t and "246" in t and "240" in t and "anchor" in t.lower()
     assert "same p0 prompt" in t and "mean-human" in t.lower()
     assert "score_outputs" in t and "NATIVE-CHECK" in t
     assert "dictionary" in t.lower() and "exclu" in t.lower()
