@@ -1,8 +1,12 @@
 #!/usr/bin/env python
 """Seeded sub-samples of a release (design 4.5, red-team items 46 and 56).
 
-    python scripts/sample_items.py main --release data/release/v0.2 --per-cell 350 --seed 20261004
-    python scripts/sample_items.py c2   --release data/release/v0.2 --n 500 --seed 20261005
+    python scripts/sample_items.py main --release data/release/v0.3 --per-cell 350 --seed 20261201
+    python scripts/sample_items.py c2   --release data/release/v0.3 --n 500 --seed 20261202
+
+The sampling seeds are public (they select from the BUILT test split and regenerate nothing) and
+distinct from the withheld build seed (DESIGN_DECISIONS 4.6); the `samples` entry goes into the
+public manifest.json and, when present, into manifest_private.json as well.
 
 `main` writes noilai_main.jsonl: the open-model main sample, 350 items per task × variant
 cell drawn from the test split, always containing the core, stratified as far as the pool
@@ -29,7 +33,14 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from noilai.gen import variants as V
-from noilai.gen.generate import Generator, c2_affected, load_items, read_header
+from noilai.gen.generate import (
+    PRIVATE_MANIFEST,
+    PUBLIC_MANIFEST,
+    Generator,
+    c2_affected,
+    load_items,
+    read_header,
+)
 from noilai.vi.reencode import canonical_text
 
 
@@ -147,10 +158,15 @@ def cmd_c2(args) -> int:
 
 
 def _record(rel: Path, name: str, path: Path, meta: dict) -> None:
-    mpath = rel / "manifest.json"
-    m = json.loads(mpath.read_text(encoding="utf-8")) if mpath.exists() else {}
-    m.setdefault("samples", {})[name] = {"file": path.name, "sha256": sha256(path), **meta}
-    mpath.write_text(json.dumps(m, ensure_ascii=False, indent=2), encoding="utf-8")
+    """Record the sample under `samples.<name>` in the public manifest and, when present, in the private one."""
+    entry = {"file": path.name, "sha256": sha256(path), **meta}
+    for fname in (PUBLIC_MANIFEST, PRIVATE_MANIFEST):
+        mpath = rel / fname
+        if fname == PRIVATE_MANIFEST and not mpath.exists():
+            continue
+        m = json.loads(mpath.read_text(encoding="utf-8")) if mpath.exists() else {}
+        m.setdefault("samples", {})[name] = entry
+        mpath.write_text(json.dumps(m, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def main(argv=None) -> int:
@@ -159,12 +175,12 @@ def main(argv=None) -> int:
     a = sub.add_parser("main")
     a.add_argument("--release", required=True)
     a.add_argument("--per-cell", type=int, default=350)
-    a.add_argument("--seed", type=int, default=20261004)
+    a.add_argument("--seed", type=int, default=20261201, help="public sampling seed (selects from the built test split)")
     a.set_defaults(func=cmd_main)
     c = sub.add_parser("c2")
     c.add_argument("--release", required=True)
     c.add_argument("--n", type=int, default=500)
-    c.add_argument("--seed", type=int, default=20261005)
+    c.add_argument("--seed", type=int, default=20261202, help="public sampling seed of the independent C2 pool")
     c.set_defaults(func=cmd_c2)
     args = ap.parse_args(argv)
     return args.func(args)

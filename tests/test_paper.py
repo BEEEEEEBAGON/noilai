@@ -17,6 +17,7 @@ every quoted figure recomputed from its file, no build seed anywhere, no superse
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import re
 import subprocess
@@ -1057,19 +1058,62 @@ def test_superseded_statements_are_absent_from_the_documents():
         assert "consulted at build time" in _read(DOCS / name) or name == "DATA_FORMAT.md"
 
 
-def test_build_seed_appears_in_no_document_or_paper_source():
-    """DESIGN_DECISIONS 4.6 (item 51): the build seed is not published. The private release manifest is the
-    only place it may live (it is not covered here; redacting it is the release scripts' job)."""
-    if not MANIFEST.exists():
-        pytest.skip("no v0.2 manifest")
-    seed = str(json.load(MANIFEST.open(encoding="utf-8"))["seed"])
-    assert seed.isdigit() and len(seed) >= 6
-    files = sorted(DOCS.glob("*.md")) + sorted(PAPER.glob("*.tex")) + sorted((PAPER / "tables").glob("*.tex")) + [PAPER / "README.md"]
-    assert len(files) >= 25
-    hits = [str(f.relative_to(ROOT)) for f in files if seed in f.read_text(encoding="utf-8")]
+# The withheld build seeds, stored as SHA-256 digests so that this file does not carry them either: the digest of the
+# v0.2 build seed (its manifest.json still carries the integer until the orchestrator's v0.3 rebuild removes v0.2) plus
+# whatever `seed` the local private manifest holds. Strings of 6+ digits in every scanned file are hashed and compared.
+_WITHHELD_SEED_DIGESTS = {"cbd9fd1d20e2824c265299eb311b5487a723d656748e9cdaa97b6de78dca794d"}
+# public release manifests that were written BEFORE write_release split the private keys out (DESIGN_DECISIONS 4.6); the
+# orchestrator removes them at the v0.3 rebuild — delete the entry here when a directory is gone or rebuilt
+_LEGACY_PUBLIC_MANIFESTS = {"v0.1", "v0.2"}
+
+
+def _withheld_seed_digests() -> set[str]:
+    digests = set(_WITHHELD_SEED_DIGESTS)
+    for rel in (ROOT / "data" / "release").glob("v*"):
+        for name in ("manifest_private.json", "manifest.json"):
+            f = rel / name
+            if f.exists():
+                seed = json.loads(f.read_text(encoding="utf-8")).get("seed")
+                if seed is not None:
+                    digests.add(hashlib.sha256(str(seed).encode()).hexdigest())
+    return digests
+
+
+def _seed_scan_files() -> list[Path]:
+    files = [ROOT / "README.md", ROOT / "Makefile", ROOT / ".gitignore", ROOT / "pyproject.toml", PAPER / "README.md"]
+    files += sorted(DOCS.glob("*.md")) + sorted(PAPER.glob("*.tex")) + sorted((PAPER / "tables").glob("*.tex"))
+    files += sorted(PAPER.glob("*.py")) + sorted((ROOT / "configs").rglob("*.yaml")) + sorted((ROOT / "prompts").rglob("*.yaml"))
+    files += sorted((ROOT / "scripts").rglob("*.py")) + sorted((ROOT / "notebooks").glob("*.ipynb"))
+    files += sorted((ROOT / "noilai").rglob("*.py")) + sorted((ROOT / "tests").rglob("*.py"))
+    files += [f for f in sorted((ROOT / "data" / "release").glob("v*/manifest.json")) if f.parent.name not in _LEGACY_PUBLIC_MANIFESTS]
+    return [f for f in files if f.exists()]
+
+
+def test_build_seed_appears_in_no_tracked_source_document_or_config():
+    """DESIGN_DECISIONS 4.6 (item 51): the build seed is not published. It may live in `manifest_private.json`
+    (git-ignored) only: not in the documents, the paper, the README, the Makefile, the configs, the scripts, the
+    notebooks, the package, the tests or a public release manifest (the legacy v0.1/v0.2 manifests excepted until the
+    v0.3 rebuild removes them). The seed itself is never written here: digits runs are compared by SHA-256."""
+    digests = _withheld_seed_digests()
+    assert digests, "no withheld seed known"
+    files = _seed_scan_files()
+    assert len(files) >= 120, len(files)                       # non-vacuity: the whole tree is scanned
+    assert any(f.name == "sample_items.py" for f in files) and any(f.suffix == ".ipynb" for f in files)
+    hits = []
+    for f in files:
+        text = f.read_text(encoding="utf-8", errors="replace")
+        for m in re.finditer(r"(?<!\d)\d{6,}(?!\d)", text):
+            if hashlib.sha256(m.group(0).encode()).hexdigest() in digests:
+                hits.append(f"{f.relative_to(ROOT)}:{text.count(chr(10), 0, m.start()) + 1}")
     assert not hits, f"the build seed is printed in {hits}"
     ds = _read(DOCS / "DATA_STATEMENT.md")
     assert "**The build seed is not published**" in ds and "one seeded stream" in ds.split("## 0.")[1].split("## A.")[0]
+    # the private manifest is ignored and the public one, when the working tree holds a post-split build, carries no seed
+    assert "data/release/*/manifest_private.json" in (ROOT / ".gitignore").read_text(encoding="utf-8")
+    for pub in (ROOT / "data" / "release").glob("v*/manifest.json"):
+        if pub.parent.name not in _LEGACY_PUBLIC_MANIFESTS:
+            d = json.loads(pub.read_text(encoding="utf-8"))
+            assert "seed" not in d and "canary" not in d and "seed" not in d.get("generator_args", {}) and d.get("canary_sha256"), pub
 
 
 # ------------------------------------------------------------------ figures reproduce from the named files (DD 12.43)
@@ -1264,3 +1308,181 @@ def test_design_document_sub_sample_names_are_run_plan_keys_and_the_checklist_na
     subs = set(re.search(r"\{([a-z,]+)\}", help_text).group(1).split(","))
     named = set(re.findall(r"scripts/compute_log\.py (\w+)", _read(DOCS / "WEEK1_CHECKLIST.md")))
     assert named and named <= subs, (named, subs)
+
+
+# ------------------------------------------------------------------ amendment markers say what the code does (1 October 2026)
+# Where the binding text contradicts the code, the rule is kept and followed by a dated `[Amendment, 1 October 2026 — what
+# the code does: …]` marker (DESIGN_DECISIONS section 13 reserves the ruling for the author). These tests read each marker
+# and check its claims against the code, so a code change that silently invalidates a marker fails here.
+_AMEND = "[Amendment, 1 October 2026"
+
+
+def _dd_section(start: str, end: str) -> str:
+    sec = _read(DD).split(start)[1].split(end)[0]
+    assert len(sec) > 500, (start, len(sec))                   # non-vacuity: the section was found and has a body
+    return sec
+
+
+def _marker(section: str) -> str:
+    assert section.count(_AMEND) == 1, section.count(_AMEND)
+    m = re.search(r"\[Amendment, 1 October 2026[^\]]*\]", section)
+    assert m and len(m.group(0)) > 200 and "DEVIATIONS.md" in m.group(0), "marker missing or unsourced"
+    return m.group(0)
+
+
+def _tiny_build():
+    from noilai.gen.generate import Generator
+    g = Generator(seed=1)
+    b = g.build(n_lexicon=10, n_pseudo=5, per_cell_t1=5, per_cell_t2=3, per_cell_t3=3, core_per_cell=1,
+                canary="NOILAI-CANARY-doc-residues-test")
+    assert b["items"], "empty tiny build"
+    return g, b
+
+
+def test_quota_scope_marker_matches_the_generator():
+    from noilai.gen import generate as G
+    sec = _dd_section("### 4.2", "### 4.3")
+    assert "within each task × variant cell" in sec            # the binding sentence is kept, never deleted
+    mk = _marker(sec)
+    assert "ONCE over the base-pair pool" in mk and "not within each task × variant cell" in mk
+    assert f"`QUOTA_ATTEMPT_FACTOR` = {G.QUOTA_ATTEMPT_FACTOR} × n_pseudo" in mk
+    assert len(G.QUOTA_FEATURES) == 5 and "five strata" in mk
+    _g, b = _tiny_build()
+    q = b["pseudo_quota"]
+    assert q["scope"].startswith("base-pair pool") and q["cap_attempts"] == G.QUOTA_ATTEMPT_FACTOR * q["n_pseudo_target"]
+    assert "shortfall" in q and "`shortfall`" in mk
+    assert "(pseudo-pair quota scope)" in _read(DOCS / "DEVIATIONS.md") and "(pseudo-pair quota scope)" in mk
+
+
+def test_marginal_rime_marker_matches_the_generator_on_oao():
+    from noilai.vi.syllable import spell, try_parse
+    sec = _dd_section("### 2.3", "### 2.4")
+    assert "`oao` 3" in sec                                    # the binding enumeration is kept
+    mk = _marker(sec)
+    assert "`oao` has 6 types" in mk and "is KEPT" in mk and "qu- entries INCLUDED" in mk
+    named = re.search(r"6 types \(`([^`]+)`\)", mk).group(1).replace(",", "").split()
+    assert len(named) == 6 and sum(w.startswith("qu") for w in named) == 3
+    g, _b = _tiny_build()
+    rimes = {try_parse(w, strict=True).syllable.rime for w in named}
+    assert len(rimes) == 1, rimes
+    (rime,) = rimes
+    assert rime not in g.marginal_rimes, "the generator excludes oao: the marker is stale"
+    attested = {spell(s) for s in g.attested}
+    assert set(named) <= attested, set(named) - attested
+    assert "qu- included" in b_conv(_b) and "`marginal_rime_convention`" in mk
+
+
+def b_conv(build: dict) -> str:
+    return build["marginal_rime_convention"]
+
+
+def test_boundary_convention_marker_matches_the_harness():
+    from noilai.eval import prompts as P
+    from noilai.eval import run, score
+    sec = _dd_section("### 7.3", "### 7.4")
+    assert "Candidates start after a newline" in sec           # the binding sentence is kept
+    mk = _marker(sec)
+    marker = P.answer_marker()
+    assert f"(`{marker}`" in mk, (marker, mk[:200])
+    assert '`" Có"`' in mk and '`" Không"`' in mk and '`" " + candidate`' in mk and "no newline is inserted" in mk
+    assert "`prefix_property_violations`" in mk and callable(score.violated)
+    src = run._t3_logprobs.__doc__ if hasattr(run, "_t3_logprobs") else _read(ROOT / "noilai" / "eval" / "run.py")
+    assert "scoring context ends with the" in src and '" Có"' in src
+    assert "(log-probability boundary convention)" in _read(DOCS / "DEVIATIONS.md")
+
+
+def test_position_group_markers_name_the_drivers_groups():
+    if str(ROOT / "scripts") not in sys.path:
+        sys.path.insert(0, str(ROOT / "scripts"))
+    import run_probe as RP
+    dd = _dd_section("### 9.3", "### 9.4")
+    assert "G1a/b/c each token separately" in dd and "G3 the instruction" in dd      # binding text kept
+    mk = _marker(dd)
+    for name in RP.GROUP_NAMES:
+        assert f"`{name}`" in mk, name
+    assert "instruction AND demonstrations" in mk and "`position_groups`" in mk
+    pr = _read(PREREG).split("### 8.10")[1].split("## 9.")[0]
+    assert len(pr) > 500 and "G1a/b/c (its tokens), G2 (fixed syllable), G3 (instruction)" in pr
+    pmk = _marker(pr)
+    assert "`G1_first` / `G1_last`" in pmk and "`G3_context`" in pmk and "instruction AND demonstrations" in pmk
+    assert {"G1_first", "G1_last", "G3_context"} <= set(RP.GROUP_NAMES)
+    groups = RP._position_groups({"target_positions": [5, 6, 7], "partner_positions": [3, 4], "context_positions": [0, 1, 2],
+                                  "suffix_positions": [8], "answer_pos": 9}, 10)
+    assert groups[1] == [5] and groups[2] == [7] and groups[4] == [0, 1, 2] and len(groups) == len(RP.GROUP_NAMES)
+
+
+def test_power_figures_are_the_named_functions_output():
+    from noilai.stats import power
+    for name, text in (("DD 8.5", _dd_section("### 8.5", "### 8.6")), ("PREREG §9", _read(PREREG).split("## 9.")[1].split("## 10.")[0])):
+        assert len(text) > 500, name
+        m = re.search(r"100 \(15% discordance\), 145 \(20%\), 227 \(30%\), 308 \(40%\), 356 \(46%\)", text)
+        assert m, name
+        quoted = [(100, 15), (145, 20), (227, 30), (308, 40), (356, 46)]
+        for n, pct in quoted:
+            assert power.n_for_mcnemar_power_conditional(0.10, pct / 100) == n, (name, n, pct)
+        assert "`noilai.stats.power.n_for_mcnemar_power_conditional(0.10, r)`" in text, name
+        unc = re.search(r"`n_for_mcnemar_power` gives ([\d, ]+)", text)
+        assert unc, name
+        assert [int(x) for x in unc.group(1).split(",")] == [power.n_for_mcnemar_power(0.10, p / 100) for _n, p in quoted], name
+
+
+def test_verbatim_viet74k_count_is_manifest_derived_not_typed():
+    from noilai.vi import lexicon
+    docs = {name: _read(DOCS / name) for name in ("DESIGN_DECISIONS.md", "DATA_STATEMENT.md", "IMPLEMENTATION_DECISIONS.md")}
+    assert all(len(t) > 1000 for t in docs.values())
+    for name, t in docs.items():
+        for stale in ("about 1,500 Viet74K", "about 1,500 of Viet74K", "about 1,500 of its"):
+            assert stale not in t, (name, stale)                 # the ~1,500-item CORE is a different, live figure
+        assert "N Viet74K two-syllable entries verbatim" in t and "`n_lexical_base_pairs`" in t and "`source: lexicon`" in t, name
+    doc = lexicon.__doc__
+    assert doc and "never redistributed" not in doc and "consulted at build time" in doc
+    assert "N Viet74K two-syllable entries" in doc and "`n_lexical_base_pairs`" in doc and "12.22" in doc
+    # the derivation the documents name is well defined on a build: distinct lexical base pairs, a subset of all base pairs
+    _g, b = _tiny_build()
+    lexical = {it["base_pair_id"] for it in b["items"] if it["source"] == "lexicon"}
+    assert 0 < len(lexical) <= b["n_base_pairs"]
+
+
+def test_implementation_decision_22_reports_no_share_and_names_the_module():
+    import importlib
+    t = _read(DOCS / "IMPLEMENTATION_DECISIONS.md")
+    item = t.split("\n22. ")[1].split("\n23. ")[0]
+    assert len(item) > 200 and "and its share" not in item and "`noilai.stats.dose_response`" in item and 'no "share"' in item
+    assert importlib.import_module("noilai.stats.dose_response")
+
+
+def test_models_yaml_comment_names_the_revision_check_that_exists():
+    from noilai.eval import run
+    head = "\n".join((ROOT / "configs" / "models.yaml").read_text(encoding="utf-8").splitlines()[:40])
+    assert "revision" in head and "`noilai.eval.run.check_revision`" in head and "does not check it yet" not in head
+    assert callable(run.check_revision)
+    assert "check_revision(" in _read(ROOT / "scripts" / "run_eval.py")
+
+
+def test_data_format_documents_the_release_manifest_keys_and_the_public_private_split(tmp_path):
+    from noilai.gen.generate import PRIVATE_MANIFEST, PUBLIC_MANIFEST, write_release
+    t = _read(DOCS / "DATA_FORMAT.md")
+    sec = t.split("`manifest.json` records")[1].split("## Seeded sub-samples")[0]
+    assert len(sec) > 800
+    _g, b = _tiny_build()
+    priv = write_release(b, tmp_path, manifest_extra={"seed": 1, "generator_args": {"seed": 1, "n_lexicon": 10}})
+    pub = json.loads((tmp_path / PUBLIC_MANIFEST).read_text(encoding="utf-8"))
+    assert (tmp_path / PRIVATE_MANIFEST).exists() and PRIVATE_MANIFEST == "manifest_private.json"
+    for key in ("marginal_rimes", "marginal_rime_convention", "degenerate_counts", "attested_strings_sha256",
+                "dev_base_pairs_moved_for_vulgar", "n_marginal_rimes", "pseudo_quota", "content_sha256", "canary_sha256",
+                "private_manifest", "exclude_qu"):
+        assert key in pub, key
+        assert f"`{key}`" in sec, key
+    assert pub["private_manifest"] == PRIVATE_MANIFEST and f"`{PRIVATE_MANIFEST}`" in sec
+    assert "seed" not in pub and "canary" not in pub and "seed" not in pub["generator_args"]
+    assert priv["seed"] == 1 and priv["canary"] and "no `seed`, no `canary` GUID" in sec
+    assert f"data/release/*/{PRIVATE_MANIFEST}" in sec and f"data/release/*/{PRIVATE_MANIFEST}" in (ROOT / ".gitignore").read_text(encoding="utf-8")
+    # strata keys and the `spelled` note the generator round asked for
+    strata_row = next(ln for ln in t.splitlines() if ln.startswith("| `strata` |"))
+    for key in ("degenerate", "attested_overlap", "c2_enriched", "c2_affected"):
+        assert f"`{key}`" in strata_row, key
+    it = b["items"][0]
+    assert {"degenerate", "attested_overlap", "c2_affected"} <= set(it["strata"])
+    spelled_row = next(ln for ln in t.splitlines() if ln.startswith("| `input_syllables` |"))
+    assert "exactly as stored in `input`/`gold`" in spelled_row and "standard new-style spelling" not in spelled_row
+    assert [s["spelled"] for s in it["input_syllables"]] == it["input"].split()

@@ -51,6 +51,17 @@ def run(adapter, out: Path, syllables, phrases, probe_set_source: dict | None = 
     print(json.dumps({"tokenizer": adapter.name, **res["summary"], "census": res["normalization_census"]}, ensure_ascii=False, indent=1))
 
 
+def _relative(path: Path | None) -> str | None:
+    """The probe set's item file as a repository-relative path (the JSON is committed; an absolute
+    path would name the build machine)."""
+    if path is None:
+        return None
+    try:
+        return str(Path(path).resolve().relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--spm", nargs="*", default=[], help="path[:name] of SentencePiece models")
@@ -73,7 +84,7 @@ def main(argv=None) -> int:
     phrases = census_probe_set(words, item_texts, seed=args.census_seed)
     n_words = min(500, len({w for w in words if " " in w}))
     source = {"n": len(phrases), "n_words": n_words, "n_items": len(phrases) - n_words,
-              "items_file": str(args.items) if args.items is not None else None, "seed": args.census_seed,
+              "items_file": _relative(args.items), "seed": args.census_seed,
               "rule": "500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)"}
     for spec in args.spm:
         path, _, name = spec.partition(":")

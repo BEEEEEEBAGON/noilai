@@ -29,9 +29,10 @@
 #   * API entries have no dtype;
 #   * every self-hosted entry carries `revision` (DESIGN_DECISIONS 7.1: the runner refuses to
 #     start unless it is a full commit hash, a Kaggle Models slug + version or a GGUF SHA-256);
-#     it is null until the panel is frozen and MUST be filled before a paper run. `run_eval.py`
-#     refuses an unpinned local backend without --smoke, and `scripts/kaggle_run_plan.py` skips
-#     an unpinned self-hosted model on every non-smoke line (dry runs still print the command).
+#     it is null until the panel is frozen and MUST be filled before a paper run. The check lives in
+#     `noilai.eval.run.check_revision`, called by `scripts/run_eval.py`, which refuses an unpinned
+#     local backend without --smoke; `scripts/kaggle_run_plan.py` skips an unpinned self-hosted
+#     model on every non-smoke line (dry runs still print the command).
 #   * every provider block carries `terms.trains_on_inputs` as a BOOLEAN: the run driver refuses a
 #     canary-bearing (test-split) item file for a provider whose tier trains on inputs, and the eval
 #     harness refuses any core item unless the value is exactly false (DESIGN_DECISIONS 11.2 / 12.41).
@@ -46,7 +47,7 @@ defaults:
   max_model_len: 1024          # DESIGN_DECISIONS 7.3: ~500 prompt tokens (3 demonstrations) + <= 64 output tokens under NFC; [UNCERTAIN: verify] that the NFD prompts (~1.6x the tokens on Gemma 3) stay under 1024 - 64, else raise per entry and record it
   max_new_tokens: 64
   temperature: 0.0             # greedy decoding everywhere (plan 2.5)
-  seed: 20261004
+  seed: 20261203               # the run (backend) seed; public, distinct from the withheld build seed (DESIGN_DECISIONS 4.6)
   gpu_memory_utilization: 0.85 # DESIGN_DECISIONS 7.3 (the plan said <= 0.9); CUDA graphs on unless a model forces eager
   enforce_eager: false         # flip per model on a graph-capture failure and record it in the manifest
   trust_remote_code: false

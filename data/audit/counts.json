@@ -126,7 +126,498 @@
    "xuỳ",
    "đoá",
    "đoạ"
+  ],
+  "onset_written": {
+   "": 291,
+   "b": 337,
+   "c": 254,
+   "ch": 337,
+   "d": 245,
+   "g": 146,
+   "gh": 26,
+   "gi": 157,
+   "h": 335,
+   "k": 91,
+   "kh": 229,
+   "l": 412,
+   "m": 294,
+   "n": 249,
+   "ng": 231,
+   "ngh": 56,
+   "nh": 279,
+   "p": 15,
+   "ph": 182,
+   "qu": 127,
+   "r": 286,
+   "s": 268,
+   "t": 360,
+   "th": 301,
+   "tr": 248,
+   "v": 245,
+   "x": 282,
+   "đ": 312
+  },
+  "coda_tone": {
+   "c": {
+    "ngang": 0,
+    "huyen": 0,
+    "sac": 197,
+    "hoi": 0,
+    "nga": 0,
+    "nang": 145
+   },
+   "ch": {
+    "ngang": 0,
+    "huyen": 0,
+    "sac": 62,
+    "hoi": 0,
+    "nga": 0,
+    "nang": 55
+   },
+   "j": {
+    "ngang": 162,
+    "huyen": 146,
+    "sac": 155,
+    "hoi": 130,
+    "nga": 65,
+    "nang": 91
+   },
+   "m": {
+    "ngang": 176,
+    "huyen": 156,
+    "sac": 132,
+    "hoi": 80,
+    "nga": 48,
+    "nang": 87
+   },
+   "n": {
+    "ngang": 248,
+    "huyen": 207,
+    "sac": 173,
+    "hoi": 116,
+    "nga": 63,
+    "nang": 149
+   },
+   "ng": {
+    "ngang": 214,
+    "huyen": 177,
+    "sac": 141,
+    "hoi": 122,
+    "nga": 71,
+    "nang": 93
+   },
+   "nh": {
+    "ngang": 68,
+    "huyen": 62,
+    "sac": 33,
+    "hoi": 43,
+    "nga": 23,
+    "nang": 34
+   },
+   "open": {
+    "ngang": 292,
+    "huyen": 241,
+    "sac": 232,
+    "hoi": 207,
+    "nga": 143,
+    "nang": 195
+   },
+   "p": {
+    "ngang": 1,
+    "huyen": 0,
+    "sac": 155,
+    "hoi": 0,
+    "nga": 0,
+    "nang": 126
+   },
+   "t": {
+    "ngang": 2,
+    "huyen": 0,
+    "sac": 279,
+    "hoi": 0,
+    "nga": 0,
+    "nang": 229
+   },
+   "w": {
+    "ngang": 145,
+    "huyen": 110,
+    "sac": 113,
+    "hoi": 73,
+    "nga": 39,
+    "nang": 89
+   }
+  },
+  "coda_tone_columns": [
+   "ngang",
+   "huyen",
+   "sac",
+   "hoi",
+   "nga",
+   "nang"
+  ],
+  "n_rimes_orthographic": 162,
+  "rimes_orthographic": [
+   "a",
+   "ac",
+   "ach",
+   "ai",
+   "am",
+   "an",
+   "ang",
+   "anh",
+   "ao",
+   "ap",
+   "at",
+   "au",
+   "ay",
+   "e",
+   "ec",
+   "em",
+   "en",
+   "eng",
+   "eo",
+   "ep",
+   "et",
+   "i",
+   "ia",
+   "ich",
+   "im",
+   "in",
+   "ing",
+   "inh",
+   "ip",
+   "it",
+   "iu",
+   "iêc",
+   "iêm",
+   "iên",
+   "iêng",
+   "iêp",
+   "iêt",
+   "iêu",
+   "o",
+   "oa",
+   "oac",
+   "oach",
+   "oai",
+   "oam",
+   "oan",
+   "oang",
+   "oanh",
+   "oao",
+   "oap",
+   "oat",
+   "oay",
+   "oc",
+   "oe",
+   "oen",
+   "oeo",
+   "oet",
+   "oi",
+   "om",
+   "on",
+   "ong",
+   "ooc",
+   "oong",
+   "op",
+   "ot",
+   "oăc",
+   "oăm",
+   "oăn",
+   "oăng",
+   "oăt",
+   "u",
+   "ua",
+   "uc",
+   "ui",
+   "um",
+   "un",
+   "ung",
+   "up",
+   "ut",
+   "uy",
+   "uya",
+   "uych",
+   "uyn",
+   "uynh",
+   "uyt",
+   "uyu",
+   "uyên",
+   "uyêt",
+   "uân",
+   "uâng",
+   "uât",
+   "uây",
+   "uê",
+   "uêch",
+   "uênh",
+   "uôc",
+   "uôi",
+   "uôm",
+   "uôn",
+   "uông",
+   "uôt",
+   "uơ",
+   "y",
+   "ynh",
+   "yt",
+   "yêm",
+   "yên",
+   "yêng",
+   "yêt",
+   "yêu",
+   "âc",
+   "âm",
+   "ân",
+   "âng",
+   "âp",
+   "ât",
+   "âu",
+   "ây",
+   "ê",
+   "êch",
+   "êm",
+   "ên",
+   "ênh",
+   "êp",
+   "êt",
+   "êu",
+   "ô",
+   "ôc",
+   "ôi",
+   "ôm",
+   "ôn",
+   "ông",
+   "ôp",
+   "ôt",
+   "ăc",
+   "ăm",
+   "ăn",
+   "ăng",
+   "ăp",
+   "ăt",
+   "ơ",
+   "ơi",
+   "ơm",
+   "ơn",
+   "ơp",
+   "ơt",
+   "ư",
+   "ưa",
+   "ưc",
+   "ưi",
+   "ưm",
+   "ưn",
+   "ưng",
+   "ưt",
+   "ưu",
+   "ươc",
+   "ươi",
+   "ươm",
+   "ươn",
+   "ương",
+   "ươp",
+   "ươt",
+   "ươu"
   ]
+ },
+ "byte_length": {
+  "ngang": {
+   "letters": {
+    "a": 1,
+    "ă": 2,
+    "â": 2,
+    "e": 1,
+    "ê": 2,
+    "i": 1,
+    "o": 1,
+    "ô": 2,
+    "ơ": 2,
+    "u": 1,
+    "ư": 2,
+    "y": 1
+   },
+   "two_byte": [
+    "ă",
+    "â",
+    "ê",
+    "ô",
+    "ơ",
+    "ư"
+   ],
+   "three_byte": [],
+   "one_byte": [
+    "a",
+    "e",
+    "i",
+    "o",
+    "u",
+    "y"
+   ]
+  },
+  "huyen": {
+   "letters": {
+    "a": 2,
+    "ă": 3,
+    "â": 3,
+    "e": 2,
+    "ê": 3,
+    "i": 2,
+    "o": 2,
+    "ô": 3,
+    "ơ": 3,
+    "u": 2,
+    "ư": 3,
+    "y": 3
+   },
+   "two_byte": [
+    "a",
+    "e",
+    "i",
+    "o",
+    "u"
+   ],
+   "three_byte": [
+    "ă",
+    "â",
+    "ê",
+    "ô",
+    "ơ",
+    "ư",
+    "y"
+   ],
+   "one_byte": []
+  },
+  "sac": {
+   "letters": {
+    "a": 2,
+    "ă": 3,
+    "â": 3,
+    "e": 2,
+    "ê": 3,
+    "i": 2,
+    "o": 2,
+    "ô": 3,
+    "ơ": 3,
+    "u": 2,
+    "ư": 3,
+    "y": 2
+   },
+   "two_byte": [
+    "a",
+    "e",
+    "i",
+    "o",
+    "u",
+    "y"
+   ],
+   "three_byte": [
+    "ă",
+    "â",
+    "ê",
+    "ô",
+    "ơ",
+    "ư"
+   ],
+   "one_byte": []
+  },
+  "hoi": {
+   "letters": {
+    "a": 3,
+    "ă": 3,
+    "â": 3,
+    "e": 3,
+    "ê": 3,
+    "i": 3,
+    "o": 3,
+    "ô": 3,
+    "ơ": 3,
+    "u": 3,
+    "ư": 3,
+    "y": 3
+   },
+   "two_byte": [],
+   "three_byte": [
+    "a",
+    "ă",
+    "â",
+    "e",
+    "ê",
+    "i",
+    "o",
+    "ô",
+    "ơ",
+    "u",
+    "ư",
+    "y"
+   ],
+   "one_byte": []
+  },
+  "nga": {
+   "letters": {
+    "a": 2,
+    "ă": 3,
+    "â": 3,
+    "e": 3,
+    "ê": 3,
+    "i": 2,
+    "o": 2,
+    "ô": 3,
+    "ơ": 3,
+    "u": 2,
+    "ư": 3,
+    "y": 3
+   },
+   "two_byte": [
+    "a",
+    "i",
+    "o",
+    "u"
+   ],
+   "three_byte": [
+    "ă",
+    "â",
+    "e",
+    "ê",
+    "ô",
+    "ơ",
+    "ư",
+    "y"
+   ],
+   "one_byte": []
+  },
+  "nang": {
+   "letters": {
+    "a": 3,
+    "ă": 3,
+    "â": 3,
+    "e": 3,
+    "ê": 3,
+    "i": 3,
+    "o": 3,
+    "ô": 3,
+    "ơ": 3,
+    "u": 3,
+    "ư": 3,
+    "y": 3
+   },
+   "two_byte": [],
+   "three_byte": [
+    "a",
+    "ă",
+    "â",
+    "e",
+    "ê",
+    "i",
+    "o",
+    "ô",
+    "ơ",
+    "u",
+    "ư",
+    "y"
+   ],
+   "one_byte": []
+  }
  },
  "inventory": {
   "base_structures": 6572,
@@ -382,6 +873,8 @@
  "wordlist": {
   "entries": 73901,
   "two_syllable_pairs": 49103,
+  "two_syllable_entries": 49103,
+  "distinct_canonical_pairs": 47535,
   "distinct_canonical_syllables": 7478,
   "iy_table_y_forms": [
    "mĩ"
@@ -395,6 +888,8 @@
      "tokens_per_syllable_mean": 1.782562547384382,
      "single_token_frac": 0.29461713419257013,
      "boundary_alignment_mean": 0.9414455395501643,
+     "boundary_alignment_among_split_mean": 0.9169891086271138,
+     "n_split": 4652,
      "onset_rime_split_frac": 0.5152388172858225,
      "tone_isolated_frac": 0,
      "byte_fallback_frac": 0,
@@ -410,6 +905,8 @@
      "tokens_per_syllable_mean": 2.830780894617134,
      "single_token_frac": 0.07050796057619409,
      "boundary_alignment_mean": 0.2701516300227445,
+     "boundary_alignment_among_split_mean": 0.21478792822185971,
+     "n_split": 6130,
      "onset_rime_split_frac": 0.06823351023502654,
      "tone_isolated_frac": 0.41637604245640636,
      "byte_fallback_frac": 0,
@@ -425,7 +922,64 @@
     }
    },
    "normalizes_nfd": false,
-   "normalizer": "identity"
+   "verdict_nfd": "passes_through",
+   "verdict_pc": "passes_through",
+   "census_n_samples": 1000,
+   "normalizer": "identity",
+   "single_token_by_tone": {
+    "nfc": {
+     "hoi": {
+      "n": 771,
+      "single_token_frac": 0.23216601815823606
+     },
+     "huyen": {
+      "n": 1099,
+      "single_token_frac": 0.2302092811646952
+     },
+     "nang": {
+      "n": 1293,
+      "single_token_frac": 0.2242846094354215
+     },
+     "nga": {
+      "n": 452,
+      "single_token_frac": 0.1836283185840708
+     },
+     "ngang": {
+      "n": 1308,
+      "single_token_frac": 0.5084097859327217
+     },
+     "sac": {
+      "n": 1672,
+      "single_token_frac": 0.28289473684210525
+     }
+    },
+    "nfd": {
+     "hoi": {
+      "n": 771,
+      "single_token_frac": 0.0012970168612191958
+     },
+     "huyen": {
+      "n": 1099,
+      "single_token_frac": 0.0018198362147406734
+     },
+     "nang": {
+      "n": 1293,
+      "single_token_frac": 0.0
+     },
+     "nga": {
+      "n": 452,
+      "single_token_frac": 0.0
+     },
+     "ngang": {
+      "n": 1308,
+      "single_token_frac": 0.3516819571865443
+     },
+     "sac": {
+      "n": 1672,
+      "single_token_frac": 0.0011961722488038277
+     }
+    }
+   }
   },
   "gemma2": {
    "summary": {
@@ -434,6 +988,8 @@
      "tokens_per_syllable_mean": 1.771948445792267,
      "single_token_frac": 0.2988627748294162,
      "boundary_alignment_mean": 0.938640384129391,
+     "boundary_alignment_among_split_mean": 0.9124855824682814,
+     "n_split": 4624,
      "onset_rime_split_frac": 0.506899166034875,
      "tone_isolated_frac": 0,
      "byte_fallback_frac": 0,
@@ -449,6 +1005,8 @@
      "tokens_per_syllable_mean": 2.898559514783927,
      "single_token_frac": 0.07278241091736164,
      "boundary_alignment_mean": 0.28983320697498105,
+     "boundary_alignment_among_split_mean": 0.23408830744071954,
+     "n_split": 6115,
      "onset_rime_split_frac": 0.043669446550416983,
      "tone_isolated_frac": 0.5041698256254739,
      "byte_fallback_frac": 0,
@@ -463,7 +1021,249 @@
     }
    },
    "normalizes_nfd": false,
-   "normalizer": "identity"
+   "verdict_nfd": "passes_through",
+   "verdict_pc": "passes_through",
+   "census_n_samples": 1000,
+   "normalizer": "identity",
+   "single_token_by_tone": {
+    "nfc": {
+     "hoi": {
+      "n": 771,
+      "single_token_frac": 0.21660181582360571
+     },
+     "huyen": {
+      "n": 1099,
+      "single_token_frac": 0.23202911737943585
+     },
+     "nang": {
+      "n": 1293,
+      "single_token_frac": 0.22815158546017014
+     },
+     "nga": {
+      "n": 452,
+      "single_token_frac": 0.18141592920353983
+     },
+     "ngang": {
+      "n": 1308,
+      "single_token_frac": 0.5290519877675841
+     },
+     "sac": {
+      "n": 1672,
+      "single_token_frac": 0.28708133971291866
+     }
+    },
+    "nfd": {
+     "hoi": {
+      "n": 771,
+      "single_token_frac": 0.0
+     },
+     "huyen": {
+      "n": 1099,
+      "single_token_frac": 0.0018198362147406734
+     },
+     "nang": {
+      "n": 1293,
+      "single_token_frac": 0.0
+     },
+     "nga": {
+      "n": 452,
+      "single_token_frac": 0.0
+     },
+     "ngang": {
+      "n": 1308,
+      "single_token_frac": 0.3654434250764526
+     },
+     "sac": {
+      "n": 1672,
+      "single_token_frac": 0.0
+     }
+    }
+   }
+  }
+ },
+ "release_strata": {
+  "status": "computed",
+  "release": "data/release/v0.2",
+  "manifest": {
+   "content_sha256": "95ba53ae9f3f4b1a45192dceeccff93de34f4c303f20025e3164e12ae18cb0cd",
+   "git_commit": "ee28792129bc9f7b044a6ae52a78363735c9ddbf",
+   "n_items": 10000,
+   "c2_affected_counts": {
+    "T1-V1": 24,
+    "T1-V2": 32,
+    "T1-V3": 37,
+    "T1-V4": 20,
+    "T2-V1": 12,
+    "T2-V2": 21,
+    "T2-V3": 20,
+    "T2-V4": 15,
+    "T3-V1": 16,
+    "T3-V2": 34,
+    "T3-V3": 38,
+    "T3-V4": 22
+   }
+  },
+  "n_items": 10000,
+  "degenerate_rule": "strata.degenerate when present, else same_tone or same_onset or same_rime (design 3.4)",
+  "c2_affected_test_total": 221,
+  "output_lexical_share_total": 0.2034,
+  "cells": {
+   "T1-V1": {
+    "n_items": 1000,
+    "n_test": 793,
+    "degenerate": 314,
+    "degenerate_share": 0.314,
+    "same_tone": 246,
+    "same_onset": 68,
+    "same_rime": 0,
+    "output_lexical": 7,
+    "output_lexical_share": 0.007,
+    "c2_affected": 24,
+    "c2_affected_test": 16
+   },
+   "T1-V2": {
+    "n_items": 1000,
+    "n_test": 792,
+    "degenerate": 29,
+    "degenerate_share": 0.029,
+    "same_tone": 0,
+    "same_onset": 0,
+    "same_rime": 29,
+    "output_lexical": 4,
+    "output_lexical_share": 0.004,
+    "c2_affected": 32,
+    "c2_affected_test": 25
+   },
+   "T1-V3": {
+    "n_items": 1000,
+    "n_test": 785,
+    "degenerate": 109,
+    "degenerate_share": 0.109,
+    "same_tone": 0,
+    "same_onset": 76,
+    "same_rime": 33,
+    "output_lexical": 5,
+    "output_lexical_share": 0.005,
+    "c2_affected": 37,
+    "c2_affected_test": 27
+   },
+   "T1-V4": {
+    "n_items": 1000,
+    "n_test": 806,
+    "degenerate": 0,
+    "degenerate_share": 0.0,
+    "same_tone": 0,
+    "same_onset": 0,
+    "same_rime": 0,
+    "output_lexical": 2,
+    "output_lexical_share": 0.002,
+    "c2_affected": 20,
+    "c2_affected_test": 16
+   },
+   "T2-V1": {
+    "n_items": 500,
+    "n_test": 398,
+    "degenerate": 179,
+    "degenerate_share": 0.358,
+    "same_tone": 125,
+    "same_onset": 54,
+    "same_rime": 0,
+    "output_lexical": 500,
+    "output_lexical_share": 1.0,
+    "c2_affected": 12,
+    "c2_affected_test": 9
+   },
+   "T2-V2": {
+    "n_items": 500,
+    "n_test": 401,
+    "degenerate": 32,
+    "degenerate_share": 0.064,
+    "same_tone": 0,
+    "same_onset": 0,
+    "same_rime": 32,
+    "output_lexical": 500,
+    "output_lexical_share": 1.0,
+    "c2_affected": 21,
+    "c2_affected_test": 16
+   },
+   "T2-V3": {
+    "n_items": 500,
+    "n_test": 395,
+    "degenerate": 87,
+    "degenerate_share": 0.174,
+    "same_tone": 0,
+    "same_onset": 59,
+    "same_rime": 28,
+    "output_lexical": 500,
+    "output_lexical_share": 1.0,
+    "c2_affected": 20,
+    "c2_affected_test": 17
+   },
+   "T2-V4": {
+    "n_items": 500,
+    "n_test": 408,
+    "degenerate": 0,
+    "degenerate_share": 0.0,
+    "same_tone": 0,
+    "same_onset": 0,
+    "same_rime": 0,
+    "output_lexical": 500,
+    "output_lexical_share": 1.0,
+    "c2_affected": 15,
+    "c2_affected_test": 13
+   },
+   "T3-V1": {
+    "n_items": 1000,
+    "n_test": 778,
+    "degenerate": 320,
+    "degenerate_share": 0.32,
+    "same_tone": 238,
+    "same_onset": 82,
+    "same_rime": 0,
+    "output_lexical": 8,
+    "output_lexical_share": 0.008,
+    "c2_affected": 16,
+    "c2_affected_test": 8
+   },
+   "T3-V2": {
+    "n_items": 1000,
+    "n_test": 792,
+    "degenerate": 16,
+    "degenerate_share": 0.016,
+    "same_tone": 0,
+    "same_onset": 0,
+    "same_rime": 16,
+    "output_lexical": 0,
+    "output_lexical_share": 0.0,
+    "c2_affected": 34,
+    "c2_affected_test": 28
+   },
+   "T3-V3": {
+    "n_items": 1000,
+    "n_test": 774,
+    "degenerate": 110,
+    "degenerate_share": 0.11,
+    "same_tone": 0,
+    "same_onset": 82,
+    "same_rime": 28,
+    "output_lexical": 6,
+    "output_lexical_share": 0.006,
+    "c2_affected": 38,
+    "c2_affected_test": 28
+   },
+   "T3-V4": {
+    "n_items": 1000,
+    "n_test": 800,
+    "degenerate": 0,
+    "degenerate_share": 0.0,
+    "same_tone": 0,
+    "same_onset": 0,
+    "same_rime": 0,
+    "output_lexical": 2,
+    "output_lexical_share": 0.002,
+    "c2_affected": 22,
+    "c2_affected_test": 18
+   }
   }
  },
  "resource_sha256": {

@@ -771,7 +771,7 @@ def build_colab_probe() -> nbformat.NotebookNode:
         ENCODINGS = ["nfc", "nfd"]
         FEATURES = ["tone", "onset", "rime"]
         POSITION = "last"                 # "last" sub-token of the syllable or "after"
-        SEED = 20261004
+        SEED = 20261204                   # probe split/control seed; public, distinct from the withheld build seed (DD 4.6)
         BATCH_SIZE = 8
 
         PLATFORM, GPU_TYPE, N_GPUS = "colab", "t4", 1    # Kaggle 2xT4 for the 4B: PLATFORM "kaggle", N_GPUS 2, DRIVE_DIR -> /kaggle/working/noilai

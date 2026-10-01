@@ -63,6 +63,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from ..audit.tokenizers import CENSUS_VERDICTS
 from ..gen import variants as V
 from ..vi import reencode as R
 from . import prompts as P
@@ -124,6 +125,12 @@ def check_revision(entry: dict, backend_kind: str | None, smoke: bool = False) -
 
 class DemoOverlapError(RuntimeError):
     pass
+
+
+class CorruptingCensusError(RuntimeError):
+    """A re-encoding arm was requested on an engine path whose normalization census verdict is
+    `corrupts` (decoding the ids does not return the input): the arm is refused on that engine
+    (DESIGN_DECISIONS 6.2, PREREGISTRATION 5.5 / 8.6)."""
 
 
 class UnchangedArmError(RuntimeError):
@@ -494,6 +501,9 @@ def t3_logprobs(backend: Backend, req: Request, messages: list[dict], opts: RunO
     out["Có"], out["Không"] = _lp(lp[0], viol[0]), _lp(lp[1], viol[1])
     out["n_tokens_Có"], out["n_tokens_Không"] = n_tok
     out["prompt_ids_sha256"] = getattr(backend, "last_prompt_ids_sha256", None)
+    # per continuation (DESIGN_DECISIONS 7.3): the scorer nulls only the violated continuation's
+    # prediction; the row-level flag is the any() of them, for the manifest count
+    out["prefix_property_violations"] = {"Có": viol[0], "Không": viol[1], "candidate": None}
     out["prefix_property_violation"] = any(viol) if any(v is not None for v in viol) else None
     it = req.item
     out["candidate"] = None
@@ -514,6 +524,7 @@ def t3_logprobs(backend: Backend, req: Request, messages: list[dict], opts: RunO
     out["candidate"] = _lp(lp2[0], viol2[0])
     out["candidate_n_tokens"] = _n_tokens(backend, 1)[0]
     out["candidate_context_ids_sha256"] = getattr(backend, "last_prompt_ids_sha256", None)
+    out["prefix_property_violations"]["candidate"] = viol2[0]
     if viol2[0]:
         out["prefix_property_violation"] = True
     out["candidate_context_hash"] = P.prompt_hash(ctx_messages)
@@ -548,6 +559,7 @@ def xcopa_logprobs(backend: Backend, req: Request) -> dict:
     n_tok = _n_tokens(backend, 2)
     return {"1": _lp(lp[0], viol[0]), "2": _lp(lp[1], viol[1]), "n_tokens_1": n_tok[0], "n_tokens_2": n_tok[1],
             "context": ctx, "prompt_ids_sha256": getattr(backend, "last_prompt_ids_sha256", None),
+            "prefix_property_violations": {"1": viol[0], "2": viol[1]},
             "prefix_property_violation": any(viol) if any(v is not None for v in viol) else None}
 
 
@@ -649,23 +661,62 @@ def placement_baseline_for(item_path: Path, items: list[dict]) -> dict:
             "n_inputs_changed_by_new": changed_new}
 
 
+# which census verdict each re-encoding arm depends on (DESIGN_DECISIONS 6.2: NFD = the C1 arm, PC = the
+# partial Windows-1258 decomposition); the strip and placement arms produce NFC strings and need no verdict
+CENSUS_ARM_VERDICTS = {"nfd": "verdict_nfd", "win1258": "verdict_pc"}
+
+
+def census_classification(census: dict) -> tuple[str | None, bool]:
+    """(classification, legacy) from a census block. The three-valued `verdict_nfd` of
+    noilai.audit.tokenizers.normalization_census is authoritative; a census written before the
+    verdicts existed carries only the two-valued `normalizes_nfd`, which cannot tell a pass-through
+    from a corrupting path -- it is read as a fallback and flagged `legacy_census` in the manifest."""
+    if not census:
+        return None, False
+    verdict = census.get("verdict_nfd")
+    if verdict in CENSUS_VERDICTS:
+        return verdict, False
+    return ("normalizes" if census.get("normalizes_nfd") else "passes_through"), True
+
+
 def normalization_census_for(entry: dict, backend_info: dict) -> dict:
     """The tokenizer normalization census (DESIGN_DECISIONS 6.2) recorded for this model: read
-    from data/audit/<name>.json (entry `tokenizer_audit` or `family`), else marked absent."""
+    from data/audit/<name>.json (entry `tokenizer_audit` or `family`), else marked absent.
+    `classification` is the NFD verdict (normalizes | passes_through | corrupts), `verdict_pc` the
+    PC arm's; `legacy_census` is True when only the two-valued `normalizes_nfd` was available."""
     names = [entry.get("tokenizer_audit"), entry.get("family"), entry.get("name")]
     for name in names:
         if not name:
             continue
         p = AUDIT_DIR / f"{name}.json"
         if p.exists():
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(OSError, json.JSONDecodeError, AttributeError):   # unreadable file: not censused
                 d = json.loads(p.read_text(encoding="utf-8"))
                 census = d.get("normalization_census") or {}
-                cls = ("normalizes" if census.get("normalizes_nfd") else "passes_through" if census else None)
-                return {"status": "censused", "source": str(p.relative_to(ROOT)), "classification": cls,
-                        "engine": backend_info.get("engine") or backend_info.get("backend"), **census}
-    return {"status": "not_censused", "source": None, "classification": None,
+                cls, legacy = census_classification(census)
+                verdict_pc = census.get("verdict_pc") if census.get("verdict_pc") in CENSUS_VERDICTS else None
+                source = str(p.relative_to(ROOT)) if p.is_relative_to(ROOT) else str(p)
+                return {"status": "censused", "source": source, "classification": cls,
+                        "engine": backend_info.get("engine") or backend_info.get("backend"),
+                        "legacy_census": legacy, **census, "verdict_nfd": cls, "verdict_pc": verdict_pc}
+    return {"status": "not_censused", "source": None, "classification": None, "legacy_census": False,
             "note": "no data/audit/<family>.json for this model; run scripts/audit_tokenizers.py before GPU time (6.2)"}
+
+
+def check_census_arms(census: dict, arms, engine=None) -> None:
+    """DESIGN_DECISIONS 6.2 / PREREGISTRATION 5.5: an arm whose census verdict on this engine path is
+    `corrupts` is refused (raises CorruptingCensusError), because the string the model would receive is
+    not the re-encoded input. A missing verdict (uncensused model, legacy census, strip or placement
+    arm) refuses nothing; `require_census` is the switch for that."""
+    if not census or census.get("status") != "censused":
+        return
+    bad = {a: census.get(CENSUS_ARM_VERDICTS[a]) for a in arms
+           if a in CENSUS_ARM_VERDICTS and census.get(CENSUS_ARM_VERDICTS[a]) == "corrupts"}
+    if bad:
+        raise CorruptingCensusError(
+            f"arm(s) {sorted(bad)} refused: the normalization census ({census.get('source')}) says the tokenizer path "
+            f"CORRUPTS the re-encoded form (decoding the ids does not return the input) on engine {engine!r}; "
+            "the arm is refused on this engine and reported (DESIGN_DECISIONS 6.2, PREREGISTRATION 5.5)")
 
 
 def provider_privacy(entry: dict) -> dict:
@@ -752,6 +803,7 @@ def run(backend: Backend, entry: dict, items: list[dict], item_path: Path, opts:
     census = normalization_census_for(entry, backend_info)
     if opts.require_census and census["status"] != "censused":
         raise RuntimeError(census["note"])
+    check_census_arms(census, opts.arms, engine=census.get("engine"))
 
     run_id = opts.run_id or default_run_id(entry, item_path)
     run_dir = Path(opts.out_root) / run_id
@@ -836,6 +888,7 @@ def run(backend: Backend, entry: dict, items: list[dict], item_path: Path, opts:
                  "resource_hashes": resource_hashes(), "normalization_census": census,
                  **placement_baseline_for(item_path, items), "n_changed_prompts": n_changed,
                  "n_unchanged_prompts": n_unchanged, "prefix_property_violations": 0,
+                 "prefix_property_violations_by_continuation": {},
                  "sample": selection.get("sample"), "demo_overlap_item_ids": demo_report.get("item_ids", [])},
         "sampling": {"temperature": 0.0, "max_tokens": opts.max_new_tokens, "seed": opts.seed,
                      "stop": getattr(backend, "stop", None),      # the stop list handed to the backend, if it has one
@@ -931,6 +984,10 @@ def run(backend: Backend, entry: dict, items: list[dict], item_path: Path, opts:
                             nan_inf += 1
                     if (row.get("logprobs") or {}).get("prefix_property_violation"):
                         manifest["data"]["prefix_property_violations"] += 1
+                    for cont, v in ((row.get("logprobs") or {}).get("prefix_property_violations") or {}).items():
+                        if v:
+                            by_cont = manifest["data"]["prefix_property_violations_by_continuation"]
+                            by_cont[cont] = by_cont.get(cont, 0) + 1
                 fout.write(json.dumps(row, ensure_ascii=False) + "\n")
                 n_written += 1
             fout.flush()

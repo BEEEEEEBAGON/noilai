@@ -1,22 +1,21 @@
 {
  "paths": [
-  "data/external/xcopa_test_vi.jsonl",
-  "data/external/xcopa_val_vi.jsonl"
+  "data/external/xcopa_test_vi.jsonl"
  ],
- "n_texts": 2400,
- "n_word_tokens": 12333,
- "n_syllable_tokens": 11677,
- "n_items": 600,
- "affected_tokens": 62,
- "affected_items": 50,
- "old": 60,
+ "n_texts": 2000,
+ "n_word_tokens": 10137,
+ "n_syllable_tokens": 9594,
+ "n_items": 500,
+ "affected_tokens": 53,
+ "affected_items": 43,
+ "old": 51,
  "new": 2,
- "old_share": 0.967741935483871,
+ "old_share": 0.9622641509433962,
  "by_rime": {
   "oa|new": 2,
-  "oa|old": 46,
+  "oa|old": 41,
   "oe|old": 1,
-  "uy|old": 13
+  "uy|old": 9
  },
  "majority": "old",
  "per_file": {
@@ -29,16 +28,6 @@
    "affected_items": 43,
    "old": 51,
    "new": 2
-  },
-  "data/external/xcopa_val_vi.jsonl": {
-   "n_items": 100,
-   "n_texts": 400,
-   "n_word_tokens": 2196,
-   "n_syllable_tokens": 2083,
-   "affected_tokens": 9,
-   "affected_items": 7,
-   "old": 9,
-   "new": 0
   }
  },
  "definitions": {

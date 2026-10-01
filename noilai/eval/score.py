@@ -40,8 +40,11 @@ T3  Có/Không (yes/no) mapped with negation precedence (extract.t3_label). When
     recorded log-probabilities, forced-choice accuracy (P(Có) vs P(Không) for the same prompt)
     and BLiMP-style paired accuracy (log P(correct candidate) > log P(twin candidate) under the
     same context, over the yes/no pair sharing pair_item_id; raw sum and per-token mean,
-    `paired_correct` / `paired_correct_norm`) are added. A row whose log-probabilities carry a
-    prefix-property violation gets None in every log-probability field (7.3). Cells report
+    `paired_correct` / `paired_correct_norm`) are added. A prefix-property violation is recorded
+    per continuation (`prefix_property_violations`: Có / Không / candidate) and nulls only the
+    prediction that continuation enters -- the forced choice needs both answer tokens, the pair
+    comparison both candidates (7.3); a log-probability block carrying only the row-level
+    `prefix_property_violation` flag (an older run) nulls every prediction. Cells report
     balanced accuracy and d' next to accuracy (generated T3 has a "yes" bias; an unparseable
     row is the wrong label, so it lowers tpr or tnr) and the headline excludes spelling twins
     (`t3_headline`).
@@ -435,6 +438,18 @@ def score_t2(item: dict, answer: str | None, method: str = "marker", raw: str | 
 
 
 # ------------------------------------------------------------------ T3
+def violated(logprobs: dict | None, continuation: str) -> bool:
+    """Whether `continuation`'s prefix property was violated (DESIGN_DECISIONS 7.3). Reads the
+    per-continuation `prefix_property_violations` when the block carries it; a block with only the
+    row-level `prefix_property_violation` flag (older runs) counts every continuation as violated."""
+    if not logprobs:
+        return False
+    per = logprobs.get("prefix_property_violations")
+    if isinstance(per, dict) and continuation in per:
+        return bool(per[continuation])
+    return bool(logprobs.get("prefix_property_violation"))
+
+
 def score_t3(item: dict, answer: str | None, method: str = "marker", logprobs: dict | None = None) -> dict:
     row = _base(item, answer, method)
     row["gold"] = item["gold"]
@@ -451,16 +466,21 @@ def score_t3(item: dict, answer: str | None, method: str = "marker", logprobs: d
     row["candidate_logprob"] = None
     row["candidate_n_tokens"] = None
     row["prefix_property_violation"] = None
+    row["prefix_property_violations"] = None
     if logprobs:
         lp_yes, lp_no = logprobs.get("Có"), logprobs.get("Không")
-        # a row with a prefix-property violation is excluded from every log-probability metric
-        # (DESIGN_DECISIONS 7.3, item 55): the log-probabilities are recorded, the predictions are not
-        if not logprobs.get("prefix_property_violation") and lp_yes is not None and lp_no is not None:
+        # a violated continuation is excluded from the log-probability metric it enters (DESIGN_DECISIONS
+        # 7.3, item 55): the forced choice needs both answer tokens unviolated; the candidate's violation
+        # nulls the pair comparison (paired_t3), not the forced choice. Log-probabilities are recorded as
+        # returned; the predictions are what is nulled.
+        if not violated(logprobs, "Có") and not violated(logprobs, "Không") and lp_yes is not None and lp_no is not None:
             row["forced_choice_pred"] = "yes" if lp_yes > lp_no else "no"
             row["forced_choice_correct"] = row["forced_choice_pred"] == item["gold"]
         row["candidate_logprob"] = logprobs.get("candidate")
         row["candidate_n_tokens"] = logprobs.get("candidate_n_tokens")
         row["prefix_property_violation"] = logprobs.get("prefix_property_violation")
+        per = logprobs.get("prefix_property_violations")
+        row["prefix_property_violations"] = dict(per) if isinstance(per, dict) else None
     row["twin_type"] = item.get("twin_type")
     row["pair_item_id"] = item.get("pair_item_id")
     return row
@@ -471,8 +491,10 @@ def paired_t3(rows: list[dict]) -> list[dict]:
     the twin's, same context, same arm and prompt), `paired_correct_norm` (the same on the
     per-token mean, DESIGN_DECISIONS 5.3 item 40: raw and length-normalized are both reported)
     and `pair_both_correct` (both generated answers right) to every T3 row that has a partner
-    in the same run. A pair with a prefix-property violation or a missing candidate
-    log-probability gets None; the normalized field also needs both token counts."""
+    in the same run. A pair whose candidate continuation was violated on either side (7.3: the
+    violated continuation's prediction is nulled, an answer-token violation does not null the
+    pair) or with a missing candidate log-probability gets None; the normalized field also
+    needs both token counts."""
     by_key = {}
     for r in rows:
         if r["task"] == "T3":
@@ -489,12 +511,18 @@ def paired_t3(rows: list[dict]) -> list[dict]:
         r["pair_both_correct"] = bool(r["correct"] and mate["correct"])
         yes, no = (r, mate) if r["gold"] == "yes" else (mate, r)
         if (yes.get("candidate_logprob") is not None and no.get("candidate_logprob") is not None
-                and not yes.get("prefix_property_violation") and not no.get("prefix_property_violation")):
+                and not _row_violated(yes, "candidate") and not _row_violated(no, "candidate")):
             r["paired_correct"] = yes["candidate_logprob"] > no["candidate_logprob"]
             ny, nn = yes.get("candidate_n_tokens"), no.get("candidate_n_tokens")
             if ny and nn:
                 r["paired_correct_norm"] = yes["candidate_logprob"] / ny > no["candidate_logprob"] / nn
     return rows
+
+
+def _row_violated(row: dict, continuation: str) -> bool:
+    """`violated` read from a SCORED row (its `prefix_property_violations` / `prefix_property_violation`)."""
+    return violated({"prefix_property_violations": row.get("prefix_property_violations"),
+                     "prefix_property_violation": row.get("prefix_property_violation")}, continuation)
 
 
 # ------------------------------------------------------------------ XCOPA
@@ -517,8 +545,10 @@ def score_xcopa(item: dict, answer: str | None, method: str = "marker", logprobs
     row["n_tokens_1"] = row["n_tokens_2"] = None
     row["delta_n_tokens"] = None             # n_tokens_1 - n_tokens_2: the 8.6 covariate
     row["prefix_property_violation"] = (logprobs or {}).get("prefix_property_violation")
-    # a violated row is excluded from every log-probability metric (DESIGN_DECISIONS 7.3, item 55)
-    if logprobs and not logprobs.get("prefix_property_violation") and logprobs.get("1") is not None \
+    per = (logprobs or {}).get("prefix_property_violations")
+    row["prefix_property_violations"] = dict(per) if isinstance(per, dict) else None
+    # the choice needs both continuations unviolated (DESIGN_DECISIONS 7.3, item 55)
+    if logprobs and not violated(logprobs, "1") and not violated(logprobs, "2") and logprobs.get("1") is not None \
             and logprobs.get("2") is not None:
         row["logprob_pred"] = "1" if logprobs["1"] > logprobs["2"] else "2"
         row["logprob_correct"] = row["logprob_pred"] == gold

@@ -81,9 +81,18 @@ from `google/gemma_pytorch` on GitHub and the Hunspell/word-list resources from 
 ## Build the data
 
 ```bash
-python scripts/build_data.py --out data/release/v0.2 --seed 20261004
-python scripts/build_data.py --out data/release/sealed --seed 777 --sealed      # regenerated at release; never sent to any API
+python scripts/build_data.py --out data/release/v0.3 --seed <private>
+python scripts/build_data.py --out data/release/sealed --seed <private> --sealed   # regenerated at release; never sent to any API
+make data SEED=<private>                                                           # build + attested.jsonl + the sampled files
 ```
+
+The build seed is not published (DD 4.6, item 51): dev and test are drawn, shuffled and split from
+one `random.Random(seed)` stream, so publishing it would regenerate the gated test split; it lives
+only in `data/release/<version>/manifest_private.json` (git-ignored), while the committed
+`manifest.json` carries the counts, the content hash and the SHA-256 of the canary. `--seed` is
+required, `make data` fails when `SEED` is unset, and the sampling seeds of `scripts/sample_items.py`
+(20261201 for `main`, 20261202 for `c2`) are public because they select from the built test split
+and regenerate nothing.
 
 Base pairs are real two-syllable words (Viet74K) and pseudo-pairs sampled from attested
 syllables; every output syllable must pass `Inventory.is_legal` (attested onset+rime, tone

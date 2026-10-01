@@ -1,12 +1,15 @@
 #!/usr/bin/env python
-"""Build a NóiLái release: items, splits, core set, manifest.
+"""Build a NóiLái release: items, splits, core set, manifests.
 
-    python scripts/build_data.py --out data/release/v0.2 --seed 20261004
-    python scripts/build_data.py --out data/release/sealed --seed 777 --sealed   # never sent to any API
+    python scripts/build_data.py --out data/release/v0.3 --seed <from the private release manifest>
+    python scripts/build_data.py --out data/release/sealed --seed <another private seed> --sealed   # never sent to any API
 
-The manifest records the seed, item counts per cell, resource hashes, the git
-commit of the generator and the canary string. A sealed build uses a different
-seed and a different canary and is meant to be regenerated at release time.
+`--seed` is REQUIRED and has no default (DESIGN_DECISIONS 4.6, item 51): one seeded stream draws,
+shuffles and splits dev and test, so the build seed regenerates the gated test split and is not
+published. Two manifests are written: `manifest.json` (public: counts, hashes, the git commit,
+the SHA-256 of the canary; no seed, no canary GUID) and `manifest_private.json` (everything,
+git-ignored). A sealed build uses a different seed and a different canary and is meant to be
+regenerated at release time.
 """
 from __future__ import annotations
 
@@ -40,7 +43,8 @@ def git_dirty() -> bool:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", type=Path, required=True)
-    ap.add_argument("--seed", type=int, default=20261004)
+    ap.add_argument("--seed", type=int, required=True,
+                    help="build seed <from the private release manifest>; REQUIRED, never published (DESIGN_DECISIONS 4.6)")
     ap.add_argument("--n-lexicon", type=int, default=1500)
     ap.add_argument("--n-pseudo", type=int, default=1000)
     ap.add_argument("--per-cell-t1", type=int, default=1000)
@@ -65,8 +69,10 @@ def main(argv=None) -> int:
         "started_utc": t0.isoformat(), "finished_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
         "n_lexical_pairs_available": len(g.lex_pairs), "n_attested_syllables": len(g.attested),
     })
-    print(json.dumps({k: manifest[k] for k in ("n_items", "n_base_pairs", "counts", "core_counts", "vulgar_counts", "c2_affected_counts", "drops", "canary", "git_commit", "git_dirty")},
-                     ensure_ascii=False, indent=2))
+    # the canary GUID and the seed stay in manifest_private.json; the summary prints the canary's SHA-256 only
+    print(json.dumps({k: manifest[k] for k in ("n_items", "n_base_pairs", "counts", "core_counts", "vulgar_counts", "c2_affected_counts", "drops",
+                                               "canary_sha256", "content_sha256", "git_commit", "git_dirty")}
+                     | {"private_manifest": str(args.out / "manifest_private.json")}, ensure_ascii=False, indent=2))
     return 0
 
 

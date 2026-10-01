@@ -61,18 +61,28 @@ their six-variant outputs), identity outputs, plain-reversal outputs, illegal ou
 
 `manifest.json` records counts per (task, variant, split), core / vulgar / C2-affected
 counts, pool sizes before capping, drop counts per filter (vulgar input drops per blocklist
-entry under `base:vulgar_input:<rule>`), the pseudo-pair quota report (target = the lexical
+entry under `base:vulgar_input:<rule>`), the pseudo-pair quota report (`pseudo_quota`: target = the lexical
 pairs' joint distribution over the five strata tone class, stop coda, spelling trigger, glide
 and zero onset, in that priority order; achieved shares and any shortfall — the v0.2 manifest
 lists the four strata of the generator at that build, without the spelling trigger, which
-lands in v0.3), placement style, exclude_qu, reserved counts, the number of
-marginal rimes, `content_sha256` (the items without the canary fields: the content's
+lands in v0.3), `placement_style`, `exclude_qu`, reserved counts, `dev_base_pairs_moved_for_vulgar` (base pairs
+whose dev-split items were forced to test by the vulgar screen), `degenerate_counts` (degenerate
+items per task × variant cell), `n_marginal_rimes` with `marginal_rimes` (the excluded rimes as
+canonical keys with their dictionary type counts) and `marginal_rime_convention` (the counting
+rule; DESIGN_DECISIONS 2.3 C10), `attested_strings_sha256` (the frozen attested-string set the
+overlap screen used; 4.1), `content_sha256` (the items without the canary fields: the content's
 identity), resource SHA-256s (including the blocklist and the attested seed), git commit and
-dirty flag, timestamps, canary, and a `samples` entry per seeded sub-sample. The build seed
-belongs to the private release record, not to any published manifest or document
-(DESIGN_DECISIONS 4.6: one seeded stream draws and splits dev and test, so a public seed
-would regenerate the gated test split; the committed v0.2 manifest still carries `seed` and
-is redacted before any public release — `content_sha256` is the dataset's identity).
+dirty flag, timestamps, and a `samples` entry per seeded sub-sample. **Two manifests** are
+written by `noilai.gen.generate.write_release`: `manifest.json` (public, committed) carries
+everything above with `canary_sha256` (the SHA-256 of the full canary string, the digest the
+paper prints and every run manifest records) and `private_manifest` (= `manifest_private.json`),
+and **no `seed`, no `canary` GUID**, at the top level or inside `generator_args`;
+`manifest_private.json` (git-ignored: `data/release/*/manifest_private.json`) holds the full
+record including both. The build seed belongs to the private record, not to any published
+manifest or document (DESIGN_DECISIONS 4.6: one seeded stream draws and splits dev and test, so
+a public seed would regenerate the gated test split; the committed v0.2 manifest predates the
+split, still carries `seed` and the GUID, and is replaced by the v0.3 rebuild — `content_sha256`
+is the dataset's identity).
 
 ## Seeded sub-samples (`scripts/sample_items.py`)
 

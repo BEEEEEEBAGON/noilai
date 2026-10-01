@@ -21,4 +21,6 @@ paper/*.pdf
 .venv/
 data/cache/
 data/release/*/*.jsonl
+# the private release manifest carries the build seed and the canary GUID (DESIGN_DECISIONS 4.6): never tracked
+data/release/*/manifest_private.json
 data/audit/items_*.jsonl

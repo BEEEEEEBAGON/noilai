@@ -62,8 +62,8 @@ resolved there. Numbers in brackets are the plan's sections.
     other order, and swapping onsets and tones is V1 in the other order, so they are not
     separate variants; T2 accepts either order of any variant's output.
 13. **Base pairs** come from the two-syllable entries of the Viet74K word list (47,535 distinct canonical
-    pairs from 49,103 two-syllable entries; the list is consulted at build time, and about 1,500 of its
-    two-syllable entries appear verbatim in the lexical items, under the terms of DESIGN_DECISIONS 4.1/11.1)
+    pairs from 49,103 two-syllable entries; the list is consulted at build time; the lexical items reproduce
+    N Viet74K two-syllable entries verbatim, N = the number of lexical base pairs of the release (counted from the release files as the distinct `base_pair_id` with `source: lexicon`; the manifest key `n_lexical_base_pairs` is to be emitted by `write_release` next to `n_base_pairs`, which counts lexical and pseudo pairs together — never typed into a document; the v0.3 rebuild sets the number), under the terms of DESIGN_DECISIONS 4.1/11.1 and 12.22)
     and from pseudo-pairs of two attested syllables.
     Lexical base pairs must have both syllables attested (drops word-list typos and loanwords).
 14. **Items whose output equals the input (identity: equal tones under V3, equal rimes under
@@ -107,7 +107,8 @@ resolved there. Numbers in brackets are the plan's sections.
     task).
 22. **"Share of the effect mediated by token count" is replaced** by two well-defined
     quantities: the dose–response decomposition (form-only effect at Δtok = 0, slope per
-    token, token-associated part and its share, with clustered CIs) and the matched contrast of
+    token, token-associated part, with clustered CIs; `noilai.stats.dose_response`; no "share" is
+    reported, DESIGN_DECISIONS 6.4 / 8.6) and the matched contrast of
     items whose token count does versus does not change. The paper calls it a descriptive
     decomposition, not a causal mediation.
 23. **The mixed model** is fitted by variational Bayes (`BinomialBayesMixedGLM`) with random

@@ -31,7 +31,8 @@ def test_reconcile_counts_matches_the_documented_inventory_facts(tmp_path):
     assert c["distributions_new_file"]["tone"]["sac"] > c["distributions_new_file"]["tone"]["nga"]
     if "gemma3" in c["tokenizer_audit"]:
         g = c["tokenizer_audit"]["gemma3"]["summary"]
-        assert 1.7 < g["nfc"]["tokens_per_syllable_mean"] < 1.9 and 2.7 < g["nfd"]["tokens_per_syllable_mean"] < 2.95
+        # DESIGN_DECISIONS 1 / 6.2 and RESULTS_LOG RL-2026-09-30-06: 1.78 -> 2.83 tokens per syllable (reconciled values +/- 0.02)
+        assert abs(g["nfc"]["tokens_per_syllable_mean"] - 1.78) < 0.02 and abs(g["nfd"]["tokens_per_syllable_mean"] - 2.83) < 0.02
         assert c["tokenizer_audit"]["gemma3"]["normalizes_nfd"] is False
 
 

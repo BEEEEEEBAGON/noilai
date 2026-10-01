@@ -65,7 +65,7 @@ item_files:
     sha256: null
     description: "open-model main sample: 4,200 test items = 350 per T1/T2/T3 x variant cell (DD 12.11; T3 as 175 yes/no pairs), contains the core; written by scripts/sample_items.py main"
     canary_required: true
-    produced_by: "scripts/sample_items.py main --release {release} --per-cell 350 --seed 20261004"
+    produced_by: "scripts/sample_items.py main --release {release} --per-cell 350 --seed 20261201"
     manifest_sample: main          # `samples.main.sha256` in the release manifest must equal the observed hash
     expected_counts: {per_cell: 350, n_items: 4200}
   noilai_core:
@@ -83,7 +83,7 @@ item_files:
     sha256: null
     description: "C2-enriched T1 set for H4 (DD 4.5 / 12.6): a separate seeded build from an independent pseudo pool, every item C2-affected, excluded from E1/E2; written by scripts/sample_items.py c2 (the verify gate refuses the file while it holds no items)"
     canary_required: true
-    produced_by: "scripts/sample_items.py c2 --release {release} --n 500 --seed 20261005"
+    produced_by: "scripts/sample_items.py c2 --release {release} --n 500 --seed 20261202"
     manifest_sample: c2
   attested:
     path: "{release}/attested.jsonl"

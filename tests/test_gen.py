@@ -16,8 +16,11 @@ from noilai.gen.generate import (
     VulgarLexicon,
     attested_strings_hash,
     c2_affected,
+    canary_sha256,
     load_items,
+    public_manifest,
     read_header,
+    release_canary,
     write_release,
 )
 from noilai.vi import lexicon as L
@@ -203,6 +206,41 @@ def test_build_is_deterministic_given_seed_and_canary():
     assert json.dumps(a, sort_keys=True, ensure_ascii=False) == json.dumps(b, sort_keys=True, ensure_ascii=False)
     c = Generator(seed=5).build(**{**kw, "canary": None})
     assert c["canary"].startswith("NOILAI-CANARY-") and c["canary"] != CANARY
+
+
+def test_generator_seed_is_required_and_an_int():
+    """Design 4.6 (item 51): no default build seed; a caller must pass one."""
+    with pytest.raises(TypeError):
+        Generator()                                   # the missing argument is the point
+    with pytest.raises(TypeError):
+        Generator(seed="11")
+    with pytest.raises(TypeError):
+        Generator(seed=True)
+    import inspect
+    assert inspect.signature(Generator.__init__).parameters["seed"].default is inspect.Parameter.empty
+
+
+def test_write_release_splits_the_public_and_private_manifests(build, tmp_path):
+    """Design 4.6: manifest.json (tracked) carries neither `seed` nor `canary` (nor either inside `generator_args`) and
+    names the canary by its SHA-256; manifest_private.json (git-ignored) carries everything."""
+    import hashlib
+    _, b = build
+    extra = {"seed": 11, "generator_args": {"seed": 11, "canary": CANARY, "n_pseudo": 80}, "git_commit": "abc"}
+    full = write_release(b, tmp_path, manifest_extra=extra)
+    pub = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    priv = json.loads((tmp_path / "manifest_private.json").read_text(encoding="utf-8"))
+    assert full == priv and priv["seed"] == 11 and priv["canary"] == CANARY and priv["generator_args"]["seed"] == 11
+    assert "seed" not in pub and "canary" not in pub and "seed" not in pub["generator_args"] and "canary" not in pub["generator_args"]
+    assert pub["generator_args"]["n_pseudo"] == 80 and pub["git_commit"] == "abc" and pub["private_manifest"] == "manifest_private.json"
+    assert pub["canary_sha256"] == priv["canary_sha256"] == hashlib.sha256(CANARY.encode()).hexdigest() == canary_sha256(CANARY)
+    assert CANARY not in (tmp_path / "manifest.json").read_text(encoding="utf-8") and "11" not in json.dumps(pub.get("seed"))
+    assert {k for k in priv if k not in ("seed", "canary")} <= set(pub) | {"canary_sha256"}   # nothing else is dropped
+    assert pub["content_sha256"] == priv["content_sha256"] == b["content_sha256"]
+    assert public_manifest(priv) == pub
+    # the release's canary is recoverable without the private file (header record), and prefers it when present
+    assert release_canary(tmp_path) == CANARY
+    (tmp_path / "manifest_private.json").unlink()
+    assert release_canary(tmp_path) == CANARY == read_header(tmp_path / "noilai_test.jsonl")["canary"]
 
 
 def test_write_and_load_release_with_header(build, tmp_path):

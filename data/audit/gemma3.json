@@ -6,6 +6,8 @@
       "tokens_per_syllable_mean": 1.782562547384382,
       "single_token_frac": 0.29461713419257013,
       "boundary_alignment_mean": 0.9414455395501643,
+      "boundary_alignment_among_split_mean": 0.9169891086271138,
+      "n_split": 4652,
       "onset_rime_split_frac": 0.5152388172858225,
       "tone_isolated_frac": 0,
       "byte_fallback_frac": 0,
@@ -21,6 +23,8 @@
       "tokens_per_syllable_mean": 2.830780894617134,
       "single_token_frac": 0.07050796057619409,
       "boundary_alignment_mean": 0.2701516300227445,
+      "boundary_alignment_among_split_mean": 0.21478792822185971,
+      "n_split": 6130,
       "onset_rime_split_frac": 0.06823351023502654,
       "tone_isolated_frac": 0.41637604245640636,
       "byte_fallback_frac": 0,
@@ -36,11 +40,26 @@
     }
   },
   "normalization_census": {
-    "n_samples": 500,
-    "nfd_same_ids_frac": 0.034,
-    "normalizes_nfd": false,
-    "nfd_longer_frac": 0.922,
+    "n_samples": 1000,
+    "forms": [
+      "nfd",
+      "pc"
+    ],
+    "nfd_same_ids_frac": 0.015,
+    "nfd_longer_frac": 0.905,
     "nfd_byte_fallback_frac": 0.0,
+    "nfd_roundtrip_ok_frac": 1.0,
+    "nfd_roundtrip_failures": [],
+    "verdict_nfd": "passes_through",
+    "pc_same_ids_frac": 0.063,
+    "pc_longer_frac": 0.779,
+    "pc_byte_fallback_frac": 0.0,
+    "pc_roundtrip_ok_frac": 1.0,
+    "pc_roundtrip_failures": [],
+    "verdict_pc": "passes_through",
+    "normalizes_nfd": false,
+    "verdict": "passes_through",
+    "roundtrip_rule": "NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)",
     "type": "sentencepiece",
     "model_type": "BPE",
     "vocab_size": 262144,
@@ -48,6 +67,14 @@
     "byte_fallback": true,
     "add_dummy_prefix": false,
     "remove_extra_whitespaces": false,
-    "split_by_unicode_script": true
+    "split_by_unicode_script": true,
+    "probe_set": {
+      "n": 1000,
+      "n_words": 500,
+      "n_items": 500,
+      "items_file": "data/release/v0.2/noilai_main.jsonl",
+      "seed": 0,
+      "rule": "500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)"
+    }
   }
 }

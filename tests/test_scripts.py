@@ -1,6 +1,7 @@
 """End-to-end tests of the command-line scripts on small builds."""
 import csv
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -24,15 +25,37 @@ def release(tmp_path_factory):
 
 
 def test_build_data_writes_release_and_manifest(release):
+    """DD 4.6: the public manifest.json carries neither the build seed nor the canary GUID (its SHA-256 instead); the
+    private manifest_private.json carries everything and is the only place the seed lives."""
+    import hashlib
     m = json.loads((release / "manifest.json").read_text())
-    assert m["n_items"] > 0 and m["seed"] == 3 and "git_commit" in m and m["canary"].startswith("NOILAI-CANARY-")
+    priv = json.loads((release / "manifest_private.json").read_text())
+    assert priv["n_items"] > 0 and priv["seed"] == 3 and "git_commit" in priv and priv["canary"].startswith("NOILAI-CANARY-")
+    assert priv["generator_args"]["seed"] == 3
+    assert "seed" not in m and "canary" not in m and "seed" not in m["generator_args"] and "canary" not in m["generator_args"]
+    assert m["canary_sha256"] == priv["canary_sha256"] == hashlib.sha256(priv["canary"].encode()).hexdigest()
+    assert m["private_manifest"] == "manifest_private.json" and m["n_items"] == priv["n_items"] and m["content_sha256"] == priv["content_sha256"]
     for name in ("noilai_dev.jsonl", "noilai_test.jsonl", "noilai_core.jsonl"):
         assert (release / name).exists()
-    from noilai.gen.generate import load_items, read_header
+    from noilai.gen.generate import load_items, read_header, release_canary
     core = load_items(release / "noilai_core.jsonl")
     assert all(it["in_core"] and it["split"] == "test" for it in core)
-    assert read_header(release / "noilai_core.jsonl")["canary"] == m["canary"]
+    assert read_header(release / "noilai_core.jsonl")["canary"] == priv["canary"] == release_canary(release)
     assert sum(m["core_counts"].values()) == len(core)
+
+
+def test_build_data_requires_a_seed(tmp_path):
+    """DD 4.6 (item 51): no default build seed anywhere; `--seed` is required and the Makefile has no SEED default."""
+    r = subprocess.run([PY, "scripts/build_data.py", "--out", str(tmp_path / "x")], cwd=ROOT, text=True, capture_output=True, check=False)
+    assert r.returncode == 2 and "--seed" in r.stderr and "required" in r.stderr
+    mk = (ROOT / "Makefile").read_text(encoding="utf-8")
+    assert not re.search(r"^SEED\s*\??=", mk, re.MULTILINE), "the Makefile must not carry a build-seed default"
+    assert 'test -n "$(SEED)"' in mk and "exit 1" in mk[mk.index("data: resources"):mk.index("audit:")]
+    r = subprocess.run(["make", "-n", "data", "SEED="], cwd=ROOT, text=True, capture_output=True, check=False)
+    if r.returncode == 0:                                     # `make -n` prints the recipe; run the guard line itself
+        guard = next(ln for ln in r.stdout.splitlines() if 'test -n "$(SEED)"' in ln or "test -n \"\"" in ln)
+        g = subprocess.run(["sh", "-c", guard], cwd=ROOT, text=True, capture_output=True, check=False)
+        assert g.returncode == 1 and "SEED is unset" in g.stderr
 
 
 def test_build_attested(tmp_path):
@@ -128,8 +151,32 @@ def test_audit_script_on_gemma3_if_present(tmp_path):
     assert (tmp_path / "g3_rows.csv").exists()
 
 
+def _fetch_resources_module():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("fetch_resources", ROOT / "scripts" / "fetch_resources.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
 def test_fetch_resources_keeps_existing_and_verifies_hashes():
+    """Offline only: the script is run when every resource is already under data/external with the hash recorded in
+    data/HASHES.json, so that it takes the `[keep]` path for each file and reaches the network for nothing. Missing
+    files skip the test (the fetch is the author's step, never a test side effect); a hash mismatch on disk fails it
+    before the script could rename the file."""
+    FR = _fetch_resources_module()
+    known = FR.load_hashes()
+    assert known, "data/HASHES.json is empty"
+    missing = [n for n in FR.RESOURCES if not (FR.EXTERNAL / n).exists()]
+    if missing:
+        pytest.skip(f"resources not downloaded ({missing}); run scripts/fetch_resources.py by hand")
+    mismatched = {n: (FR.sha256(FR.EXTERNAL / n)[:16], (known.get(n) or FR.RESOURCES[n].get("sha256") or "")[:16])
+                  for n in FR.RESOURCES if (known.get(n) or FR.RESOURCES[n].get("sha256"))
+                  and FR.sha256(FR.EXTERNAL / n) != (known.get(n) or FR.RESOURCES[n].get("sha256"))}
+    assert not mismatched, f"data/external differs from data/HASHES.json: {mismatched}"
     r = run("scripts/fetch_resources.py")
+    assert "[get ]" not in r.stdout, "the script must not fetch when every file is present"
+    assert r.stdout.count("[keep]") == len(FR.RESOURCES) and r.stdout.count("[ok  ]") == len(FR.RESOURCES)
     assert "HASH MISMATCH" not in r.stdout and "[FAIL]" not in r.stdout
 
 
@@ -160,14 +207,49 @@ def test_count_placement_on_xcopa(tmp_path):
     assert rep["majority"] == "old" and rep["old_share"] > 0.9
 
 
+def _expected_main_counts(test_items: list[dict], per_cell: int) -> dict[str, int]:
+    """DD 4.5 / scripts/sample_items.py: per T1/T2 cell `per_cell` non-vulgar test items (the core first, then the pool
+    until it is exhausted); per T3 cell `per_cell // 2` yes/no PAIRS drawn from the `yes` members that have a mate."""
+    from collections import Counter
+
+    from noilai.gen import variants as V
+    by_id = {it["item_id"]: it for it in test_items}
+    want = Counter()
+    for task in ("T1", "T2"):
+        for v in V.VARIANTS:
+            pool = [it for it in test_items if it["task"] == task and it["variant"] == v and not it["vulgar"]]
+            core = sum(1 for it in pool if it["in_core"])
+            want[f"{task}-{v}"] = core + min(max(per_cell - core, 0), len(pool) - core)
+    for v in V.VARIANTS:
+        pool = [it for it in test_items if it["task"] == "T3" and it["variant"] == v and it["gold"] == "yes" and not it["vulgar"]
+                and it.get("pair_item_id") in by_id]
+        core = sum(1 for it in pool if it["in_core"])
+        want[f"T3-{v}"] = 2 * (core + min(max(per_cell // 2 - core, 0), len(pool) - core))
+    return dict(want)
+
+
 def test_sample_items_main_and_c2(release):
+    """tests-health-2: EXACT per-cell counts (350 per T1/T2 cell and 175 yes/no pairs per T3 cell on the paper's build;
+    on this fixture the exact numbers its pools allow, computed independently here), not an upper bound."""
+    from collections import Counter
     r = run("scripts/sample_items.py", "main", "--release", str(release), "--per-cell", "20", "--seed", "1")
     info = json.loads(r.stdout.strip().splitlines()[-1])
     from noilai.gen.generate import load_items, read_header
     main_items = load_items(release / "noilai_main.jsonl")
     core = load_items(release / "noilai_core.jsonl")
+    test_items = load_items(release / "noilai_test.jsonl")
     assert {it["item_id"] for it in core} <= {it["item_id"] for it in main_items}       # the core is inside the main sample
-    assert all(v <= 20 or k.startswith("T3") for k, v in info["counts"].items())
+    expected = _expected_main_counts(test_items, 20)
+    assert info["counts"] == expected, (info["counts"], expected)
+    observed = dict(Counter(f"{it['task']}-{it['variant']}" for it in main_items))
+    assert observed == expected and info["n_items"] == len(main_items) == sum(expected.values())
+    assert len(expected) == 12 and all(v % 2 == 0 for k, v in expected.items() if k.startswith("T3"))
+    assert any(v == 20 for k, v in expected.items() if not k.startswith("T3")), "no cell reaches the requested size: fixture too small"
+    assert all(v <= 20 for v in expected.values())
+    t3 = [it for it in main_items if it["task"] == "T3"]
+    t3_ids = {it["item_id"] for it in t3}
+    assert all(it["pair_item_id"] in t3_ids for it in t3) and sum(1 for it in t3 if it["gold"] == "yes") * 2 == len(t3)
+    assert not any(it["vulgar"] for it in main_items)
     assert read_header(release / "noilai_main.jsonl")["canary"] == read_header(release / "noilai_test.jsonl")["canary"]
     run("scripts/sample_items.py", "c2", "--release", str(release), "--n", "30", "--seed", "7")
     c2 = load_items(release / "noilai_c2.jsonl")
@@ -176,6 +258,9 @@ def test_sample_items_main_and_c2(release):
     assert all(it["c2_enriched"] is True and it["strata"]["c2_enriched"] is True for it in c2)     # design 4.3 / 4.5
     m = json.loads((release / "manifest.json").read_text())
     assert m["samples"]["main"]["sha256"] and m["samples"]["c2"]["disjoint_from_release"] is True
+    assert m["samples"]["main"]["counts"] == expected and m["samples"]["main"]["seed"] == 1 and m["samples"]["c2"]["seed"] == 7
+    priv = json.loads((release / "manifest_private.json").read_text())
+    assert priv["samples"] == m["samples"] and "canary" not in m and "seed" not in m      # both manifests record the samples
 
 
 def test_attested_labels_are_engine_derived(tmp_path):

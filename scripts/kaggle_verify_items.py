@@ -18,7 +18,9 @@ Checks (DESIGN_DECISIONS 4.6 and 4.5):
      "canary": "NOILAI-CANARY-<uuid>", "do_not_train": true, "evaluation_only": true}` is
      skipped for the item checks; it is REQUIRED on every file that requires a canary
      (test, core, sealed and the files derived from them), its canary must equal the rows'
-     canary and the release manifest's, and a `_header` record anywhere but on the first
+     canary and the release manifest's (the GUID from `manifest_private.json` when present;
+     otherwise its SHA-256 against `canary_sha256` in the public `manifest.json`, which carries
+     no GUID and no build seed, DD 4.6), and a `_header` record anywhere but on the first
      line is an error;
   3. if run_plan.yaml records a sha256 for the key, the observed hash equals it; for a file
      written by scripts/sample_items.py (`manifest_sample` in the plan) the hash recorded
@@ -42,6 +44,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 RUN_PLAN = ROOT / "configs" / "run_plan.yaml"
 CANARY_PREFIX = "NOILAI-CANARY-"
+PRIVATE_MANIFEST = "manifest_private.json"      # git-ignored; the only file that carries the GUID and the build seed (DD 4.6)
 HEADER_KEY = "_header"
 XCOPA_KEYS = ("premise", "choice1", "choice2", "question", "label", "idx")
 
@@ -97,13 +100,15 @@ def _is_item(d, kind: str) -> bool:
 def verify_items(path: Path, expected_sha256: str | None = None, canary_required: bool = False,
                  manifest_canary: str | None = None, header_required: bool | None = None,
                  kind: str = "noilai", expected_counts: dict | None = None,
-                 sample_sha256: str | None = None) -> dict:
+                 sample_sha256: str | None = None, manifest_canary_sha256: str | None = None) -> dict:
     """Return a summary dict with an `ok` flag and a list of `problems` (empty when ok).
 
     `header_required` defaults to `canary_required` (DD 4.6: every file with a canary begins
     with the header record). `sample_sha256` is the hash the release manifest recorded for a
     sample file (scripts/sample_items.py); `expected_counts` may hold `n_items` and/or
-    `per_cell` (items per task x variant cell for a NóiLái file).
+    `per_cell` (items per task x variant cell for a NóiLái file). `manifest_canary` is the GUID
+    string (private manifest or a pre-split public manifest); `manifest_canary_sha256` is the
+    digest the public manifest carries instead, checked against the SHA-256 of the file's canary.
     """
     path = Path(path)
     if header_required is None:
@@ -176,6 +181,9 @@ def verify_items(path: Path, expected_sha256: str | None = None, canary_required
         if manifest_canary is not None and hc != manifest_canary:
             hok = False
             problems.append("header canary differs from the release manifest")
+        if manifest_canary_sha256 is not None and isinstance(hc, str) and canary_sha256(hc) != manifest_canary_sha256:
+            hok = False
+            problems.append("header canary differs from the release manifest (canary_sha256)")
         if canaries and (len(canaries) != 1 or hc not in canaries):
             hok = False
             problems.append("header canary differs from the rows' canary")
@@ -190,7 +198,8 @@ def verify_items(path: Path, expected_sha256: str | None = None, canary_required
         if len(canaries) == 1:
             c = next(iter(canaries))
             out["canary"] = c
-            ok = c.startswith(CANARY_PREFIX) and (manifest_canary is None or c == manifest_canary)
+            ok = c.startswith(CANARY_PREFIX) and (manifest_canary is None or c == manifest_canary) \
+                and (manifest_canary_sha256 is None or canary_sha256(c) == manifest_canary_sha256)
             out["canary_ok"] = ok
             if not ok:
                 problems.append("canary malformed or different from the release manifest")
@@ -215,13 +224,38 @@ def verify_items(path: Path, expected_sha256: str | None = None, canary_required
     return out
 
 
+def canary_sha256(canary: str) -> str:
+    """SHA-256 of the full canary string (the digest the public manifest and every run manifest carry)."""
+    return hashlib.sha256(canary.encode("utf-8")).hexdigest()
+
+
+def _read_manifest(path: Path, name: str) -> dict | None:
+    m = Path(path).parent / name
+    if not m.exists():
+        return None
+    try:
+        d = json.loads(m.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return d if isinstance(d, dict) else None
+
+
 def manifest_canary_for(path: Path) -> str | None:
-    m = Path(path).parent / "manifest.json"
-    if m.exists():
-        try:
-            return json.loads(m.read_text(encoding="utf-8")).get("canary")
-        except (OSError, json.JSONDecodeError):
-            return None
+    """The canary GUID the release recorded next to `path`: from `manifest_private.json` when present, else
+    from a public `manifest.json` that still carries `canary` (releases built before the public/private split,
+    DD 4.6). A public manifest with `canary_sha256` only yields None here: use manifest_canary_sha256_for()."""
+    for name in (PRIVATE_MANIFEST, "manifest.json"):
+        d = _read_manifest(path, name)
+        if d and isinstance(d.get("canary"), str):
+            return d["canary"]
+    return None
+
+
+def manifest_canary_sha256_for(path: Path) -> str | None:
+    """`canary_sha256` of the public manifest next to `path` (None when absent)."""
+    d = _read_manifest(path, "manifest.json")
+    if d and isinstance(d.get("canary_sha256"), str):
+        return d["canary_sha256"]
     return None
 
 
@@ -247,6 +281,7 @@ def verify_spec(spec: dict, root: Path = ROOT, expected_sha256: str | None = Non
     canary_required = expect_canary or bool(spec.get("canary_required"))
     return verify_items(path, expected_sha256=expected, canary_required=canary_required,
                         manifest_canary=manifest_canary_for(path) if canary_required else None,
+                        manifest_canary_sha256=manifest_canary_sha256_for(path) if canary_required else None,
                         kind=spec.get("kind", "noilai"), expected_counts=spec.get("expected_counts"),
                         sample_sha256=sample_sha256_for(path, spec.get("manifest_sample")))
 
@@ -282,7 +317,8 @@ def main(argv: list[str] | None = None) -> int:
         path = args.items
         kind = args.kind or "noilai"
         res = verify_items(path, expected_sha256=args.sha256, canary_required=args.expect_canary,
-                           manifest_canary=manifest_canary_for(path) if args.expect_canary else None, kind=kind)
+                           manifest_canary=manifest_canary_for(path) if args.expect_canary else None,
+                           manifest_canary_sha256=manifest_canary_sha256_for(path) if args.expect_canary else None, kind=kind)
         expected = args.sha256
     print(json.dumps(res, ensure_ascii=False, indent=2))
     if res["ok"] and expected is None:

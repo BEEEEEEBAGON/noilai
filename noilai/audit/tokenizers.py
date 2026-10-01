@@ -315,11 +315,17 @@ def audit_inventory(adapter: TokenizerAdapter, syllables: Iterable[str], encodin
         sub = [r for r in rows if r["encoding"] == enc]
         if not sub:
             continue
+        # alignment AMONG SPLIT syllables (design 8.4, RESULTS_LOG RL-2026-09-30-06): the all-syllable mean
+        # scores a single-token syllable 1.0, so it overstates how often a boundary, when there is one, is
+        # linguistic; `n_split` is its denominator. None when no syllable is split.
+        split = [r for r in sub if not r["single_token"]]
         summary[enc] = {
             "n": len(sub),
             "tokens_per_syllable_mean": mean(r["n_tokens"] for r in sub),
             "single_token_frac": mean(r["single_token"] for r in sub),
             "boundary_alignment_mean": mean(r["boundary_alignment"] for r in sub),
+            "boundary_alignment_among_split_mean": mean(r["boundary_alignment"] for r in split) if split else None,
+            "n_split": len(split),
             "onset_rime_split_frac": mean(r["onset_rime_split"] for r in sub),
             "tone_isolated_frac": mean(r["tone_isolated"] for r in sub),
             "byte_fallback_frac": mean(r["byte_fallback"] for r in sub),
