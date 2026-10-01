@@ -140,3 +140,51 @@ def test_supplementary_sheets():
         a, b = VA.phrase_syllables(r["phrase"])
         assert a.tone != b.tone and a.onset != b.onset and a.rime != b.rime      # the produced form identifies the kind
     assert any(r["phrase"] == "quốc gia" for r in sup["D2"])                     # DD 2.1 O5 (b): a quốc-type item
+
+
+def test_documents_quote_the_validation_constants():
+    """The DD 10.1 amendment marker and the protocol quote the sizes the code uses (repo convention: doc numbers are
+    test-pinned). docs/PREREGISTRATION.md does not fix the validation size and is not edited."""
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    dd = (root / "docs" / "DESIGN_DECISIONS.md").read_text(encoding="utf-8")
+    proto = (root / "docs" / "gate1" / "VALIDATION_PROTOCOL.md").read_text(encoding="utf-8")
+    marker = dd.split("[Amendment, 1 October 2026 — what the Gate 1 packet does")[1].split("]\n")[0]
+    for q in (f"VALIDATION_PER_CELL` = {C.VALIDATION_PER_CELL}", f"VALIDATION_CONTROLS_PER_CELL` = {C.VALIDATION_CONTROLS_PER_CELL}",
+              f"VALIDATION_OVERLAP` = {C.VALIDATION_OVERLAP}", f"{C.VALIDATION_ITEMS} rows", f"{C.VALIDATION_CALIBRATION_ITEMS}-item calibration"):
+        assert q in marker, q
+    for q in (f"{C.VALIDATION_PER_CELL} + {C.VALIDATION_CONTROLS_PER_CELL} per cell", f"{C.VALIDATION_OVERLAP} rows to every validator",
+              f"{round(C.VALIDATION_CONTROL_CATCH_MIN * 100)}% of the planted controls", f"{C.VALIDATION_CALIBRATION_ITEMS} keyed items",
+              f"fewer than {round(C.VALIDATION_CALIBRATION_PASS * 100)}%", f"{C.VALIDATION_T2_GOLD_OVERLAP} items by everyone"):
+        assert q in proto, q
+
+
+def test_baseline_closing_rows_exclude(tmp_path):
+    """PREREG 5.7: a respondent who used tools or who was a validator is excluded; the rows exist on every form."""
+    import csv
+    import json
+    import subprocess
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(root / "scripts"))
+    import make_validation_forms as MV
+    assert {c["item_id"] for c in MV.CLOSING_ITEMS} == {"TOOLS", "WAS_VALIDATOR"}
+    items = []
+    for t in ("T1", "T2", "T3"):
+        for v in ("V1", "V2", "V3", "V4"):
+            for i in range(6):
+                base = {"task": t, "variant": v, "input": "a b", "vulgar": False, "split": "test"}
+                if t == "T3":
+                    items.append({**base, "item_id": f"T3-{v}-{2 * i:06d}", "gold": "yes", "candidate": "b a", "pair_item_id": f"T3-{v}-{2 * i + 1:06d}"})
+                    items.append({**base, "item_id": f"T3-{v}-{2 * i + 1:06d}", "gold": "no", "candidate": "c a", "pair_item_id": f"T3-{v}-{2 * i:06d}"})
+                else:
+                    items.append({**base, "item_id": f"{t}-{v}-{i:06d}", "gold": ["b a"] if t == "T1" else [{"output": "b a"}]})
+    p = tmp_path / "items.jsonl"
+    p.write_text("\n".join(json.dumps(x, ensure_ascii=False) for x in items), encoding="utf-8")
+    out = tmp_path / "human"
+    subprocess.run([sys.executable, "scripts/make_validation_forms.py", "baseline", "--items", str(p), "--out", str(out),
+                    "--n-forms", "4", "--per-form", "24", "--no-model-prompt"], cwd=root, check=True, capture_output=True, text=True)
+    with open(out / "baseline_form_01.csv", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    assert [r["item_id"] for r in rows if r["block"] == "closing"] == ["TOOLS", "WAS_VALIDATOR"]

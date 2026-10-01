@@ -133,6 +133,8 @@ Part B rows (controls included); the sample-only figures are reported beside it.
    precision estimate (PREREG §5 rule 2); the count is reported.
 5. The author never overrides validators who agree.
 
+**Low control catch rate** (pre-specified): a validator who labels fewer than 75% of the planted controls Không (`VALIDATION_CONTROL_CATCH_MIN`) is re-briefed after the first weekly return and the rate is reported in the paper; no validator's labels are excluded or down-weighted on it.
+
 **Offensive**: one validator's "Có" flags the item (union rule; conservative); flagged items join the blocklist screen
 (DD 11.5). **Dialect**: the union of the mergers named. **`RULE?` comments**: every one is checked by the author against
 the rule tables; a confirmed bug → fix + full regeneration before any model run.
@@ -152,6 +154,8 @@ below the floor of 100.** Clearing it needs ≈ 21 more exact two-syllable rows 
 rejections; see BLOCKED.md and the decision memo (the fallback is the pre-registered one: H6 descriptive).
 
 ## 7. Reporting (paper and data statement)
+
+Committed wording for agreement (so that it is not chosen after the numbers exist): "α on `correct` is computed over the Part B sheet including its N planted control rows; the probability-sample-only α and AC1 are reported beside it."
 
 Number of validators and their regions; hours; α / AC1 / raw agreement / marginals per judgment with CIs; per-validator
 control catch rate; adjudication counts (unanimous / majority / author / unresolved); generator precision pooled (main

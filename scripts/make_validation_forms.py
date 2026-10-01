@@ -52,6 +52,13 @@ NATURAL_BLOCK_ITEMS = 10            # design 10.2: T2 on attested, non-vulgar ro
 CHECK_ITEM = {"item_id": "CHECK-01", "task": "check", "variant": "",
               "prompt_vi": "Câu kiểm tra: xin hãy viết đúng hai chữ “đã đọc” vào ô trả lời của câu này. [NATIVE-CHECK]",
               "expected": "đã đọc"}
+# closing questions (PREREG 5.7): "yes" to either excludes the form; asked on every form, answered Có / Không
+CLOSING_ITEMS = (
+    {"item_id": "TOOLS", "prompt_vi": "Bạn có dùng từ điển, công cụ tìm kiếm hay trợ lý AI cho câu nào không? (Có/Không) "
+                                      "Xin trả lời thật; câu trả lời “Có” không ảnh hưởng gì đến bạn. [NATIVE-CHECK]"},
+    {"item_id": "WAS_VALIDATOR", "prompt_vi": "Bạn có phải là người kiểm định (đánh giá bảng dữ liệu) của dự án NóiLái không? "
+                                              "(Có/Không) [NATIVE-CHECK]"},
+)
 
 SHEETS = {
     "A_calibration": ["row_id", "task", "kind", "input", "candidate", "system_verdict", "question_vi", "question_en",
@@ -478,6 +485,9 @@ def cmd_baseline(args) -> int:
         for r in nat:
             rows.append({"item_id": r["item_id"], "task": "natural", "variant": "", "block": "natural", "prompt_model": "",
                          "prompt_hash": "", "question_short": r["prompt_vi"], "answer": ""})
+        for c in CLOSING_ITEMS:
+            rows.append({"item_id": c["item_id"], "task": "closing", "variant": "", "block": "closing", "prompt_model": "",
+                         "prompt_hash": "", "question_short": c["prompt_vi"], "answer": ""})
         for pos, r in enumerate(rows, start=1):
             r["form"], r["position"] = fi + 1, pos
         _write_csv(out / f"baseline_form_{fi+1:02d}.csv", fields, rows)
@@ -492,7 +502,7 @@ def cmd_baseline(args) -> int:
             "others": sorted({v for k, v in cover.items() if k not in anchor_ids}),
             "shared_items_per_form_pair": {str(k): v for k, v in sorted(shared.items())},
             "rater_graph_connected": 0 not in shared, "seed": args.seed, "items_file": str(args.items),
-            "check_items_per_form": 1, "natural_block_items": len(nat),
+            "check_items_per_form": 1, "natural_block_items": len(nat), "closing_items": [c["item_id"] for c in CLOSING_ITEMS],
             "design": "DESIGN_DECISIONS 10.2: anchors on every form, every other item on exactly two forms, cyclic double coverage"}
     (out / "human_items.json").write_text(json.dumps(sorted(cover), ensure_ascii=False), encoding="utf-8")
     (out / "baseline_manifest.json").write_text(json.dumps({**info, "anchor_ids": sorted(anchor_ids),
@@ -506,7 +516,7 @@ def cmd_baseline(args) -> int:
 def cmd_score_baseline(args) -> int:
     """Score returned baseline forms with the models' scorer (DESIGN_DECISIONS 10.2; PREREG 8.11 and the exclusions
     of PREREG 5.7). A returned CSV keeps the form's columns; `answer` filled; a closing row with item_id `TOOLS`
-    and answer yes/no records the honesty question (yes excludes the form)."""
+    and the `WAS_VALIDATOR` row record the closing questions (yes to either excludes the form)."""
     from noilai.eval.score import score_outputs
     from noilai.vi.reencode import canonical_text
     items = {it["item_id"]: it for it in load_items(Path(args.items))}
@@ -521,6 +531,7 @@ def cmd_score_baseline(args) -> int:
         answered = sum(bool((r.get("answer") or "").strip()) for r in main)
         check = next((r for r in rows if r["item_id"] == CHECK_ITEM["item_id"]), None)
         tools = next((r for r in rows if r["item_id"] == "TOOLS"), None)
+        was_validator = next((r for r in rows if r["item_id"] == "WAS_VALIDATOR"), None)
         reason = None
         if answered < args.min_answered:
             reason = f"answered {answered} < {args.min_answered}"
@@ -528,6 +539,8 @@ def cmd_score_baseline(args) -> int:
             reason = "failed instruction check"
         elif tools is not None and VA.norm_label(tools.get("answer")) == "yes":
             reason = "reported using a dictionary, search engine or AI assistant"
+        elif was_validator is not None and VA.norm_label(was_validator.get("answer")) == "yes":
+            reason = "respondent was a validator (validators never take the baseline form)"
         if reason:
             excluded[form] = reason
             continue
