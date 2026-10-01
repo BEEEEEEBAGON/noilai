@@ -133,8 +133,8 @@ def main(argv=None) -> int:
     ap.add_argument("--release", type=Path, default=None,
                     help="a built release directory (dev/test files + manifest) for the release_strata block; absent -> noted")
     args = ap.parse_args(argv)
-    raw_new = [ln.rstrip("\n") for ln in open(L.EXTERNAL / "vi-DauMoi.dic", encoding="utf-8")][1:]
-    raw_old = [ln.rstrip("\n") for ln in open(L.EXTERNAL / "vi-DauCu.dic", encoding="utf-8")][1:]
+    raw_new = (L.EXTERNAL / "vi-DauMoi.dic").read_text(encoding="utf-8").splitlines()[1:]
+    raw_old = (L.EXTERNAL / "vi-DauCu.dic").read_text(encoding="utf-8").splitlines()[1:]
     new = L.load_hunspell_syllables("new")
     old = L.load_hunspell_syllables("old")
     base = Inventory(new + old)

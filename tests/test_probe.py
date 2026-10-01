@@ -34,7 +34,7 @@ def tiny():
 
 
 def test_examples_and_token_span(tiny):
-    model, tok = tiny
+    _model, tok = tiny
     exs = extract.make_examples(["mèo", "bí"], encoding="nfc", carrier_ids=[0])
     assert len(exs) == 2 and exs[0].labels["tone"] == 1 and exs[1].labels["onset"] == "b"
     ex = exs[0]
@@ -116,7 +116,7 @@ def test_steering_changes_logits(tiny):
 def test_minimal_pairs_build_and_align(tiny):
     from noilai.probe import pairs as P
     from noilai.vi import lexicon as L
-    model, tok = tiny
+    _model, tok = tiny
     inv = L.load_inventory()
     prs = P.build_pairs(inv, 30, seed=0)
     assert len(prs) == 30
@@ -135,7 +135,7 @@ def test_pairs_target_second_nfd_and_tone_only_readout(tiny):
     from noilai.probe import pairs as P
     from noilai.vi import lexicon as L
     from noilai.vi import unicode as U
-    model, tok = tiny
+    _model, tok = tiny
     inv = L.load_inventory()
     prs = P.build_pairs(inv, 20, seed=1)                       # target second by default
     for pr in prs:
@@ -174,7 +174,7 @@ def test_extraction_uses_the_patching_hooks_not_the_post_norm_hidden_states(tiny
     exs = extract.make_examples(["mèo"], encoding="nfc", carrier_ids=[0])
     H = extract.extract_hidden_states(model, tok, exs, batch_size=1, add_special_tokens=False, positions=("last",))
     enc = tok(exs[0].text, return_tensors="pt", add_special_tokens=False)
-    first, last = extract.token_span([tuple(o) for o in tok(exs[0].text, return_offsets_mapping=True, add_special_tokens=False)["offset_mapping"]],
+    _first, last = extract.token_span([tuple(o) for o in tok(exs[0].text, return_offsets_mapping=True, add_special_tokens=False)["offset_mapping"]],
                                      exs[0].char_start, exs[0].char_end)
     with torch.no_grad():
         with patching.ResidualCache(model) as cache:

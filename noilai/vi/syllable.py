@@ -177,9 +177,8 @@ def parse(text: str, strict: bool = True) -> Parse:
     if onset_sp == "qu":
         rest = "u" + rest
     # 'gi' contraction: gì, gìn, giêng, giết -> the rime starts with i.
-    if onset_sp == "gi":
-        if rest == "" or rest[0] not in U.VOWELS_NFC_SET or rest[0] == "ê":
-            rest = "i" + rest
+    if onset_sp == "gi" and (rest == "" or rest[0] not in U.VOWELS_NFC_SET or rest[0] == "ê"):
+        rest = "i" + rest
     # 'g' before i/e/ê is spelled gh; a bare 'g'+front vowel is not a standard spelling
     # (gi handles /z/). 'ng' + front vowel must be 'ngh'. 'c' + front vowel must be 'k'.
     # These are checked after the rime is known (spelling round-trip).

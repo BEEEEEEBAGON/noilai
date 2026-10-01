@@ -1,6 +1,7 @@
 """Tokenizer audit tests: metrics on a locally trained toy tokenizer, the three-valued census
 on fake adapters, the item-audit covariates, and, when the downloaded Gemma 3 model is
 present, sanity checks on the real thing."""
+import itertools
 import json
 import sys
 from pathlib import Path
@@ -34,7 +35,7 @@ class FakeAdapter(TokenizerAdapter):
 
     def encode(self, text):
         cuts = [0] + sorted(self.splits.get(text, [])) + [len(text)]
-        return [Token(text=text[a:b], start=a, end=b, id=i) for i, (a, b) in enumerate(zip(cuts, cuts[1:]))]
+        return [Token(text=text[a:b], start=a, end=b, id=i) for i, (a, b) in enumerate(itertools.pairwise(cuts))]
 
 
 class CharAdapter(TokenizerAdapter):

@@ -118,7 +118,7 @@ def cmd_sample(args) -> int:
             for it in its:
                 w.writerow({**_display(it), **{j: "" for j in JUDGMENTS}, "comment": ""})
     meta = {"n_items": len(chosen), "overlap": len(overlap), "validators": vals, "per_validator": {v: len(a) for v, a in assign.items()},
-            "strata": Counter(f"{k[0]}-{k[1]}-{k[2]}-{k[3]}" for k in (tuple((it["task"], it["variant"], it["source"], it["split"])) for it in chosen)),
+            "strata": Counter(f"{k[0]}-{k[1]}-{k[2]}-{k[3]}" for k in ((it["task"], it["variant"], it["source"], it["split"]) for it in chosen)),
             "seed": args.seed}
     (out / "validation_manifest.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1))
     print(json.dumps({k: v for k, v in meta.items() if k != "strata"}, ensure_ascii=False))
@@ -130,7 +130,9 @@ def cmd_score(args) -> int:
     rows_by_item = defaultdict(dict)
     for path in args.returned:
         coder = Path(path).stem.split("_")[-1]
-        for r in csv.DictReader(open(path, encoding="utf-8")):
+        with open(path, encoding="utf-8") as fh:
+            rows_ = list(csv.DictReader(fh))
+        for r in rows_:
             for j in JUDGMENTS:
                 lab = (r.get(j) or "").strip().lower()
                 if lab in ("yes", "no", "unsure", "có", "không"):

@@ -34,3 +34,8 @@ addopts = "-q"
 [tool.ruff]
 line-length = 110
 target-version = "py310"
+
+[tool.ruff.lint]
+# BLE001: the resource fetcher, the backends and the cloud scripts catch every exception on purpose so that one
+# failing model, request or environment probe is recorded and the session continues (DESIGN_DECISIONS 7.3, 7.6).
+extend-ignore = ["BLE001"]

@@ -43,9 +43,9 @@ def get_decoder_layers(model):
             return obj
     best = None
     for name, mod in model.named_modules():
-        if isinstance(mod, nn.ModuleList) and len(mod) >= 2 and len({type(m) for m in mod}) == 1:
-            if best is None or len(mod) > len(best):
-                best = mod
+        if (isinstance(mod, nn.ModuleList) and len(mod) >= 2 and len({type(m) for m in mod}) == 1
+                and (best is None or len(mod) > len(best))):
+            best = mod
     if best is None:
         raise ValueError("no decoder layer list found")
     return best

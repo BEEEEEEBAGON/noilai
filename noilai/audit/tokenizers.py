@@ -94,7 +94,8 @@ class SentencePieceAdapter(TokenizerAdapter):
             from sentencepiece import sentencepiece_model_pb2 as pb
 
             m = pb.ModelProto()
-            m.ParseFromString(open(self.model_path, "rb").read())
+            with open(self.model_path, "rb") as fh:
+                m.ParseFromString(fh.read())
             return {
                 "type": "sentencepiece",
                 "model_type": pb.TrainerSpec.ModelType.Name(m.trainer_spec.model_type),
@@ -160,7 +161,7 @@ def linguistic_boundaries(parse: Parse, surface: str) -> dict[str, int | None]:
     coda_len = 0
     if s.coda:
         coda_len = {"j": 1, "w": 1}.get(s.coda, len(s.coda))
-    glide_len = 1 if (s.glide and not (onset_sp == "gi")) else 0
+    glide_len = 1 if (s.glide and onset_sp != "gi") else 0
     b_onset = onset_len if onset_len else None
     b_glide = onset_len + glide_len if s.glide else None
     b_coda = n - coda_len if coda_len else None
@@ -229,7 +230,7 @@ def _nfd_to_nfc_offset(surf_nfd: str, k: int) -> float:
         if i == k:
             return letters if not unicodedata.combining(ch) else letters - 0.5
         if not unicodedata.combining(ch):
-            letters += 1 if i else 1
+            letters += 1
     return letters
 
 
