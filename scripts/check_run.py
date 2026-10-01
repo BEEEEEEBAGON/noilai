@@ -114,7 +114,7 @@ def main(argv=None) -> int:
         print(json.dumps({"verified": not bad, "differences": bad}, ensure_ascii=False))
         return 1 if bad else 0
     if not (run / "scores.jsonl").exists() or (run / "scores.jsonl").stat().st_mtime < (run / "outputs.jsonl").stat().st_mtime:
-        import score_run                          # score (or rescore after new rows, e.g. a resumed or parked API run)
+        import score_run  # score (or rescore after new rows, e.g. a resumed or parked API run)
         score_run.score_run_dir(run, item_file, quiet=True, allow_thinking=args.allow_thinking)
         report["scored_here"] = True
     # 1. item gate
