@@ -1616,3 +1616,124 @@ def test_a_chunk_may_only_narrow_its_line_and_writes_its_own_run_directory(plan)
     with pytest.raises(ValueError, match="only narrow"):
         KRP.narrow_run(e1, {"items": "noilai_test"})
     assert KRP.narrow_run(e1, None) is e1
+    whole = KRP.narrow_run(e1, None, "cpu")                          # a tag alone: the whole line in its own directory
+    assert whole["paraphrases"] == e1["paraphrases"] and KRP.run_dir(plan, whole, "m").endswith("__m__cpu")
+
+
+# ----------------------------------------------------------------------------- compute chunks (docs/COMPUTE_PLAN.md)
+import plan_chunks as PC  # noqa: E402
+
+
+@pytest.fixture(scope="module")
+def chunk_spec():
+    return PC.build_chunks()
+
+
+def test_compute_chunks_notebooks_and_plan_block_match_the_generator(chunk_spec):
+    assert PC.check(chunk_spec) == []
+
+
+def test_chunk_order_is_the_reverse_of_the_pre_registered_cut_order(chunk_spec, plan, models_cfg):
+    dd = (ROOT / "docs" / "DESIGN_DECISIONS.md").read_text(encoding="utf-8")
+    assert "tokenizer-redundant models first — Gemma 3 12B, Qwen3.5-0.8B, Gemma 4 12B — then the second model of any family" in dd
+    assert PC.REDUNDANT == ("gemma-3-12b-it", "qwen3.5-0.8b", "gemma-4-12b")
+    assert "paraphrases drop to two for the TPU/2×T4 models before any model is cut" in dd
+    tiers = [c["tier"] for c in chunk_spec["chunks"]]
+    assert tiers == sorted(tiers) and [c["order"] for c in chunk_spec["chunks"]] == list(range(1, len(tiers) + 1))
+    leads = set(chunk_spec["rules"]["first_of_family"].values())
+    for c in chunk_spec["chunks"]:
+        for j in c["jobs"]:
+            for m in j["models"]:
+                base = models_cfg["by_name"][m].get("reference_of") or m
+                if base in PC.REDUNDANT:
+                    assert c["tier"] in (0, 4, 5), (c["id"], m)
+                if base in leads and c["tier"] in (3, 4):
+                    raise AssertionError(f"lead model {m} scheduled in cut tier {c['tier']} ({c['id']})")
+            if j["tag"] == "p2":
+                assert c["tier"] == 5 and j["overrides"] == {"paraphrases": ["p2"]}
+                assert all(models_cfg["by_name"][m]["hardware"] in ("2xt4", "tpu") for m in j["models"])
+
+
+def test_tier_zero_reads_only_dev_files_and_later_tiers_wait_for_stage_two(chunk_spec, plan):
+    for c in chunk_spec["chunks"]:
+        canary = [k for k in c["item_keys"] if plan["item_files"][k].get("canary_required")]
+        if c["tier"] == 0:
+            assert not canary, (c["id"], canary)
+            assert all(j["run"] in PC.PRE_LINES for j in c["jobs"])
+        else:
+            assert "stage-2" in c["window"], c["id"]
+
+
+def test_chunks_cover_every_gpu_and_tpu_job_of_the_plan_exactly_once(chunk_spec, plan, models_cfg):
+    seen: dict[tuple, list[str]] = {}
+    for c in chunk_spec["chunks"]:
+        if c["tier"] == 0:
+            continue
+        for j in c["jobs"]:
+            run = KRP.find_run(plan, j["run"])
+            paras = (j["overrides"] or {}).get("paraphrases", run["paraphrases"])
+            for m in j["models"]:
+                seen.setdefault((j["run"], m), []).extend(paras)
+    expected = {}
+    for rid in PC.MAIN_LINES + PC.OUTSIDE_LINES:
+        run = KRP.find_run(plan, rid)
+        for m in PC.booked_models(run, plan, models_cfg):
+            if models_cfg["by_name"][m]["hardware"] in PC.HW_QUEUE:
+                expected[(rid, m)] = sorted(run["paraphrases"])
+    assert {k: sorted(v) for k, v in seen.items()} == expected
+    assert [(u["run"], u["model"]) for u in chunk_spec["unscheduled"]] == [("bf16_drift_200", "phogpt-4b-chat--bf16")]
+    tpu_line = set(KRP.expand_models(KRP.find_run(plan, "tpu_main"), plan, models_cfg))
+    assert not any(r == "E1_main" and m in tpu_line for r, m in seen), "tpu_main books the TPU trio's E1 runs"
+
+
+def test_each_chunk_fits_one_session_and_only_narrows_its_lines(chunk_spec, plan, models_cfg):
+    dirs = set()
+    for c in chunk_spec["chunks"]:
+        assert c["hours"]["high"] <= PC.SESSION_CAP_H[c["queue"]], c["id"]
+        assert c["hours"]["low"] <= c["hours"]["high"]
+        for j in c["jobs"]:
+            run = KRP.narrow_run(KRP.find_run(plan, j["run"]), j["overrides"], j["tag"])   # raises on a widening override
+            for m in j["models"]:
+                d = KRP.run_dir(plan, run, m)
+                assert d not in dirs or (c["queue"] == "cpu" and j["run"] == "smoke_20"), d   # the CPU pilot re-enters c01's smoke (--resume)
+                dirs.add(d)
+                if j["overrides"]:
+                    cmd = KRP.build_command(run, m, plan, models_cfg)
+                    assert cmd[cmd.index("--paraphrases") + 1:cmd.index("--shots")] == j["overrides"]["paraphrases"]
+                    assert cmd[cmd.index("--run-id") + 1].endswith(f"__{j['tag']}")
+
+
+def test_first_models_of_the_families_meet_the_minimum_viable_panel(chunk_spec, models_cfg):
+    leads = chunk_spec["rules"]["first_of_family"]
+    open_leads = [m for m in leads.values() if models_cfg["by_name"][m]["hardware"] != "api"]
+    assert len(open_leads) >= 8 and len(set(leads)) >= 4             # DD 7.1: >= 8 open models over >= 4 families
+    assert {"gemma-3-1b-it", "qwen3.5-2b", "phogpt-4b-chat"} <= set(leads.values())   # the pilot models lead their families
+    assert not set(PC.REDUNDANT) & set(leads.values())
+
+
+def test_chunk_notebooks_preset_exactly_the_chunk_jobs(chunk_spec):
+    for c in chunk_spec["chunks"]:
+        nb = nbformat.read(str(ROOT / c["notebook"]), as_version=4)
+        nbformat.validate(nb)
+        assert nb.metadata["noilai"]["chunk"] == c["id"]
+        param = next(cell for cell in nb.cells if cell.cell_type == "code" and "# ---- parameters" in cell.source)
+        ns: dict = {}
+        exec(compile(param.source, c["id"], "exec"), ns)              # the parameters cell runs on its own
+        assert ns["RUN_LABEL"] == c["id"]
+        if c["queue"] == "cpu":
+            assert ns["RUN_IDS"] == [j["run"] for j in c["jobs"]] and ns["MODELS"] == c["jobs"][0]["models"]
+        else:
+            assert ns["JOBS"] == c["jobs"] and ns["MODELS"] == []
+            assert set(c["item_keys"]) <= set(ns["VERIFY_ITEM_KEYS"])
+            run_cell = next(cell for cell in nb.cells if KBN.RUN_TAG in cell.metadata.get("tags", []) and "JOBS" in cell.source)
+            assert 'line_overrides=job.get("overrides"), chunk_tag=job.get("tag")' in run_cell.source
+
+
+def test_cpu_chunk_estimates_derive_from_the_benchmark(chunk_spec):
+    b = json.loads(PC.BENCH.read_text())
+    est = PC.cpu_estimates(b)
+    dec = (b["generate_bs1_520p_24new_s"] - b["prefill_520_s"]) / 24
+    assert est["smoke_20"] == pytest.approx(40 * (b["prefill_520_s"] + 64 * dec) / 3600)
+    cpu = [c for c in chunk_spec["chunks"] if c["queue"] == "cpu"]
+    assert [c["jobs"][0]["models"] for c in cpu] == [["gemma-3-1b-it"], ["gemma-3-1b-it"], ["qwen3.5-2b"], ["phogpt-4b-chat"]]
+    assert all(c["quota_hours"]["x1"] == [0, 0] for c in cpu)

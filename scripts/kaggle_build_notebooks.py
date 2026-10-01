@@ -564,17 +564,22 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
                     print("periodic push failed:", repr(e))
         _pusher = threading.Thread(target=_periodic_push, daemon=True)
         _pusher.start()
+        # a compute chunk (scripts/plan_chunks.py) sets JOBS: [{run, models, overrides, tag}], run in order
+        JOBS = globals().get("JOBS") or [{"run": RUN_ID, "models": MODELS, "overrides": globals().get("LINE_OVERRIDES"),
+                                          "tag": globals().get("CHUNK_TAG")}]
+        RESULTS = []
         try:
-            RESULTS = KRP.execute(RUN_ID, models=MODELS or None, platform=PLATFORM, dry_run=DRY_RUN, continue_on_error=True,
-                                  extra=RUN_EXTRA, python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
-                                  allow_hardware_mismatch=ALLOW_HARDWARE_MISMATCH, session_t0=SESSION_T0,
-                                  max_session_hours=MAX_SESSION_HOURS, after_each=after_each_model,
-                                  allow_unpinned_revision=ALLOW_UNPINNED_REVISION,
-                                  line_overrides=globals().get("LINE_OVERRIDES"), chunk_tag=globals().get("CHUNK_TAG"))
+            for job in JOBS:
+                RESULTS += KRP.execute(job["run"], models=job.get("models") or None, platform=PLATFORM, dry_run=DRY_RUN,
+                                       continue_on_error=True, extra=RUN_EXTRA, python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
+                                       allow_hardware_mismatch=ALLOW_HARDWARE_MISMATCH, session_t0=SESSION_T0,
+                                       max_session_hours=MAX_SESSION_HOURS, after_each=after_each_model,
+                                       allow_unpinned_revision=ALLOW_UNPINNED_REVISION,
+                                       line_overrides=job.get("overrides"), chunk_tag=job.get("tag"))
         finally:
             _stop_push.set()
             _pusher.join(timeout=5)
-        print(json.dumps([{"model": r["model"], "status": r["status"], "hours": r.get("hours"),
+        print(json.dumps([{"run": r["run"], "model": r["model"], "status": r["status"], "hours": r.get("hours"),
                            "new_outputs": r.get("new_outputs"), "logged_device": r.get("logged_device")} for r in RESULTS], indent=1))
         ''', tags=[RUN_TAG]),
         code(CHECK_AFTER_RUN),
@@ -702,15 +707,18 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
                     print("periodic push failed:", repr(e))
         _pusher = threading.Thread(target=_periodic_push, daemon=True)
         _pusher.start()
+        # a compute chunk (scripts/plan_chunks.py) sets JOBS: [{run, models, overrides, tag}], run in order
+        JOBS = globals().get("JOBS") or [{"run": r, "models": MODELS, "overrides": globals().get("LINE_OVERRIDES"),
+                                          "tag": globals().get("CHUNK_TAG")} for r in RUN_IDS]
         RESULTS = []
         try:
-            for run_id in RUN_IDS:
-                RESULTS += KRP.execute(run_id, models=MODELS or None, platform=PLATFORM, dry_run=DRY_RUN, continue_on_error=True,
-                                       extra=RUN_EXTRA, python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
+            for job in JOBS:
+                RESULTS += KRP.execute(job["run"], models=job.get("models") or None, platform=PLATFORM, dry_run=DRY_RUN,
+                                       continue_on_error=True, extra=RUN_EXTRA, python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
                                        allow_hardware_mismatch=ALLOW_HARDWARE_MISMATCH, session_t0=SESSION_T0,
                                        max_session_hours=MAX_SESSION_HOURS, after_each=after_each_model,
                                        allow_unpinned_revision=ALLOW_UNPINNED_REVISION,
-                                       line_overrides=globals().get("LINE_OVERRIDES"), chunk_tag=globals().get("CHUNK_TAG"))
+                                       line_overrides=job.get("overrides"), chunk_tag=job.get("tag"))
         finally:
             _stop_push.set()
             _pusher.join(timeout=5)
@@ -1241,11 +1249,12 @@ CHECK_RUNS = '''
 # stats.json (accuracy with the base-pair cluster-bootstrap CI, the copy-baseline gain of PREREG section 10, the paired
 # NFD contrast, the EXPLORATORY T1 forced choice against chance) and results_hashes.json
 import json, subprocess, sys
+from pathlib import Path
 
 def check_runs(results):
     summaries = []
     for r in results:
-        run_dir = PROJECT / "data" / "runs" / f"{r['run']}__{r['model']}"
+        run_dir = Path(r["out"]) if r.get("out") else PROJECT / "data" / "runs" / f"{r['run']}__{r['model']}"   # "out" carries a chunk's __<tag>
         if not (run_dir / "scores.jsonl").exists():
             print(r["run"], r["model"], "->", r["status"], "(no scores: not checked)")
             continue
@@ -1350,13 +1359,16 @@ def build_kaggle_cpu_pilot() -> nbformat.NotebookNode:
         import shlex
         import kaggle_run_plan as KRP
         CPU_EXTRA = ["--backend", "hf", "--device", "cpu", "--dtype", "float32"]
+        RUN_DIR_TAG = "cpu"      # data/runs/<run>__<model>__cpu: a T4 run of the same line keeps its own directory, so the first
+                                 # GPU smoke really runs and its outputs can be compared with these row by row
         RUN_EXTRA = CPU_EXTRA + shlex.split(EXTRA_ARGS) + (["--account-holder", ACCOUNT_HOLDER_ROLE] if ACCOUNT_HOLDER_ROLE else [])
         if not ACCOUNT_HOLDER_ROLE:
             print("WARNING: ACCOUNT_HOLDER_ROLE is empty; the manifests will record account_holder 'unknown' (DD 11.2 asks for the role)")
         SMOKE_RESULTS = KRP.execute("smoke_20", models=MODELS, platform=PLATFORM, dry_run=DRY_RUN, continue_on_error=False,
                                     extra=RUN_EXTRA, python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
                                     allow_hardware_mismatch=True, session_t0=SESSION_T0, max_session_hours=MAX_SESSION_HOURS,
-                                    after_each=after_each_model, allow_unpinned_revision=ALLOW_UNPINNED_REVISION)
+                                    after_each=after_each_model, allow_unpinned_revision=ALLOW_UNPINNED_REVISION,
+                                    chunk_tag=RUN_DIR_TAG)
         FIRST_RUN = check_runs(SMOKE_RESULTS)
         if any(str(r["status"]).startswith(("failed", "skipped", "refused")) for r in SMOKE_RESULTS):
             raise SystemExit("the first run failed or was skipped: read the status above before the pilot cell")
@@ -1391,7 +1403,7 @@ def build_kaggle_cpu_pilot() -> nbformat.NotebookNode:
                                            extra=extra, python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
                                            allow_hardware_mismatch=True, session_t0=SESSION_T0,
                                            max_session_hours=MAX_SESSION_HOURS, after_each=after_each_model,
-                                           allow_unpinned_revision=ALLOW_UNPINNED_REVISION)
+                                           allow_unpinned_revision=ALLOW_UNPINNED_REVISION, chunk_tag=RUN_DIR_TAG)
             finally:
                 _stop_push.set()
                 _pusher.join(timeout=5)

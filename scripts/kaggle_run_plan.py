@@ -207,9 +207,10 @@ NARROWABLE = ("paraphrases", "arms", "tasks", "variants")
 def narrow_run(run: dict, overrides: dict | None, tag: str | None = None) -> dict:
     """A compute chunk's view of a run line (docs/COMPUTE_PLAN.md): it may only NARROW the line's paraphrases, arms,
     tasks or variants (never add one), and writes to its own run directory `<run>__<model>__<tag>` so that a manifest
-    always describes exactly the rows beside it. The analysis pools the directories of a line by its run id."""
+    always describes exactly the rows beside it. The analysis pools the directories of a line by its run id. A tag
+    without overrides keeps the line whole in a directory of its own (the CPU notebook's `cpu` tag: an engine apart)."""
     if not overrides:
-        return run
+        return run if not tag else {**run, "chunk_tag": tag}
     bad = set(overrides) - set(NARROWABLE)
     if bad:
         raise ValueError(f"a chunk may only narrow {NARROWABLE}, not {sorted(bad)}")

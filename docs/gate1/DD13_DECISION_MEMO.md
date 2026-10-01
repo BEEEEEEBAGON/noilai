@@ -7,7 +7,7 @@ answers that change a binding text are applied as dated `docs/DEVIATIONS.md` row
 
 Column "Stage 2?" marks the answers that feed the stage-2 pre-registration (due by Gate 2, 8 November, before any
 test-split run). Rows 1–21 are DD §13 in its own numbering; A1–A4 are the four amendment markers of 1 October that
-wait for a ruling; N1–N12 are decisions raised by this session's work.
+wait for a ruling; N1–N13 are decisions raised by this session's work.
 
 | # | Decision | Options | Recommendation | What it changes downstream | Stage 2? | By |
 |---|---|---|---|---|---|---|
@@ -48,4 +48,5 @@ wait for a ruling; N1–N12 are decisions raised by this session's work.
 | N10 | First real run route | (a) Kaggle CPU notebook now (no GPU quota), then the GPU smoke; (b) wait for the GPU smoke week | **(a)**: `notebooks/kaggle_cpu_pilot.ipynb`, `MODE = "first_run"` on gemma-3-1b-it this week | Gate 1 evidence earlier | no | — |
 | N11 | The Gate 1 pilot on CPU | (a) the three pilot models on CPU sessions (no GPU quota; ~1 session each, `docs/COMPUTE_PLAN.md`); (b) on T4 | **(a)** for the go/no-go numbers, plus a 20-item GPU smoke per family for the tokens/s DD 8.5 needs | Gate 1 timing; GPU budget | yes (pilot constants) | — |
 | N12 | Gate 1 and the C2 corpus count | DD 6.3 wants the count before Gate 1 | **run the count kit with the CPU pilot** (row 2) | H4 direction | yes | — |
+| N13 | Date of the stage-2 commit (DD 8.8: "no later than Gate 2, 8 November, and before any test-split run") | (a) 8 November, after the co-author's edits (or without them, "anyway"); (b) as soon as the panel is frozen (25 Oct), the validators' generator fixes are in and the pilot constants are set | **(b), if no co-author has joined by then; (a) if one is editing**: with (a) all test-split GPU work has two weeks before the 22 Nov results freeze, which at 30 GPU-h a week covers tiers 1–2 of `docs/COMPUTE_PLAN.md` under the x1 reading and stops inside tier 1 under x2; (b) gives four weeks and fits everything at x1 | PREREG header, `configs/run_plan.yaml` weeks (a DEVIATIONS row), the chunk windows | yes | 25 Oct |
 
