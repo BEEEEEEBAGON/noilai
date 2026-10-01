@@ -34,9 +34,10 @@ target `make baseline`.
 - **The cultural task.** A 10-item **natural-competence block** (T2 on 10 attested, non-vulgar two-syllable nói lái
   drawn at random from the attested file) gives the human reference for decoding real wordplay, which the generated
   items do not test (DD 10.2). The paper reserves the word "nói lái" for the attested set and calls the generated items
-  rule-generated component permutations. The draw (`natural_block` in the script) does not select for familiarity or
-  native verification and does not de-duplicate originals: a build from the scratch release put three textbook
-  illustrations of the same original, *thay đổi*, into the block (open decision 5 in §9).
+  rule-generated component permutations. The draw (`natural_block` in the script) keeps one row per original, skips
+  rows whose source or note says `[UNCERTAIN]`, "same source" or "illustration" and rows a validator flagged offensive,
+  and, once Part C is scored, draws only native-verified rows (`--attested-verified`; open decision 5 in §9, settled
+  in the script on 1 October 2026).
 
 ## 2. Who takes part
 
@@ -119,9 +120,9 @@ synthetic 20 × 30 build:
 titles set in `buildOne` inside `cmd_google_form`); the native check is done on those strings, never on the model
 prompt, which must stay identical to what the models receive. `CONSENT_BOXES_VI` and `DEMOGRAPHICS_VI` carry no
 in-string marker: check them by name. The same holds for the titles in `buildOne`: the form title `NóiLái - phiếu <nn>`,
-the consent question `Đồng ý tham gia`, the page titles `Thông tin chung (thô, không định danh)` and `Các câu hỏi`, the
-choices `Có` / `Không`, and the closing `Góp ý (không bắt buộc)`. (Pending script change: a `# [NATIVE-CHECK]` comment
-above both tuples, so that a reviewer working by the markers finds them.)
+the consent question `Đồng ý tham gia` and its summary `CONSENT_HELP_VI`, the confirmation message `CONFIRMATION_VI`,
+the page titles `Thông tin chung (khái quát, không định danh)` and `Các câu hỏi`, the choices `Có` / `Không`, and the
+closing `Góp ý (không bắt buộc)`. A `# [NATIVE-CHECK]` comment above `FORM_INTRO_VI` covers the whole block.
 
 ## 4. Runbook
 
@@ -141,15 +142,15 @@ what it writes and what to check.
 1. **Build the forms.**
    `make baseline`
    Writes `data/human/baseline_form_01.csv` … `baseline_form_20.csv`, `human_items.json` and `baseline_manifest.json`.
-   The target prints the builder's line as a Python dict, not JSON (`True`, not `true`). Check: `'forms': 20`,
+   The target prints the builder's line as JSON and checks nine values itself: `'forms': 20`,
    `'per_form': 30`, `'distinct_items': 246`, `'min_appearances': 2`, `'max_appearances': 20`,
-   `'anchors_seen_by': 20`, `'others': [2]`, `'rater_graph_connected': True`, `'natural_block_items': 10`. The target
-   itself fails and deletes the forms if the first five are not met; the last four it does not test, so if any of them
-   differs, delete `data/human/baseline_form_*.csv` and do not send. Keep the printout with the private notes.
+   `'anchors_seen_by': 20`, `'others': [2]`, `'rater_graph_connected': true`; it fails and deletes the forms if any
+   differs. Check `natural_block_items` (10) by eye. Keep the printout with the private notes.
 
-   Then check that no item a validator flagged offensive is on the forms. The builder drops only items flagged `vulgar`
-   at generation; it does not read the validators' `offensive` flags (pending script change: a `--exclude-flags` option
-   to `baseline` that reads them). Run, from the repository root:
+   The builder leaves out items flagged `vulgar` at generation and, through `--exclude-flags
+   data/audit/validator_flags.json` (written by `make validation-score`), every item a validator flagged offensive;
+   the printout's `items_excluded_by_flags` gives the count and `validator_flags` the file read (null = the file was
+   missing: score the validation first). As a second check, run from the repository root:
 
    ```bash
    python - <<'EOF'
@@ -165,9 +166,8 @@ what it writes and what to check.
    EOF
    ```
 
-   It must print `[] []`. Otherwise the listed items are on the forms: do not send until they are off (the
-   `--exclude-flags` change, or a rebuild from copies of the item and attested files in which those items carry
-   `vulgar = true`, logged in `docs/DEVIATIONS.md`), then re-run this check. Part B items are matched by item id, Part C
+   It must print `[] []`. Otherwise the listed items are on the forms: do not send; re-run `make validation-score`
+   and `make baseline`, then this check. Part B items are matched by item id, Part C
    rows by their original phrase. (Tested on a simulated return with one planted Part C flag: it printed
    `[] ['đầu tiên']`.)
 2. **Write the Apps Script.**
@@ -181,35 +181,31 @@ what it writes and what to check.
 4. **Create the 20 Google Forms in the author's own Google account** (or an adult collaborator's; never an account
    opened with a misstated age). Open script.google.com → New project → delete the placeholder code → paste the whole of
    `build_forms.gs` → save → select `buildAll` → Run → authorize the script for that account. The execution log lists
-   one line per form: the form number, a tab, the form's link. Copy those lines into the private list, never into the
-   repository. The script writes the log only once, after the last form is built, so if the run stops part-way (an
-   error, or Apps Script's per-run time limit) the log shows no line at all while some forms already exist. Then search
-   Google Drive for `NóiLái - phiếu`, delete every form found, empty the trash and run `buildAll` again. (Pending script
-   change: log each form inside the loop and add a `buildRange(a, b)` function that builds forms a to b, so a stopped
-   run can be resumed instead of repeated.)
+   one line per form, written as each form is made: the form number, a tab, the form's link. Copy those lines into the
+   private list, never into the repository. If the run stops part-way (an error, or Apps Script's per-run time limit),
+   the log holds the forms made so far: run `buildRange(first, last)` for the missing numbers only (or delete the forms
+   found under `NóiLái - phiếu` in Drive and run `buildAll` again).
 5. **Check one form end to end before sending anything.** Open form 01 and check: the form cannot be submitted with a
    consent box unticked; the age band is required; each model item shows the full prompt as help text; titles are
-   numbered 1–43; `TOOLS` and `WAS_VALIDATOR` are required. The consent page shows only the three boxes, and the
-   form shows Google's default message after submission; once the script sets the consent summary and the
-   confirmation message with the form number (`docs/HUMAN_BASELINE_FORM.md` §2.1, pending script change), check both
-   here. If you submit a test response, delete it afterwards (Responses tab → menu → Delete all responses) so that it
+   numbered 1–43; `TOOLS` and `WAS_VALIDATOR` are required; the consent question shows its summary (voluntary,
+   unpaid, no ethics board, how to withdraw with the form number) and the confirmation after submitting states the
+   form number (`docs/HUMAN_BASELINE_FORM.md` §2.1; `google-form --contact-email` fills the address). If you submit a test response, delete it afterwards (Responses tab → menu → Delete all responses) so that it
    is not imported.
 6. **Send one link per person.** Personal message from the author's own account, with the consent form as a PDF
    (`docs/gate1/RECRUITMENT.md` §1 step 7). One form number per person; record the number against the person in the
-   private list; state the form number in the message (it is also in the form's title, `NóiLái - phiếu <nn>`), since
-   the form sets no confirmation message that states it; ask them not to forward the link. Never send a link to a validator.
+   private list; state the form number in the message as well (it is also in the form's title and the confirmation
+   message); ask them not to forward the link. Never send a link to a validator.
 7. **Close and download.** At the end of the window turn off "Accepting responses" in each form. For each form:
    Responses tab → ⋮ → Download responses (.csv); do not link a response Sheet, which would keep a timestamped copy of
    the responses in Google Drive. If the download arrives as a .zip, unzip it. Save the file as
-   `data/human/responses/responses_form_<nn>.csv` (`<nn>` = the form number, e.g. `responses_form_07.csv`). (The
-   comment at the top of the generated `build_forms.gs` still says "Responses -> Sheets -> …"; pending script change.)
+   `data/human/responses/responses_form_<nn>.csv` (`<nn>` = the form number, e.g. `responses_form_07.csv`).
 8. **Import.**
    `python scripts/make_validation_forms.py import-responses --dir data/human`
    Writes one file per response, `data/human/returned/baseline_form_<nn>_r<k>.csv` (answers mapped back to item ids by
    the position number at the start of each question title), and `data/human/returned/demographics.csv` (form,
-   response number and the four coarse fields; timestamps are not kept). The importer writes every response of a form,
-   so a form that received more than one response yields `_r2` or higher files. Settle open decision 2 in §9
-   **before** this step; under the recommended rule only `_r1` is ever written.
+   response number and the four coarse fields; timestamps are not kept). The importer keeps only the first response of
+   each form (open decision 2 in §9) and prints how many later ones it dropped unread (`extra_submissions_dropped`);
+   that count goes to `docs/RESULTS_LOG.md`.
 9. **Score.**
    `python scripts/make_validation_forms.py score-baseline --items data/release/v0.3/noilai_main.jsonl --dir data/human --returned 'data/human/returned/baseline_form_*.csv'`
    Writes `data/human/report/human_scores.jsonl` (one scored row per answer: `correct`, `correct_lenient`,
@@ -320,24 +316,8 @@ All of the following read `human_scores.jsonl`, `returned/demographics.csv` (joi
    the first response of each form (`_r1`, the first row of the downloaded CSV); delete every later response unread, as
    the consent form does for a form returned with the 18-or-older box unticked, and report only their count. Log the
    rule as a `docs/DEVIATIONS.md` row before any response is read; it also keeps the double-coverage design intact.
-   Until the importer does this (pending script change), run before §4 step 8:
-
-   ```bash
-   python - <<'EOF'
-   import csv, glob
-   n = 0
-   for p in sorted(glob.glob("data/human/responses/responses_form_*.csv")):
-       with open(p, encoding="utf-8", newline="") as fh:
-           rows = list(csv.reader(fh))
-       n += max(0, len(rows) - 2)                       # header + first response are kept
-       with open(p, "w", encoding="utf-8", newline="") as fh:
-           csv.writer(fh).writerows(rows[:2])
-   print("extra responses deleted unread:", n)
-   EOF
-   ```
-
-   It prints only the count, which goes to `docs/RESULTS_LOG.md`. (Tested on a copy of a simulated response file with
-   two duplicated rows added: it printed `2` and left one response.)
+   **Implemented** in `import-responses` on 1 October 2026 (DEVIATIONS row of that date): only the first response is
+   written; the count of later ones is printed. Delete the later responses from the downloaded CSVs afterwards.
 3. **Fewer than 20 respondents.** *Recommended:* do not rebuild with fewer forms (that would change the 246 items the
    models are scored on); re-send an unreturned form to a reserve volunteer within the window; report items with fewer
    than two judgments.
@@ -349,10 +329,12 @@ All of the following read `human_scores.jsonl`, `returned/demographics.csv` (joi
    20261102) and takes the first 10; it does not de-duplicate originals or select for familiarity or native
    verification. The build from the scratch release put three of the seed's six textbook illustrations of *thay đổi*
    (source `Thú chơi chữ 1990 [UNCERTAIN]`, note "as recalled; NV") into the block, so three of the ten decode to the
-   same phrase and are not natural usage. *Recommended* (pending script change): keep at most one row per original,
-   skip rows whose `note` or `source` contains "same source", "illustration" or `[UNCERTAIN]`, and, after Gate 1, draw
-   only from rows with `verified` = True and `known_any` = True in `data/validation/report/attested_verified.tsv`; log
-   it in `docs/DEVIATIONS.md`. Until then the documents describe the block as drawn at random, not as familiar.
+   same phrase and are not natural usage. **Implemented** on 1 October 2026 (DEVIATIONS row of that date): at most
+   one row per original; rows whose `note` or `source` contains "same source", "illustration" or `[UNCERTAIN]` are
+   skipped, and so are validator-flagged rows; after Gate 1, `make baseline` draws only rows with `verified` = True in
+   `data/validation/report/attested_verified.tsv`. (Restricting further to `known_any` = True, rows a validator knew,
+   is left to the author: it would make the block "familiar" but may leave fewer than ten rows.) The documents describe
+   the block as collected nói lái, not as familiar.
 6. **Retention of `returned/` and `report/`.** `docs/CONSENT_FORM.md` §5 still carries `[RETENTION — author decides]`.
    Set one date for both roles before the consent form is sent; §4 step 11 and §7 point to it.
 

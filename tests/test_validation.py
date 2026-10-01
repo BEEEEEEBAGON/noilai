@@ -1,5 +1,6 @@
 """noilai.validation: the Gate 1 validation packet (docs/gate1/VALIDATION_PROTOCOL.md; DD 10.1 / 10.2 amended 1 Oct 2026)."""
 import random
+import re
 
 import pytest
 
@@ -219,6 +220,10 @@ def test_google_form_script_and_response_import(tmp_path):
     subprocess.run(run + ["google-form", "--dir", str(out)], cwd=root, check=True, capture_output=True, text=True)
     js = (out / "build_forms.gs").read_text(encoding="utf-8")
     assert "setCollectEmail(false)" in js and "requireSelectExactly" in js
+    # what a respondent sees without the PDF and after submitting; links logged one by one; a partial rebuild
+    assert "setConfirmationMessage(f.confirmation)" in js and "consent.setHelpText(f.consent_help)" in js
+    assert "Mã phiếu của bạn: 02" in js and "function buildRange(first, last)" in js
+    assert not re.search(r"\bthô\b", js) and "quen thuộc" not in js             # "coarse", not "raw"; the block is not "familiar"
     if shutil.which("node"):
         r = subprocess.run(["node", "-e", "new Function(require('fs').readFileSync(process.argv[1], 'utf8'))", str(out / "build_forms.gs")],
                            capture_output=True, text=True, check=False)
@@ -230,10 +235,105 @@ def test_google_form_script_and_response_import(tmp_path):
         w = csv.writer(f)
         w.writerow(["Timestamp", "Nhóm tuổi"] + [f"{r['position']}. {r['question_short']}" for r in rows])
         w.writerow(["t", "18–29"] + [f"ans{r['position']}" for r in rows])
-    subprocess.run(run + ["import-responses", "--dir", str(out)], cwd=root, check=True, capture_output=True, text=True)
+        w.writerow(["t2", "50 trở lên"] + ["second" for _r in rows])            # a second submission on one form
+    res = subprocess.run(run + ["import-responses", "--dir", str(out)], cwd=root, check=True, capture_output=True, text=True)
+    assert json.loads(res.stdout.strip().splitlines()[-1])["extra_submissions_dropped"] == {"2": 1}
+    assert not (out / "returned" / "baseline_form_02_r2.csv").exists()
     with open(out / "returned" / "baseline_form_02_r1.csv", encoding="utf-8") as fh:
         back = list(csv.DictReader(fh))
     assert [(r["item_id"], r["answer"]) for r in back] == [(r["item_id"], f"ans{r['position']}") for r in rows]
     with open(out / "returned" / "demographics.csv", encoding="utf-8") as fh:
         demo = list(csv.DictReader(fh))
     assert demo[0]["Nhóm tuổi"] == "18–29" and "Timestamp" not in demo[0]
+
+
+def _synthetic_items():
+    items = []
+    for t in ("T1", "T2", "T3"):
+        for v in ("V1", "V2", "V3", "V4"):
+            for i in range(6):
+                base = {"task": t, "variant": v, "input": f"a{i} b", "vulgar": False, "split": "test"}
+                if t == "T3":
+                    items.append({**base, "item_id": f"T3-{v}-{2 * i:06d}", "gold": "yes", "candidate": "b a", "pair_item_id": f"T3-{v}-{2 * i + 1:06d}"})
+                    items.append({**base, "item_id": f"T3-{v}-{2 * i + 1:06d}", "gold": "no", "candidate": "c a", "pair_item_id": f"T3-{v}-{2 * i:06d}"})
+                else:
+                    items.append({**base, "item_id": f"{t}-{v}-{i:06d}", "gold": [f"b a{i}"] if t == "T1" else [{"output": "b a"}]})
+    return items
+
+
+def test_baseline_forms_leave_out_validator_flagged_items(tmp_path):
+    """DD 11.5: an item a validator flagged offensive never reaches a human form (by id or by a flagged text)."""
+    import json
+    import subprocess
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    p = tmp_path / "items.jsonl"
+    p.write_text("\n".join(json.dumps(x, ensure_ascii=False) for x in _synthetic_items()), encoding="utf-8")
+    flags = tmp_path / "validator_flags.json"
+    flags.write_text(json.dumps({"offensive_item_ids": ["T1-V1-000000"], "offensive_texts": ["b a3"]}), encoding="utf-8")
+    out = tmp_path / "human"
+    r = subprocess.run([sys.executable, "scripts/make_validation_forms.py", "baseline", "--items", str(p), "--out", str(out),
+                        "--n-forms", "4", "--per-form", "24", "--no-model-prompt", "--exclude-flags", str(flags)],
+                       cwd=root, check=True, capture_output=True, text=True)
+    info = json.loads(r.stdout.strip().splitlines()[-1])
+    assert info["items_excluded_by_flags"] == 5 and info["validator_flags"] == str(flags)    # the id + the four T1 golds "b a3"
+    seen = set(json.loads((out / "human_items.json").read_text(encoding="utf-8")))
+    assert seen and "T1-V1-000000" not in seen and not {f"T1-{v}-000003" for v in ("V1", "V2", "V3", "V4")} & seen
+
+
+def test_natural_block_one_row_per_original_no_uncertain_rows_verified_only():
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import make_validation_forms as MVF
+    rows = [{"item_id": f"ATT-{i:04d}", "input": "thay đổi", "attested_output": out, "source": "Thú chơi chữ 1990 [UNCERTAIN]",
+             "note": "same source", "vulgar": False} for i, out in enumerate(("thôi đảy", "đôi thảy"))]
+    rows += [{"item_id": "ATT-0100", "input": "trò chơi", "attested_output": "trời cho", "source": "folk", "vulgar": False},
+             {"item_id": "ATT-0101", "input": "trò chơi", "attested_output": "trơi chò", "source": "folk", "vulgar": False},
+             {"item_id": "ATT-0102", "input": "hiện đại", "attested_output": "hại điện", "source": "folk", "vulgar": False},
+             {"item_id": "ATT-0103", "input": "bí mật", "attested_output": "bị mất", "source": "illustration in a blog", "vulgar": False},
+             {"item_id": "ATT-0104", "input": "đi học", "attested_output": "đọc hi", "source": "folk", "vulgar": True}]
+    block = MVF.natural_block(rows, 10, 1)
+    assert sorted(r["expected"] for r in block) == ["hiện đại", "trò chơi"]           # one per original; uncertain, illustration, vulgar out
+    flagged = {"item_ids": set(), "texts": {MVF.VA.canonical_text("hại điện")}}
+    assert [r["expected"] for r in MVF.natural_block(rows, 10, 1, flagged)] == ["trò chơi"]
+    verified = {(MVF.VA.canonical_text("hiện đại"), MVF.VA.canonical_text("hại điện"))}
+    assert [r["expected"] for r in MVF.natural_block(rows, 10, 1, None, verified)] == ["hiện đại"]
+
+
+def test_second_calibration_set_uses_new_inputs_and_is_scored(tmp_path):
+    """VALIDATION_PROTOCOL §5: the second set keeps the specs, takes the next inputs, leaves out a spec with none
+    left (the single vulgar input) and is scored as `calibration_round2`."""
+    import csv
+    import json
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    from noilai import validation as VA
+    root = Path(__file__).resolve().parents[1]
+    first = VA.build_calibration()
+    (tmp_path / "A_calibration_key.json").write_text(json.dumps(first, ensure_ascii=False), encoding="utf-8")
+    run = [sys.executable, "scripts/make_validation_forms.py"]
+    r = subprocess.run(run + ["calibration2", "--dir", str(tmp_path), "--validators", "B"], cwd=root, check=True,
+                       capture_output=True, text=True)
+    info = json.loads(r.stdout.strip().splitlines()[-1])
+    second = json.loads((tmp_path / "A2_calibration_key.json").read_text(encoding="utf-8"))
+    assert info["rows"] == len(second) >= 12 and "A2-10" in info["left_out_specs"]
+    assert not {VA.phrase_key(x["base_phrase"]) for x in first} & {VA.phrase_key(x["base_phrase"]) for x in second}
+    with open(tmp_path / "A2_calibration_B.csv", encoding="utf-8") as fh:
+        sheet = list(csv.DictReader(fh))
+    assert "key" not in sheet[0] and [x["row_id"] for x in sheet] == [x["row_id"] for x in second]
+    ret = tmp_path / "returned"
+    ret.mkdir()
+    key = {x["row_id"]: x["key"] for x in second}
+    with open(ret / "A2_calibration_B.csv", "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=list(sheet[0].keys()))
+        w.writeheader()
+        for x in sheet:
+            w.writerow({**x, **{j: {"yes": "Có", "no": "Không"}[key[x["row_id"]][j]] for j in ("correct", "spelling", "offensive")}})
+    subprocess.run(run + ["score", "--dir", str(tmp_path), "--returned", str(ret / "*")], cwd=root, check=True,
+                   capture_output=True, text=True)
+    rep = json.loads((tmp_path / "report" / "validation_report.json").read_text(encoding="utf-8"))
+    assert rep["calibration_round2"]["B"]["passes"] and not rep["calibration_round2"]["B"]["to_discuss"]

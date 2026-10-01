@@ -52,9 +52,12 @@ cited as "memo N"). Updated 1 October 2026.
 - **Time:** 30 minutes.
 
 ### 7. Recruit 2–3 native validators (N, C, S) — invitations by 8 October, packet out 12 October (memo 7)
-- **Steps:** send `docs/gate1/RECRUITMENT.md` (VI/EN) to adult native speakers; record region and availability in
-  `data/validation/validators.json` (git-ignored; ids A/B/C and region only); each signs `docs/CONSENT_FORM.md`. Validators
-  and human-baseline respondents must be different people.
+- **Steps:** first fill the consent form's placeholders: `[NAME]`, `[EMAIL]`, the retention date in §5
+  (`[RETENTION — author decides]`) and, if the author is under 18, the adult second contact in §9; have the
+  `[NATIVE-CHECK]` passages read by a native speaker and remove the markers. Then send `docs/gate1/RECRUITMENT.md`
+  (VI/EN) to adult native speakers by personal message only; record region and availability in
+  `data/validation/validators.json` (git-ignored; ids A/B/C and region only); each returns the ticked
+  `docs/CONSENT_FORM.md`. Validators and human-baseline respondents must be different people.
 - **Time:** the message is ready; ~5.4 h of work per validator with three, ~6.9 h with two (`docs/gate1/VALIDATION_PROTOCOL.md`).
 
 ### 8. Build and send the validation packet — by 12 October
@@ -66,8 +69,14 @@ cited as "memo N"). Updated 1 October 2026.
      and the author's keys (`B_key.json`, `A_calibration_key.json`, `D_engine.json`, `E_key.json`: never send these).
   3. Check `data/validation/validation_manifest.json`: `sizes.n_sample` 360, `n_controls` 48, hours per validator.
   4. Upload each workbook to Google Drive → open with Google Sheets (dropdowns survive), share each with its validator only.
-  5. When sheets return: `make validation-score` → `report/validation_report.json`, adjudication and flags.
-- **Time:** ~2 minutes to build, ~20 minutes to upload and share.
+  5. Calibration (13–15 Oct): `make validation-score` scores Part A; a validator below 80% gets the second set,
+     `python scripts/make_validation_forms.py calibration2 --dir data/validation --validators <V> --release data/release/v0.3`.
+  6. After each weekly return: `make validation-score` → `report/validation_report.json`, adjudication, and
+     `data/audit/validator_flags.json`, which **must be committed** before any API run and before `make baseline`
+     (the API screen and the baseline builder read it). Third-validator sheets once per letter (protocol §5).
+  7. By 5 November (the consent form promises it): download each validator's Google Sheet as .xlsx into
+     `data/validation/returned/`, delete the Sheet in Drive, empty the Drive trash, delete any e-mailed workbook.
+- **Time:** ~2 minutes to build, ~20 minutes to upload and share; ~10 minutes per scoring round.
 
 ### 9. GPL permission e-mails — confirm this week (memo 1)
 - **Steps:** confirm that the two permission requests for the Viet74K / Hunspell entries went out on 30 September (the
@@ -105,9 +114,11 @@ cited as "memo N"). Updated 1 October 2026.
 
 ### 14. Human-baseline respondents — recruit by 1 November, forms after Gate 1
 - **Steps:** ~20 adult native speakers who are **not** validators (`docs/gate1/HUMAN_BASELINE_PROTOCOL.md`);
-  `make baseline` → forms; `scripts/make_validation_forms.py google-form` writes the Apps Script that creates the Google
-  Forms in the account holder's own Google account (e-mail collection off, consent required); responses →
-  `import-responses` → `score-baseline`.
+  `make validation-score` first (validator flags and verified attested rows), then `make baseline` → forms;
+  `python scripts/make_validation_forms.py google-form --dir data/human --contact-email <address>` writes the Apps
+  Script that creates the Google Forms in the account holder's own Google account (e-mail collection off, consent
+  required, the form number in the confirmation); responses → `import-responses` (first submission per form) →
+  `score-baseline`. Runbook: `docs/gate1/HUMAN_BASELINE_PROTOCOL.md` §4.
 - **Time:** 30–45 minutes per respondent.
 
 ## Before the stage-2 commit (25 October – 8 November)

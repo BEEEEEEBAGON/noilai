@@ -590,8 +590,7 @@ agreement and adjudication). Commands, from the repository root:
   `D2_qu`, `D3_conventions`, `E_t2gold`), CSV copies `<sheet>_<V>.csv`, and the author-only files that are **never
   sent**: `A_calibration_key.json`, `B_key.json`, `C_rows.json` (the Part C rows, needed by `make validation-score`:
   without it Part C is not scored and `attested_verified.tsv` is not written), `D_engine.json`, `E_key.json`,
-  `validation_manifest.json`. (The manifest's own `keys_never_sent` list omits `C_rows.json` and the manifest; this
-  list is the complete one.) Import each workbook into Google Sheets with File > Import (keeps the dropdowns) and share
+  `validation_manifest.json` (the manifest's `keys_never_sent` lists the same six). Import each workbook into Google Sheets with File > Import (keeps the dropdowns) and share
   it with one validator. Send the per-validator hours from `validation_manifest.json` (`per_validator.hours_estimate`)
   with the sheet (§1 promises it).
 - **Validators' coarse demographics:** §1 tells validators the author asks four questions separately (as consent §5
@@ -611,14 +610,17 @@ agreement and adjudication). Commands, from the repository root:
   letter. Rename the browser's `validation_A (1).xlsx` and Google's `validation_A - B_items.csv` before scoring: the
   first is counted as an extra validator `A (1)` and the second is ignored without a warning. Check that
   `validation_report.json` → `B.validators` lists only A, B, C.
-  **Off-list labels:** the dropdowns do not reject typed text, and `norm_label` stops the whole scoring run on any
-  value outside its lists (e.g. `ko`, `hok`, `có lẽ`) without naming the row; check returned answer columns for such
-  values and correct them with the validator before scoring.
-- **Second calibration set (not buildable yet):** §3 promises it to any validator below 80%, but
-  `scripts/make_validation_forms.py` has no subcommand that builds it, and `noilai.validation.build_calibration` with
-  the round-1 phrases excluded raises an error on spec 10 (T1 V1 vulgar), which has only one input. A builder (a
-  second, native-checked input for spec 10, or a rule that round 2 reuses the round-1 row) and scoring of its returned
-  file must exist before the 15–17 Oct debrief.
+  **Off-list labels:** the workbook's dropdowns are set to reject other values (after the Google Sheets import, check
+  under Data > Data validation that "Reject the input" is on [UNCERTAIN: verify how the import maps it]); `norm_label`
+  stops the whole scoring run on any value outside its lists (e.g. `ko`, `hok`, `có lẽ`), so check returned answer
+  columns for such values and correct them with the validator before scoring.
+- **Second calibration set:** for a validator below 80%,
+  `python scripts/make_validation_forms.py calibration2 --dir data/validation --validators B --release data/release/v0.3`
+  writes `calibration2_B.xlsx` (sheet `A2_calibration`, CSV copy `A2_calibration_B.csv`) and the key
+  `A2_calibration_key.json`: the same specs on the next inputs, the round-1 and release phrases excluded; a spec with no
+  other input is left out rather than repeated (spec 10, the single vulgar input, always; 14 rows on the bare spec
+  lists). Put the returned file in `data/validation/returned/` and run `make validation-score`: the report's
+  `calibration_round2` block scores it like round 1.
 - **Third-validator sheets (three validators):** run once per letter,
   `for V in A B C; do python scripts/make_validation_forms.py adjudication-sheet --dir data/validation --to $V; done`.
   Each `B_adjudicate_<V>.csv` holds the rows split between the other two validators, with blank judgments (with the
@@ -627,11 +629,12 @@ agreement and adjudication). Commands, from the repository root:
   (yes/no), `reason` and `date` in `data/validation/adjudication.tsv` and rescore; the scorer never lets a decision
   override agreeing validators. `adjudication.tsv` also holds each validator's judgments and comments, so it is not
   released (§10 tells validators only the count of author decisions is reported).
-- **Offensive flags (not implemented yet):** §10 tells validators that a flagged item is kept out of API prompts and
-  out of the human-baseline form. `make validation-score` writes `data/validation/report/item_flags.tsv` and
-  `attested_verified.tsv` (`offensive_any`), but no code reads them: `baseline_design()` and `natural_block()` in
-  `scripts/make_validation_forms.py` filter only on the release's own `vulgar` field, and `noilai/eval/run.py` checks
-  only `never_to_api`. The exclusion must be wired in before `make baseline` (2 Nov) and before any API run.
+- **Offensive flags:** §10 tells validators that a flagged item is kept out of API prompts and out of the
+  human-baseline form. `make validation-score` writes `data/audit/validator_flags.json` (the flagged items' ids and
+  texts, no validator letters; commit it): the API screen of `noilai/eval/run.py` drops every item it names from every
+  API run (counted in the run manifest's `api_safety`), and `make baseline` leaves those items and attested rows off the
+  forms (`--exclude-flags`). Re-run `make validation-score` after every batch of returns, before `make baseline` and
+  before the first API run.
 - **Vulgar rows and an under-18 author:** §4 and §6 ask validators not to write vulgar readings out. If the author is
   under 18, the adult co-contact reads the Part C comments on flagged rows.
 - **Before sending, check the two non-demonstration example phrases against the built release** (the release

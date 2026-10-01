@@ -1575,7 +1575,10 @@ def test_makefile_builds_the_plans_release_and_refuses_the_superseded_baseline_d
     baseline = mk[mk.index("baseline:"):mk.index("lint:")]
     assert "--per-form 40" not in baseline, "the superseded 20 x 40 design is gone (DD 10.2 / 12.20)"
     assert "--items $(RELEASE)/noilai_main.jsonl" in baseline and "--n-forms 20 --per-form 30" in baseline, "DD 10.2: 20 x 30 from the main sample"
-    assert "d['distinct_items'] == 246" in baseline and "d['min_appearances'] == 2" in baseline and "d['max_appearances'] == 20" in baseline
+    for want in ("'forms': 20", "'per_form': 30", "'anchors': 6", "'distinct_items': 246", "'min_appearances': 2",
+                 "'max_appearances': 20", "'anchors_seen_by': 20", "'others': [2]", "'rater_graph_connected': True"):
+        assert want in baseline, want                                      # all nine design values are checked by the target
+    assert "--exclude-flags data/audit/validator_flags.json" in baseline   # DD 11.5: validator-flagged items never reach a form
     assert "exit 1" in baseline and "rm -f data/human/baseline_form_*.csv" in baseline and "HUMAN_BASELINE_FORM.md" in baseline, \
         "forms that are not the 246-item design are deleted, never left to be sent (item 66)"
     assert "--seed 20261102" in baseline           # the public sampling seed of docs/HUMAN_BASELINE_FORM.md, never the build seed

@@ -85,6 +85,8 @@ def build_parser() -> argparse.ArgumentParser:
                          "manifest; the paper's sub-samples are seeded files from scripts/sample_items.py (DD 4.5 / 12.32)")
     ap.add_argument("--sample-seed", type=int, default=DEFAULT_SEED)
     ap.add_argument("--sample-keep-vulgar", action="store_true", help="keep vulgar-flagged items in the sample")
+    ap.add_argument("--validator-flags", default=None,
+                    help="validators' offensive flags (DD 11.5) an API run excludes; default data/audit/validator_flags.json if present")
     ap.add_argument("--in-core-only", action="store_true")
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--run-id")
@@ -168,7 +170,7 @@ def main(argv=None) -> int:
         in_core_only=args.in_core_only, resume=args.resume, allow_noncore_api=args.allow_noncore_api,
         core_to_training_provider_opt_out=args.core_to_training_provider_opt_out, allow_thinking=args.allow_thinking,
         allow_demo_overlap=args.allow_demo_overlap, demo_overlap_policy=args.demo_overlap_policy,
-        attested_policy=args.attested_policy,
+        attested_policy=args.attested_policy, validator_flags=args.validator_flags,
         max_new_tokens=args.max_new_tokens or int(entry.get("max_new_tokens") or 64), batch_size=args.batch_size,
         logprobs=not args.no_logprobs, t1_forced_choice=args.t1_forced_choice, input_format=args.input_format, instruction=args.instruction,
         language=args.language, seed=int(entry.get("seed", 0)), run_id=args.run_id, out_root=args.out_root,

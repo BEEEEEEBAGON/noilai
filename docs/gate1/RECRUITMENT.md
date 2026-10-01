@@ -105,7 +105,7 @@ không? Để so sánh, tôi cần biết người bản ngữ làm những câu
 
 Tôi tìm khoảng 20 người, mỗi người làm một phiếu Google Form, khoảng 30–45 phút, trong 2–8/11/2026.
 Phiếu có 30 câu nói lái (tự nói lái, giải, hoặc phán đoán đúng/sai) kèm đúng hướng dẫn và ví dụ mà mô hình nhận được,
-thêm 10 câu nói lái quen thuộc để giải. Xin làm một mình, không dùng từ điển, công cụ tìm kiếm hay trợ lý AI. Các câu
+thêm 10 câu nói lái sưu tầm để giải. Xin làm một mình, không dùng từ điển, công cụ tìm kiếm hay trợ lý AI. Các câu
 đã biết là thô tục đã được loại khỏi phiếu; nếu vẫn gặp câu làm bạn khó chịu, hãy bỏ qua. [NATIVE-CHECK]
 
 Đây là việc tình nguyện, không thù lao, chỉ dành cho người từ 18 tuổi trở lên, không phụ thuộc vào tôi (tôi không chấm
@@ -126,7 +126,7 @@ To compare them with people, I need to know how native speakers do on the same q
 
 I am looking for about 20 people to fill in one Google Form each, once, in about 30–45 minutes, between 2 and
 8 November 2026. The form has 30 nói lái questions (produce, decode or judge one) with the same instructions and
-examples the models receive, plus 10 familiar nói lái to decode. Please work alone, without a dictionary, a search
+examples the models receive, plus 10 collected nói lái to decode. Please work alone, without a dictionary, a search
 engine or an AI assistant. Items known to be vulgar have been removed from the form; if one still bothers you, skip it.
 
 This is unpaid volunteer work, open only to adults (18 or older) who do not depend on me (I do not grade, supervise or

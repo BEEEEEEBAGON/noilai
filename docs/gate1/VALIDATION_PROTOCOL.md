@@ -105,10 +105,10 @@ estimate and on the absence of any confirmed rule bug.
 | by 12 Oct | recruit 2–3 validators and ~20 baseline respondents (different people); send consent forms | author |
 | by 12 Oct | `make validation`; upload the workbooks to Google Sheets; share each with one validator | author (BLOCKED.md) |
 | 13–15 Oct | **Part A, calibration** (≈ 10 min); the author scores it (`make validation-score`, `calibration` block), sends each validator the key with the explanations of the rows they missed | validators, author |
-| 15–17 Oct | calibration debrief: if a validator matches the key on fewer than 80% of `correct` answers (`VALIDATION_CALIBRATION_PASS`), a short call or message and the second calibration set (the same specs, next inputs); nobody is excluded on calibration; any change to the instructions is versioned and logged here | author |
+| 15–17 Oct | calibration debrief: if a validator matches the key on fewer than 80% of `correct` answers (`VALIDATION_CALIBRATION_PASS`), a short call or message and the second calibration set (the same specs, next inputs: `make_validation_forms.py calibration2 --dir data/validation --validators <V> --release data/release/v0.3`; a spec with no other input, e.g. the single vulgar one, is left out; scored as `calibration_round2`); nobody is excluded on calibration; any change to the instructions is versioned and logged here | author |
 | **18 Oct** | **Gate 1**: packet sent, calibration done | |
 | 19 Oct – 1 Nov | Parts B, C, D (and E); validators return what they have each week | validators |
-| 2–5 Nov | score; adjudication (§6); third-validator sheet (`make_validation_forms.py adjudication-sheet --to C`); author decisions logged | author, third validator |
+| 2–5 Nov | score (`make validation-score`, which also writes `data/audit/validator_flags.json`: commit it); adjudication (§6); third-validator sheets, once per letter (`make_validation_forms.py adjudication-sheet --to <V>` for V = A, B, C: each holds the rows split between the other two); author decisions logged | author, third validator |
 | by 8 Nov | confirmed rule bugs fixed and the data regenerated (PREREG §5 rule 2) — before any test-split run; attested rows merged only by the author's decision (`docs/DEVIATIONS.md`) | author |
 
 No AI assistant and no discussion between validators before submission; a dictionary is allowed for the lexicality
@@ -118,7 +118,7 @@ question only.
 
 **Agreement** (`make validation-score` → `data/validation/report/validation_report.json`): for each judgment, nominal α
 on yes/no with "Không chắc" as missing (primary) and as a third category (sensitivity), Gwet's AC1, raw pairwise
-agreement and the label marginals, each with a 1,000-replicate item bootstrap CI. Primary agreement is computed over all
+agreement and the label marginals; α and AC1 each with a 1,000-replicate item bootstrap CI. Primary agreement is computed over all
 Part B rows (controls included); the sample-only figures are reported beside it. Part C: the same for `valid`, `known`,
 `spelling_ok`, `offensive`. Part E: MASI- and Jaccard-distance α over the overlap items (DD 10.1).
 
@@ -135,8 +135,10 @@ Part B rows (controls included); the sample-only figures are reported beside it.
 
 **Low control catch rate** (pre-specified): a validator who labels fewer than 75% of the planted controls Không (`VALIDATION_CONTROL_CATCH_MIN`) is re-briefed after the first weekly return and the rate is reported in the paper; no validator's labels are excluded or down-weighted on it.
 
-**Offensive**: one validator's "Có" flags the item (union rule; conservative); flagged items join the blocklist screen
-(DD 11.5). **Dialect**: the union of the mergers named. **`RULE?` comments**: every one is checked by the author against
+**Offensive**: one validator's "Có" flags the item (union rule; conservative). `score` writes the flagged Part B items'
+ids and candidate texts and the flagged Part C rows' input and output texts to `data/audit/validator_flags.json` (no
+validator letters); the API screen of `noilai/eval/run.py` drops every item it names from every API run and the
+baseline builder (`--exclude-flags`) keeps them off the human forms (DD 11.5). **Dialect**: the union of the mergers named. **`RULE?` comments**: every one is checked by the author against
 the rule tables; a confirmed bug → fix + full regeneration before any model run.
 
 **Generator precision** (`stratified_precision`): per cell p = Σ_h W_h p_h with W_h the stratum's population share; the
@@ -145,7 +147,8 @@ pooled estimate weights cells by population; unweighted Wilson intervals beside 
 **Attested rows** (`attested_verified.tsv`): a row is **native-verified** when at least two validators answer `valid` =
 Có and none answers Không. A verified row enters `data/attested_seed.tsv` only by the author's decision, with its
 citation checked on the live page (`source_checked` in `data/attested_candidates.tsv`), its `verified_by` set to the
-validator letters, and a `docs/DEVIATIONS.md` row (DD 4.1: a row added after the build never triggers a regeneration;
+letters of the validators who answered `valid` = Có (the `verified_by` column of `attested_verified.tsv`), and a
+`docs/DEVIATIONS.md` row (DD 4.1: a row added after the build never triggers a regeneration;
 overlapping generated items get `attested_overlap`).
 
 **H6 floor arithmetic, stated plainly**: the seed has 24 H6-eligible rows (exact, two-syllable, 0 verified); the
@@ -157,7 +160,9 @@ rejections; see BLOCKED.md and the decision memo (the fallback is the pre-regist
 
 Committed wording for agreement (so that it is not chosen after the numbers exist): "α on `correct` is computed over the Part B sheet including its N planted control rows; the probability-sample-only α and AC1 are reported beside it."
 
-Number of validators and their regions; hours; α / AC1 / raw agreement / marginals per judgment with CIs; per-validator
+Number of validators and their regions (a validator's letter is never printed next to their region; with one
+validator per region, a regional result is that person's answers and is said to be so); hours; α and AC1 with CIs, raw
+agreement and marginals per judgment; per-validator
 control catch rate; adjudication counts (unanimous / majority / author / unresolved); generator precision pooled (main
 text) and per cell (appendix); offensive-flag rate with α; dialect-flag counts by merger and by validator region; the
 D1 production table by region; the qu- and convention results; attested rows verified, by collection.

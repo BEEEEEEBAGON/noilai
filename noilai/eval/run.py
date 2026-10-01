@@ -31,7 +31,8 @@ Safety guards
   * an API backend refuses an item file whose path contains validation / human / sealed, one
     flagged never_to_api (header, item or sibling manifest), non-core items unless
     allow_noncore_api (the core set and the public attested examples are API-eligible), and
-    never sends an attested item whose `vulgar` flag is set (counted in the manifest);
+    never sends an attested item whose `vulgar` flag is set, nor an item the native validators flagged as offensive
+    (`data/audit/validator_flags.json`, DD 11.5); both counts go to the manifest;
   * a provider whose terms train on inputs, or whose terms are unknown (no explicit
     `trains_on_inputs: false` in the models file), never receives a core item
     (DESIGN_DECISIONS 11.2 / 12.41): run it on the dev-derived API set, or pass
@@ -157,6 +158,7 @@ class RunOptions:
     allow_demo_overlap: bool = False          # override the phrase-level refusal (dev pilots only)
     demo_overlap_policy: str = "flag"         # syllable-level overlap: flag | drop | refuse
     attested_policy: str = "exact2"           # exact2 | all
+    validator_flags: str | None = None        # validators' offensive flags (DD 11.5); None = data/audit/validator_flags.json if present
     max_new_tokens: int = 64
     batch_size: int = 8
     logprobs: bool = True                 # when the backend supports them (T3 forced choice, XCOPA)
@@ -231,6 +233,32 @@ def read_canary(path: Path, items: list[dict]) -> str | None:
 def is_vulgar(item: dict) -> bool:
     v = item.get("vulgar")
     return v is True or (isinstance(v, str) and v.strip().lower() in ("yes", "true", "1"))
+
+
+VALIDATOR_FLAGS = AUDIT_DIR / "validator_flags.json"
+
+
+def load_validator_flags(path: str | Path | None = None) -> dict:
+    """The native validators' offensive flags (DESIGN_DECISIONS 10.1 / 11.5: one validator's "Có" flags an item), as
+    written by `scripts/make_validation_forms.py score`: item ids and canonical texts, no validator letters. Absent
+    file (before Gate 1) = nothing flagged; the source path is recorded in the run manifest."""
+    p = Path(path) if path else VALIDATOR_FLAGS
+    if not p.exists():
+        return {"item_ids": set(), "texts": set(), "source": None}
+    d = json.loads(p.read_text(encoding="utf-8"))
+    return {"item_ids": set(d.get("offensive_item_ids") or []),
+            "texts": {R.canonical_text(t) for t in d.get("offensive_texts") or [] if t},
+            "source": str(p.relative_to(ROOT)) if p.is_relative_to(ROOT) else str(p)}
+
+
+def flagged_by_validators(item: dict, flags: dict) -> bool:
+    """An item the validators flagged (by id), or one whose input, candidate, gold or attested output is a flagged text."""
+    if item.get("item_id") in flags["item_ids"]:
+        return True
+    if not flags["texts"]:
+        return False
+    texts = [item.get("input"), item.get("candidate"), item.get("attested_output"), item.get("output"), *(item.get("gold") or [])]
+    return any(isinstance(t, str) and t and R.canonical_text(t) in flags["texts"] for t in texts)
 
 
 def attested_eligible(item: dict, policy: str = "exact2") -> tuple[bool, str | None]:
@@ -322,8 +350,8 @@ def check_api_safety(backend: Backend, items: list[dict], opts: RunOptions,
     False (True, a string, or unknown = not cleared) never receives a core item unless
     `opts.core_to_training_provider_opt_out` documents a key with a data-use opt-out."""
     privacy = privacy or {}
-    report = {"is_api": backend.is_api, "n_excluded_vulgar": 0, "n_noncore": 0, "n_core": 0,
-              "trains_on_inputs": privacy.get("trains_on_inputs"),
+    report = {"is_api": backend.is_api, "n_excluded_vulgar": 0, "n_excluded_validator_flag": 0, "validator_flags": None,
+              "n_noncore": 0, "n_core": 0, "trains_on_inputs": privacy.get("trains_on_inputs"),
               "core_to_training_provider_opt_out": bool(opts.core_to_training_provider_opt_out)}
     if not backend.is_api:
         return items, report
@@ -338,10 +366,15 @@ def check_api_safety(backend: Backend, items: list[dict], opts: RunOptions,
     if noncore and not opts.allow_noncore_api:
         raise ApiSafetyError(f"{len(noncore)} items are not in the core set; an API backend receives the core only "
                              f"(pass --allow-noncore-api to override for a dev-set pilot)")
+    flags = load_validator_flags(opts.validator_flags)
+    report["validator_flags"] = flags["source"]
     kept = []
     for it in items:
         if is_vulgar(it):
             report["n_excluded_vulgar"] += 1
+            continue
+        if flagged_by_validators(it, flags):      # DD 11.5: validator-flagged items never reach a hosted model
+            report["n_excluded_validator_flag"] += 1
             continue
         kept.append(it)
     core = [it for it in kept if it.get("in_core")]

@@ -42,6 +42,7 @@ sys.path.insert(0, str(ROOT))
 
 from noilai import constants as C
 from noilai import validation as VA
+from noilai.eval import run as RN
 from noilai.gen.generate import load_items
 
 PACKET_SEED = 20261018               # public sampling seed of the validation packet (Gate 1, 18 October 2026)
@@ -73,6 +74,7 @@ SHEETS = {
     "E_t2gold": ["row_id", "noilai_form", "reading_1", "accept_1", "reading_2", "accept_2", "reading_3", "accept_3",
                  "missing_reading", "comment"],
 }
+SHEETS["A2_calibration"] = SHEETS["A_calibration"]   # the second calibration set (VALIDATION_PROTOCOL §5)
 YESNO_COLUMNS = {"correct", "spelling", "lexical_input", "lexical_candidate", "offensive", "known", "valid", "spelling_ok",
                  "accept_1", "accept_2", "accept_3"}
 
@@ -103,9 +105,11 @@ def _write_xlsx(path: Path, sheets: dict[str, list[dict]]) -> bool:
         for r in rows:
             ws.append([r.get(k, "") for k in fields])
         n = max(2, len(rows) + 1)
-        yn = DataValidation(type="list", formula1='"Có,Không,Không chắc"', allow_blank=True)
-        dia = DataValidation(type="list", formula1='"' + ",".join(VA.DIALECT_CHOICES) + '"', allow_blank=True)
-        ab = DataValidation(type="list", formula1='"A,B,cả hai,không cái nào"', allow_blank=True)
+        err = {"showErrorMessage": True, "errorTitle": "Không hợp lệ / Invalid",     # [NATIVE-CHECK]
+               "error": "Chọn trong danh sách / Pick a value from the list"}
+        yn = DataValidation(type="list", formula1='"Có,Không,Không chắc"', allow_blank=True, **err)
+        dia = DataValidation(type="list", formula1='"' + ",".join(VA.DIALECT_CHOICES) + '"', allow_blank=True, **err)
+        ab = DataValidation(type="list", formula1='"A,B,cả hai,không cái nào"', allow_blank=True, **err)
         ws.add_data_validation(yn)
         ws.add_data_validation(dia)
         ws.add_data_validation(ab)
@@ -245,7 +249,8 @@ def cmd_packet(args) -> int:
                   "attested_rows": len(part_c), "D1": len(sup["D1"]), "D2": len(sup["D2"]), "D3": len(sup["D3"]),
                   "t2_gold_items": len(part_e["rows"]) if part_e else 0},
         "strata": part_b["strata"], "per_validator": per_validator, "xlsx_written": wrote_xlsx,
-        "keys_never_sent": ["A_calibration_key.json", "B_key.json", "D_engine.json", "E_key.json"],
+        "keys_never_sent": ["A_calibration_key.json", "B_key.json", "C_rows.json", "D_engine.json", "E_key.json",
+                            "validation_manifest.json"],
     }
     (out / "validation_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
     print(json.dumps({k: manifest[k] for k in ("sizes", "per_validator", "xlsx_written")}, ensure_ascii=False))
@@ -286,6 +291,30 @@ def _read_author_decisions(path: Path) -> dict:
                 if r.get("decision", "").strip().lower() in ("yes", "no")}
 
 
+def cmd_calibration2(args) -> int:
+    """The second calibration set (VALIDATION_PROTOCOL §5): for a validator who matched the key on fewer than
+    VALIDATION_CALIBRATION_PASS of the `correct` answers, the same specs on the next inputs (the first round's phrases
+    and the release phrases excluded; a spec with no other input, e.g. the single vulgar one, is left out). Writes
+    calibration2_<V>.xlsx / A2_calibration_<V>.csv per validator named and the author's A2_calibration_key.json;
+    `score` then reports `calibration_round2`."""
+    d = Path(args.dir)
+    first = json.loads((d / "A_calibration_key.json").read_text(encoding="utf-8"))
+    keys = set()
+    if args.release:
+        rel = Path(args.release)
+        keys = VA.release_phrase_keys(load_items(rel / "noilai_test.jsonl") + load_items(rel / "noilai_dev.jsonl"))
+    calib = VA.build_calibration(keys, exclude_inputs={r["base_phrase"] for r in first}, prefix="A2", skip_unavailable=True)
+    sheet = [{k: r[k] for k in r if k not in ("key", "explanation_vi", "explanation_en", "manipulation", "base_phrase")}
+             for r in calib]
+    for v in args.validators:
+        _write_csv(d / f"A2_calibration_{v}.csv", SHEETS["A2_calibration"], sheet)
+        _write_xlsx(d / f"calibration2_{v}.xlsx", {"A2_calibration": sheet})
+    (d / "A2_calibration_key.json").write_text(json.dumps(calib, ensure_ascii=False, indent=1), encoding="utf-8")
+    left_out = sorted({f"A2-{j + 1:02d}" for j in range(len(VA.CALIBRATION_SPECS))} - {r["row_id"] for r in calib})
+    print(json.dumps({"rows": len(calib), "left_out_specs": left_out, "validators": args.validators}, ensure_ascii=False))
+    return 0
+
+
 def cmd_score(args) -> int:
     d = Path(args.dir)
     returned = _read_returned(args.returned)
@@ -299,6 +328,11 @@ def cmd_score(args) -> int:
     if (d / "A_calibration_key.json").exists() and "A_calibration" in returned:
         calib = json.loads((d / "A_calibration_key.json").read_text(encoding="utf-8"))
         report["calibration"] = {v: VA.score_calibration(rows, calib) for v, rows in returned["A_calibration"].items()}
+    if (d / "A2_calibration_key.json").exists() and "A2_calibration" in returned:
+        calib2 = json.loads((d / "A2_calibration_key.json").read_text(encoding="utf-8"))
+        report["calibration_round2"] = {v: VA.score_calibration(rows, calib2) for v, rows in returned["A2_calibration"].items()}
+    flagged_ids: set[str] = set()
+    flagged_texts: set[str] = set()
     # Part B
     if (d / "B_key.json").exists() and "B_items" in returned:
         key = json.loads((d / "B_key.json").read_text(encoding="utf-8"))
@@ -327,6 +361,13 @@ def cmd_score(args) -> int:
             w.writerow(["row_id", "item_id", "final_correct", "offensive_any", "dialect", "rule_flag"])
             for rid, fl in sorted(b["item_flags"].items()):
                 w.writerow([rid, fl["item_id"], b["final"].get(rid) or "", fl["offensive_any"], ",".join(fl["dialect"]), fl["rule_flag"]])
+        cand = {r["row_id"]: r.get("candidate") or "" for rows in returned["B_items"].values() for r in rows}
+        for rid, fl in b["item_flags"].items():
+            if fl["offensive_any"]:
+                if not key.get(rid, {}).get("control"):          # a control's item is not the text shown
+                    flagged_ids.add(fl["item_id"])
+                if cand.get(rid):
+                    flagged_texts.add(VA.canonical_text(cand[rid]))
     # Part C
     if (d / "C_rows.json").exists() and "C_attested" in returned:
         rows = json.loads((d / "C_rows.json").read_text(encoding="utf-8"))
@@ -334,12 +375,15 @@ def cmd_score(args) -> int:
         report["C"] = {k: c[k] for k in ("agreement", "n_rows", "n_verified")}
         with open(rep_dir / "attested_verified.tsv", "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f, delimiter="\t")
-            w.writerow(["row_id", "input", "output", "source", "verified", "valid_votes", "known_any", "spelling_disputed",
-                        "your_forms", "offensive_any", "dialect", "validators"])
+            w.writerow(["row_id", "input", "output", "source", "verified", "verified_by", "valid_votes", "known_any",
+                        "spelling_disputed", "your_forms", "offensive_any", "dialect", "validators"])
             for r in c["rows"]:
-                w.writerow([r["row_id"], r["input"], r["output"], r["source"], r["verified"], json.dumps(r["valid"], ensure_ascii=False),
-                            r["known_any"], r["spelling_disputed"], " | ".join(r["your_forms"]), r["offensive_any"],
-                            ",".join(r["dialect"]), ",".join(r["validators"])])
+                by = ",".join(v for v, lab in sorted(r["valid"].items()) if lab == "yes") if r["verified"] else ""
+                w.writerow([r["row_id"], r["input"], r["output"], r["source"], r["verified"], by,
+                            json.dumps(r["valid"], ensure_ascii=False), r["known_any"], r["spelling_disputed"],
+                            " | ".join(r["your_forms"]), r["offensive_any"], ",".join(r["dialect"]), ",".join(r["validators"])])
+                if r["offensive_any"]:
+                    flagged_texts.update(VA.canonical_text(t) for t in (r["input"], r["output"]) if t)
     # Part D: returned as is, classified by the engine for D1
     if "D1_production" in returned and (d / "D_engine.json").exists():
         eng = {r["row_id"]: r for r in json.loads((d / "D_engine.json").read_text(encoding="utf-8"))["D1"]}
@@ -365,6 +409,17 @@ def cmd_score(args) -> int:
         e = VA.score_part_e(returned["E_t2gold"], key_e)
         report["E"] = {k: e[k] for k in ("alpha_masi", "alpha_jaccard", "n_items_returned", "n_items_multi_coded")}
         (rep_dir / "t2_validated_gold.json").write_text(json.dumps(e["validated_gold"], ensure_ascii=False, indent=1), encoding="utf-8")
+    if "B" in report or "C" in report:
+        # DD 10.1 / 11.5: one validator's "Có" in `offensive` flags the item; the API screen of noilai.eval.run and the
+        # baseline builder read this file (item ids and canonical texts only, no validator letters). `make validation-score`
+        # writes it to data/audit/validator_flags.json, the path the runs read.
+        flags_out = Path(args.flags_out) if args.flags_out else rep_dir / "validator_flags.json"
+        flags_out.parent.mkdir(parents=True, exist_ok=True)
+        flags_out.write_text(json.dumps({"generated_by": "scripts/make_validation_forms.py score", "created_utc": report["created_utc"],
+                                         "rule": "one validator's offensive = yes flags the item (union; DESIGN_DECISIONS 10.1 / 11.5)",
+                                         "offensive_item_ids": sorted(flagged_ids), "offensive_texts": sorted(flagged_texts)},
+                                        ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        report["validator_flags"] = {"path": str(flags_out), "n_item_ids": len(flagged_ids), "n_texts": len(flagged_texts)}
     (rep_dir / "validation_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
     print(json.dumps({k: (v if k != "B" else {"precision": v["generator_precision"]["pooled"],
                                               "alpha_correct": v["agreement"]["correct"].get("alpha")})
@@ -445,29 +500,65 @@ def baseline_design(items: list[dict], n_forms: int, per_form: int, seed: int, n
     return {"anchors": anchors, "pool": pool, "forms": forms, "per_cell": per_cell}
 
 
-def natural_block(attested: list[dict], n: int, seed: int) -> list[dict]:
-    """The 10-item natural-competence block (design 10.2): T2 on attested two-syllable, non-vulgar rows."""
+NATURAL_SKIP_MARKS = ("[UNCERTAIN]", "same source", "illustration")
+
+
+def natural_block(attested: list[dict], n: int, seed: int, flags: dict | None = None,
+                  verified: set[tuple[str, str]] | None = None) -> list[dict]:
+    """The 10-item natural-competence block (design 10.2): T2 on attested two-syllable, non-vulgar rows; one row per
+    original (a textbook's six forms of one phrase would otherwise fill the block), rows whose source or note is
+    uncertain or a mere illustration skipped, validator-flagged rows skipped, and -- once Part C is scored -- only
+    native-verified rows (`verified`: canonical (input, output) pairs from attested_verified.tsv)."""
+    flags = flags or {"item_ids": set(), "texts": set()}
     rows = [r for r in attested if not r.get("vulgar") and len((r.get("input") or "").split()) == 2
-            and len((r.get("attested_output") or r.get("output") or "").split()) == 2]
+            and len((r.get("attested_output") or r.get("output") or "").split()) == 2
+            and not any(m.lower() in f"{r.get('source') or ''} {r.get('note') or ''}".lower() for m in NATURAL_SKIP_MARKS)
+            and not RN.flagged_by_validators(r, flags)]
+    if verified is not None:
+        rows = [r for r in rows if (VA.canonical_text(r["input"]), VA.canonical_text(r.get("attested_output") or r.get("output")))
+                in verified]
     rows = sorted(rows, key=lambda r: (r.get("item_id") or r.get("input")))
     random.Random(seed).shuffle(rows)
+    seen, picked = set(), []
+    for r in rows:
+        k = VA.canonical_text(r["input"])
+        if k not in seen:
+            seen.add(k)
+            picked.append(r)
     out = []
-    for r in rows[:n]:
+    for r in picked[:n]:
         lai = r.get("attested_output") or r.get("output")
         out.append({"item_id": r.get("item_id") or f"ATT-{len(out) + 1:02d}", "task": "natural", "variant": "",
                     "prompt_vi": f"“{lai}” là cách nói lái của cụm từ nào? [NATIVE-CHECK]", "expected": r["input"]})
     return out
 
 
+def _read_verified(path: Path) -> set[tuple[str, str]]:
+    with open(path, encoding="utf-8") as fh:
+        return {(VA.canonical_text(r["input"]), VA.canonical_text(r["output"])) for r in csv.DictReader(fh, delimiter="\t")
+                if str(r.get("verified")).lower() == "true"}
+
+
 def cmd_baseline(args) -> int:
     rng = random.Random(args.seed)
-    design = baseline_design(load_items(Path(args.items)), args.n_forms, args.per_form, args.seed, args.anchors, args.per_cell)
+    flags = RN.load_validator_flags(args.exclude_flags)
+    if args.exclude_flags and flags["source"] is None:
+        print(f"WARNING: {args.exclude_flags} not found: no validator flag is applied (score the validation first)", file=sys.stderr)
+    all_items = load_items(Path(args.items))
+    items = [it for it in all_items if not RN.flagged_by_validators(it, flags)]
+    design = baseline_design(items, args.n_forms, args.per_form, args.seed, args.anchors, args.per_cell)
     anchors, pool, forms = design["anchors"], design["pool"], design["forms"]
     nat = []
+    verified = None
+    if args.attested_verified:
+        if Path(args.attested_verified).exists():
+            verified = _read_verified(Path(args.attested_verified))
+        else:
+            print(f"WARNING: {args.attested_verified} not found: the natural block is not restricted to verified rows", file=sys.stderr)
     if args.attested and Path(args.attested).exists():
         with open(args.attested, encoding="utf-8") as fh:
             att = [json.loads(line) for line in fh if line.strip()]
-        nat = natural_block([r for r in att if "_header" not in r], NATURAL_BLOCK_ITEMS, args.seed)
+        nat = natural_block([r for r in att if "_header" not in r], NATURAL_BLOCK_ITEMS, args.seed, flags, verified)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     fields = ["form", "position", "item_id", "task", "variant", "block", "prompt_model", "prompt_hash", "question_short", "answer"]
@@ -503,6 +594,8 @@ def cmd_baseline(args) -> int:
             "shared_items_per_form_pair": {str(k): v for k, v in sorted(shared.items())},
             "rater_graph_connected": 0 not in shared, "seed": args.seed, "items_file": str(args.items),
             "check_items_per_form": 1, "natural_block_items": len(nat), "closing_items": [c["item_id"] for c in CLOSING_ITEMS],
+            "validator_flags": flags["source"], "items_excluded_by_flags": len(all_items) - len(items),
+            "natural_block_verified_only": verified is not None,
             "design": "DESIGN_DECISIONS 10.2: anchors on every form, every other item on exactly two forms, cyclic double coverage"}
     (out / "human_items.json").write_text(json.dumps(sorted(cover), ensure_ascii=False), encoding="utf-8")
     (out / "baseline_manifest.json").write_text(json.dumps({**info, "anchor_ids": sorted(anchor_ids),
@@ -578,16 +671,22 @@ def cmd_score_baseline(args) -> int:
 
 
 # --------------------------------------------------------------------------- Google Forms (baseline)
+# [NATIVE-CHECK] every Vietnamese string below (intro, consent boxes and help, demographics, confirmation); the markers
+# inside the strings are removed from build_forms.gs after the check (docs/gate1/HUMAN_BASELINE_PROTOCOL.md §4 step 3)
 FORM_INTRO_VI = (
     "Cảm ơn bạn đã tham gia. Bạn sẽ làm 30 câu nói lái, giống hệt các câu mà các mô hình ngôn ngữ nhận được (mỗi câu có "
     "phần hướng dẫn và ba ví dụ mẫu; phần hướng dẫn lặp lại ở mỗi câu, bạn chỉ cần đọc kỹ ở vài câu đầu), sau đó 10 câu "
-    "giải nói lái quen thuộc và hai câu hỏi cuối. Xin không dùng từ điển, công cụ tìm kiếm hay trợ lý AI; nếu không biết, "
-    "hãy để trống hoặc đoán. Thời gian khoảng 30–45 phút. [NATIVE-CHECK]")
+    "nói lái sưu tầm để giải và hai câu hỏi cuối. Xin đừng dùng từ điển, công cụ tìm kiếm hay trợ lý AI; nếu không biết, "
+    "hãy để trống hoặc đoán. Nếu gặp câu làm bạn khó chịu, hãy bỏ qua. Thời gian khoảng 30–45 phút. [NATIVE-CHECK]")
 CONSENT_BOXES_VI = (
     "Tôi từ 18 tuổi trở lên.",
     "Tôi đã đọc phiếu thông tin và đồng ý tham gia; tôi hiểu việc tham gia là tự nguyện, không được trả tiền và tôi có thể dừng bất cứ lúc nào.",
-    "Tôi đồng ý cho lưu các câu trả lời và thông tin nhân khẩu học thô, và cho công bố chúng dưới dạng tổng hợp, ẩn danh.",
+    "Tôi đồng ý cho lưu các câu trả lời và thông tin nhân khẩu học ở mức khái quát, và cho công bố chúng dưới dạng tổng hợp, ẩn danh.",
 )
+# docs/HUMAN_BASELINE_FORM.md §2.1: what a respondent sees without opening the PDF, and after submitting
+CONSENT_HELP_VI = ("Tóm tắt: tình nguyện, không trả tiền; phiếu không ghi tên; nghiên cứu chưa được hội đồng đạo đức xét duyệt; "
+                   "muốn rút lui, báo mã phiếu {nn} tới {email} trước {until}. [NATIVE-CHECK]")
+CONFIRMATION_VI = "Cảm ơn bạn. Mã phiếu của bạn: {nn}. Muốn rút lui, báo mã này tới {email} trước {until}. [NATIVE-CHECK]"
 DEMOGRAPHICS_VI = (
     ("Nhóm tuổi", ("18–29", "30–49", "50 trở lên"), True),
     ("Bạn lớn lên ở vùng nào?", ("Bắc", "Trung", "Nam", "Ngoài Việt Nam"), False),
@@ -614,14 +713,19 @@ def cmd_google_form(args) -> int:
             yesno = r["task"] in ("T3", "closing")
             items.append({"pos": int(r["position"]), "title": f"{r['position']}. {r['question_short']}",
                           "help": r.get("prompt_model", ""), "yesno": yesno, "required": r["block"] == "closing"})
-        forms.append({"form": int(rows[0]["form"]), "items": items})
+        nn = f"{int(rows[0]['form']):02d}"
+        fill = {"nn": nn, "email": args.contact_email, "until": args.withdraw_until}
+        forms.append({"form": int(rows[0]["form"]), "items": items, "consent_help": CONSENT_HELP_VI.format(**fill),
+                      "confirmation": CONFIRMATION_VI.format(**fill)})
     if not forms:
         raise SystemExit(f"no baseline_form_*.csv in {d}: run the baseline subcommand first")
     js = f"""// Generated by scripts/make_validation_forms.py google-form ({len(forms)} forms). Do not edit by hand: re-generate.
 // Use: script.google.com -> New project (in the author's own Google account) -> paste this file -> run buildAll ->
-// authorize -> the log lists each form number with its link. Send each respondent ONE link. E-mail collection is off.
-// Afterwards download each form's responses as CSV (Responses -> Sheets -> File -> Download -> CSV), name them
-// responses_form_<nn>.csv and run: python scripts/make_validation_forms.py import-responses --dir {d.as_posix()}
+// authorize -> the log lists each form number with its link as it is made. Send each respondent ONE link. E-mail
+// collection is off. If the run stops part-way, delete the forms already made ("NóiLái - phiếu" in Drive) or run
+// buildRange(first, last) for the missing numbers only. Afterwards, in each form: Responses -> the three-dot menu ->
+// Download responses (.csv); name the file responses_form_<nn>.csv and run:
+// python scripts/make_validation_forms.py import-responses --dir {d.as_posix()}
 const FORMS = {_js(forms)};
 const INTRO = {_js(FORM_INTRO_VI)};
 const CONSENT = {_js(list(CONSENT_BOXES_VI))};
@@ -632,9 +736,11 @@ function buildOne(f) {{
   form.setCollectEmail(false);
   form.setDescription(INTRO);
   form.setProgressBar(true);
+  form.setConfirmationMessage(f.confirmation);
   const consent = form.addCheckboxItem().setTitle("Đồng ý tham gia").setChoiceValues(CONSENT).setRequired(true);
+  consent.setHelpText(f.consent_help);
   consent.setValidation(FormApp.createCheckboxValidation().requireSelectExactly(CONSENT.length).build());
-  form.addPageBreakItem().setTitle("Thông tin chung (thô, không định danh)");
+  form.addPageBreakItem().setTitle("Thông tin chung (khái quát, không định danh)");
   DEMOGRAPHICS.forEach(function (q) {{
     form.addMultipleChoiceItem().setTitle(q[0]).setChoiceValues(q[1]).setRequired(q[2]);
   }});
@@ -654,9 +760,12 @@ function buildOne(f) {{
 }}
 
 function buildAll() {{
-  const lines = [];
-  FORMS.forEach(function (f) {{ lines.push(f.form + "\\t" + buildOne(f)); }});
-  Logger.log(lines.join("\\n"));
+  FORMS.forEach(function (f) {{ Logger.log(f.form + "\\t" + buildOne(f)); }});   // logged one by one: a stop keeps the links
+}}
+
+function buildRange(first, last) {{
+  FORMS.filter(function (f) {{ return f.form >= first && f.form <= last; }})
+       .forEach(function (f) {{ Logger.log(f.form + "\\t" + buildOne(f)); }});
 }}
 """
     out = d / "build_forms.gs"
@@ -666,12 +775,14 @@ function buildAll() {{
 
 
 def cmd_import_responses(args) -> int:
-    """Google Forms response CSVs (responses_form_<nn>.csv) -> returned/baseline_form_<nn>_r<k>.csv in the form's own
-    layout (answers by position), demographics to returned/demographics.csv (coarse bands only, no timestamps kept)."""
+    """Google Forms response CSVs (responses_form_<nn>.csv) -> returned/baseline_form_<nn>_r1.csv in the form's own
+    layout (answers by position), demographics to returned/demographics.csv (coarse bands only, no timestamps kept).
+    One respondent per form: only the first submission is kept; later ones are counted and reported."""
     d = Path(args.dir)
     ret = d / "returned"
     ret.mkdir(parents=True, exist_ok=True)
     demo_rows = []
+    extra: dict[int, int] = {}
     n = 0
     for path in sorted((d / "responses").glob("responses_form_*.csv")):
         nn = int(path.stem.rsplit("_", 1)[1])
@@ -680,6 +791,9 @@ def cmd_import_responses(args) -> int:
         by_pos = {int(r["position"]): r for r in form_rows}
         with open(path, encoding="utf-8") as fh:
             responses = list(csv.DictReader(fh))
+        if len(responses) > 1:                         # one respondent per form: keep the first submission, count the rest
+            extra[nn] = len(responses) - 1
+            responses = responses[:1]
         for k, resp in enumerate(responses, start=1):
             out_rows = []
             for col, val in resp.items():
@@ -693,7 +807,9 @@ def cmd_import_responses(args) -> int:
             demo_rows.append({"form": nn, "response": k, **{t: resp.get(t, "") for t, _c, _r in DEMOGRAPHICS_VI}})
             n += 1
     _write_csv(ret / "demographics.csv", ["form", "response", *[t for t, _c, _r in DEMOGRAPHICS_VI]], demo_rows)
-    print(json.dumps({"responses": n, "written_to": str(ret)}, ensure_ascii=False))
+    if extra:
+        print(f"WARNING: later submissions dropped (first one kept) on forms {extra}: check who else had the link", file=sys.stderr)
+    print(json.dumps({"responses": n, "extra_submissions_dropped": extra, "written_to": str(ret)}, ensure_ascii=False))
     return 0
 
 
@@ -720,10 +836,18 @@ def main(argv=None) -> int:
     a.add_argument("--returned", nargs="+", default=None)
     a.add_argument("--fast", action="store_true")
     a.set_defaults(func=cmd_adjudication_sheet)
+    c2 = sub.add_parser("calibration2", help="the second calibration set for validators below the pass mark")
+    c2.add_argument("--dir", required=True)
+    c2.add_argument("--validators", nargs="+", required=True)
+    c2.add_argument("--release", default=None, help="exclude this release's phrases too (as the first round did)")
+    c2.set_defaults(func=cmd_calibration2)
     c = sub.add_parser("score")
     c.add_argument("--dir", required=True)
     c.add_argument("--returned", nargs="+", default=None)
     c.add_argument("--n-boot", type=int, default=1000)
+    c.add_argument("--flags-out", default=None,
+                   help="where the offensive flags go (default <dir>/report/validator_flags.json; make validation-score: "
+                        "data/audit/validator_flags.json, the file the API screen and the baseline builder read)")
     c.set_defaults(func=cmd_score)
     b = sub.add_parser("baseline")
     b.add_argument("--items", required=True)
@@ -735,6 +859,10 @@ def main(argv=None) -> int:
     b.add_argument("--per-cell", type=int, default=None, help="double-judged items per task x variant cell (derived when omitted)")
     b.add_argument("--seed", type=int, default=BASELINE_SEED)
     b.add_argument("--no-model-prompt", action="store_true", help="omit the rendered model prompt (tests on synthetic items)")
+    b.add_argument("--exclude-flags", default=None,
+                   help="validator_flags.json from `score`: flagged items never reach a form (DD 11.5)")
+    b.add_argument("--attested-verified", default=None,
+                   help="attested_verified.tsv from `score`: the natural block uses native-verified rows only")
     b.set_defaults(func=cmd_baseline)
     sb = sub.add_parser("score-baseline")
     sb.add_argument("--items", required=True)
@@ -744,6 +872,8 @@ def main(argv=None) -> int:
     sb.set_defaults(func=cmd_score_baseline)
     g = sub.add_parser("google-form", help="Apps Script that builds the baseline Google Forms in the author's account")
     g.add_argument("--dir", required=True)
+    g.add_argument("--contact-email", default="[EMAIL]", help="the withdrawal contact shown under the consent and after submitting")
+    g.add_argument("--withdraw-until", default="22/11/2026", help="the last day to withdraw (the results freeze)")
     g.set_defaults(func=cmd_google_form)
     ir = sub.add_parser("import-responses", help="Google Forms response CSVs -> returned/ in the forms' layout")
     ir.add_argument("--dir", required=True)

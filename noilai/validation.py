@@ -480,23 +480,31 @@ def calibration_item(inp: str, task: str, variant: str, manip: str) -> dict | No
             "base_phrase": inp, "key": key, "explanation_vi": _EXPLAIN[manip][0], "explanation_en": _EXPLAIN[manip][1]}
 
 
-def build_calibration(release_keys: set | None = None) -> list[dict]:
+def build_calibration(release_keys: set | None = None, exclude_inputs: set | None = None, prefix: str = "A",
+                      skip_unavailable: bool = False) -> list[dict]:
     """The calibration round: for each spec the first input that the manipulation fits and that is not a
-    release phrase (in either order). Raises if a spec has no usable input (extend its list)."""
+    release phrase (in either order). Raises if a spec has no usable input (extend its list).
+
+    The second calibration set (VALIDATION_PROTOCOL §5, for a validator below VALIDATION_CALIBRATION_PASS):
+    `exclude_inputs` = the first round's inputs, `prefix` "A2", `skip_unavailable` True -- a spec with no other
+    usable input (the single vulgar spec) is left out rather than repeated, and the row ids keep the spec number."""
     release_keys = release_keys or set()
+    exclude = {phrase_key(x) for x in (exclude_inputs or ()) if phrase_key(x)}
     rows = []
     for j, (inputs, task, variant, manip) in enumerate(CALIBRATION_SPECS):
         for inp in inputs:
-            if phrase_key(inp) in release_keys:
+            if phrase_key(inp) in release_keys or phrase_key(inp) in exclude:
                 continue
             row = calibration_item(inp, task, variant, manip)
             if row is None:
                 continue
             if any(phrase_key(t) in release_keys for t in (row["input"], row["candidate"]) if phrase_key(t)):
                 continue
-            rows.append({"row_id": f"A-{j + 1:02d}", **row})
+            rows.append({"row_id": f"{prefix}-{j + 1:02d}", **row})
             break
         else:
+            if skip_unavailable:
+                continue
             raise ValueError(f"calibration spec {j + 1} ({task} {variant} {manip}): no usable input among {inputs}")
     return rows
 

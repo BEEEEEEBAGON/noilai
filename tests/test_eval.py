@@ -1061,7 +1061,8 @@ def test_api_guard_refuses_noncore_and_drops_vulgar_items(item_file, tmp_path):
         vulgar["candidate"] = "mờ mông"
     run_dir = RN.run(api, entry, core + [vulgar], path, opts, log=lambda *a: None)
     m = RN.read_manifest(run_dir)
-    assert m["api_safety"] == {"is_api": True, "n_excluded_vulgar": 1, "n_noncore": 0, "n_core": len(core),
+    assert m["api_safety"] == {"is_api": True, "n_excluded_vulgar": 1, "n_excluded_validator_flag": 0, "validator_flags": None,
+                               "n_noncore": 0, "n_core": len(core),
                                "trains_on_inputs": False, "core_to_training_provider_opt_out": False}
     assert m["outcome"]["api_account_holder"] == "unknown" and m["outcome"]["api_account_holder_missing"] is True
     assert m["outcome"]["api_privacy_settings"]["provider"] is None
@@ -1989,3 +1990,24 @@ def test_hf_logprobs_share_the_prompt_cache_and_equal_the_full_computation(tiny_
             lg = model(torch.tensor([ids_f])).logits.float().log_softmax(-1)
         manual = sum(lg[0, i - 1, ids_f[i]].item() for i in range(len(ids_p), len(ids_f)))
         assert abs(manual - got) < 1e-4, (c, manual, got)
+
+
+def test_api_guard_drops_items_the_validators_flagged_offensive(item_file, tmp_path):
+    """DD 10.1 / 11.5: one validator's offensive flag keeps an item out of every prompt to a hosted model -- by item id,
+    or by a flagged text appearing as the item's input, candidate or gold; open models still run it (scoring complete)."""
+    path, items = item_file
+    core = [it for it in items if it["in_core"]]
+    a, b = core[0], core[1]
+    gold_b = b["gold"][0] if isinstance(b["gold"], list) and isinstance(b["gold"][0], str) else b["input"]
+    flags = tmp_path / "validator_flags.json"
+    flags.write_text(json.dumps({"offensive_item_ids": [a["item_id"]], "offensive_texts": [gold_b]}), encoding="utf-8")
+    entry = {"name": "grq", "backend": "scripted", "provider": "y", "provider_terms": {"trains_on_inputs": False}}
+    api = B.ScriptedBackend(default="Đáp án: x", is_api=True)
+    kept, rep = RN.check_api_safety(api, core, RN.RunOptions(validator_flags=str(flags)), path, RN.provider_privacy(entry))
+    ids = {it["item_id"] for it in kept}
+    assert a["item_id"] not in ids and b["item_id"] not in ids
+    assert rep["n_excluded_validator_flag"] >= 2 and rep["validator_flags"] == str(flags)
+    assert all(not RN.flagged_by_validators(it, RN.load_validator_flags(flags)) for it in kept)
+    kept_open, rep_open = RN.check_api_safety(B.EchoBackend(), core, RN.RunOptions(validator_flags=str(flags)), path)
+    assert len(kept_open) == len(core) and rep_open["n_excluded_validator_flag"] == 0     # open models: nothing dropped
+    assert RN.load_validator_flags(tmp_path / "absent.json") == {"item_ids": set(), "texts": set(), "source": None}
