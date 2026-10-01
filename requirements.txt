@@ -16,3 +16,4 @@ transformers>=4.45
 torch>=2.2
 pytest>=8
 hypothesis>=6
+nbformat>=5.9          # notebook generator/validator (scripts/kaggle_build_notebooks.py, tests/test_cloud.py)
