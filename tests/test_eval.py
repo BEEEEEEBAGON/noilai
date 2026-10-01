@@ -1385,8 +1385,8 @@ class _FakeClient:
 
 
 def test_openai_compat_backoff_and_error_handling():
-    import httpx
-    import openai
+    httpx = pytest.importorskip("httpx")
+    openai = pytest.importorskip("openai", reason="the OpenAI-compatible client is the `eval` extra (pip install -e .[eval])")
 
     def rate_limit():
         return openai.RateLimitError("slow down", response=httpx.Response(
