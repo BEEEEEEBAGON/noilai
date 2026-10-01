@@ -188,3 +188,52 @@ def test_baseline_closing_rows_exclude(tmp_path):
     with open(out / "baseline_form_01.csv", encoding="utf-8") as fh:
         rows = list(csv.DictReader(fh))
     assert [r["item_id"] for r in rows if r["block"] == "closing"] == ["TOOLS", "WAS_VALIDATOR"]
+
+
+def test_google_form_script_and_response_import(tmp_path):
+    """The Apps Script parses as JavaScript (when node is installed) and a Google Forms response CSV maps back to item
+    ids by the position prefix of each question title."""
+    import csv
+    import json
+    import shutil
+    import subprocess
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    items = []
+    for t in ("T1", "T2", "T3"):
+        for v in ("V1", "V2", "V3", "V4"):
+            for i in range(6):
+                base = {"task": t, "variant": v, "input": "a b", "vulgar": False, "split": "test"}
+                if t == "T3":
+                    items.append({**base, "item_id": f"T3-{v}-{2 * i:06d}", "gold": "yes", "candidate": "b a", "pair_item_id": f"T3-{v}-{2 * i + 1:06d}"})
+                    items.append({**base, "item_id": f"T3-{v}-{2 * i + 1:06d}", "gold": "no", "candidate": "c a", "pair_item_id": f"T3-{v}-{2 * i:06d}"})
+                else:
+                    items.append({**base, "item_id": f"{t}-{v}-{i:06d}", "gold": ["b a"] if t == "T1" else [{"output": "b a"}]})
+    p = tmp_path / "items.jsonl"
+    p.write_text("\n".join(json.dumps(x, ensure_ascii=False) for x in items), encoding="utf-8")
+    out = tmp_path / "human"
+    run = [sys.executable, "scripts/make_validation_forms.py"]
+    subprocess.run(run + ["baseline", "--items", str(p), "--out", str(out), "--n-forms", "4", "--per-form", "24", "--no-model-prompt"],
+                   cwd=root, check=True, capture_output=True, text=True)
+    subprocess.run(run + ["google-form", "--dir", str(out)], cwd=root, check=True, capture_output=True, text=True)
+    js = (out / "build_forms.gs").read_text(encoding="utf-8")
+    assert "setCollectEmail(false)" in js and "requireSelectExactly" in js
+    if shutil.which("node"):
+        r = subprocess.run(["node", "-e", "new Function(require('fs').readFileSync(process.argv[1], 'utf8'))", str(out / "build_forms.gs")],
+                           capture_output=True, text=True, check=False)
+        assert r.returncode == 0, r.stderr
+    with open(out / "baseline_form_02.csv", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    (out / "responses").mkdir()
+    with open(out / "responses" / "responses_form_02.csv", "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["Timestamp", "Nhóm tuổi"] + [f"{r['position']}. {r['question_short']}" for r in rows])
+        w.writerow(["t", "18–29"] + [f"ans{r['position']}" for r in rows])
+    subprocess.run(run + ["import-responses", "--dir", str(out)], cwd=root, check=True, capture_output=True, text=True)
+    with open(out / "returned" / "baseline_form_02_r1.csv", encoding="utf-8") as fh:
+        back = list(csv.DictReader(fh))
+    assert [(r["item_id"], r["answer"]) for r in back] == [(r["item_id"], f"ans{r['position']}") for r in rows]
+    with open(out / "returned" / "demographics.csv", encoding="utf-8") as fh:
+        demo = list(csv.DictReader(fh))
+    assert demo[0]["Nhóm tuổi"] == "18–29" and "Timestamp" not in demo[0]
