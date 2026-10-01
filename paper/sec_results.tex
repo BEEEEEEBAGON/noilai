@@ -6,13 +6,13 @@
 \label{sec:results}
 
 \paragraph{Pre-registered hypotheses.}
-The predictions below are fixed in a dated commit before any test-split run (Appendix~\ref{app:prereg}; the pilot runs on development items only). \hyp{1} (\emph{alignment beyond count}): in the regression of Section~\ref{sec:setup}, the within-model coefficient of boundary alignment is positive, that of tokens per syllable is negative, and adding the split indicator and alignment to a model that already has tokens per syllable improves its fit, decided by a nested likelihood-ratio test (or $\Delta$AIC) with model fixed effects and base-pair cluster-bootstrap intervals for the coefficients; no ``which matters more'' contrast between the two coefficients is tested, because alignment is structurally zero for an unsplit syllable. A model with fewer than 300 misaligned split syllables in the main sample contributes to \hyp{1} descriptively only, and if fewer than four tokenizer families clear that floor \hyp{1} is demoted to a descriptive result. \hyp{2} (\emph{a whole-syllable vocabulary}) is a descriptive case study, not a tested hypothesis: PhoGPT-4B-Chat, whose 20,480-piece vocabulary stores most syllables as single tokens, is the panel's extreme on the share of whole-syllable tokens, which enters the regression as a per-tokenizer covariate; its per-syllable negative log-likelihood on a held-out Vietnamese text sample and its \task{T1} accuracy are reported with intervals beside Qwen3.5-4B and Gemma~3 4B, and no inequality is pre-registered. \hyp{6} (\emph{memorization}): exact attested items outscore generated items matched on variant, task, output lexicality, spelling trigger and tone class, pooled over models; and the guided-instruction contamination rate is positive on attested items and near zero on the matched generated ones; \hyp{6} is tested only if at least 100 native-verified exact two-syllable attested rows with per-row citations from at least three collections exist at the data freeze, and is otherwise reported descriptively without the matched analysis. The memorization inference rests on the guided-instruction test \citep{2308.08493}, closed-book recall of well-known nói lái, the conditional log-probability contrast and the name-only prompt, not on the accuracy gap alone, which conflates salience with memorization.
+\hyp{1} (\emph{alignment beyond count}): within models, alignment has a positive and tokens per syllable a negative coefficient, and adding the split indicator and alignment to a model with tokens per syllable improves fit, decided by the nested likelihood-ratio test of Section~\ref{sec:setup}; a model with fewer than 300 misaligned split syllables in the main sample contributes descriptively only, and if fewer than four tokenizer families clear that floor \hyp{1} is descriptive. \hyp{2} is a descriptive case study, not a tested hypothesis, of PhoGPT-4B-Chat's whole-syllable vocabulary. \hyp{6} (\emph{memorization}): exact attested items outscore generated items matched on variant, task, lexicality, spelling trigger and tone class, and a guided-instruction probe \citep{2308.08493} recovers attested but not matched items; it is tested only if at least 100 native-verified exact two-syllable rows from three collections exist at the data freeze.
 
 \paragraph{Overall accuracy.}
-\placeholder{Table~\ref{tab:main}: strict \task{T1} accuracy per variant, \task{T2} accuracy, and \task{T3} balanced accuracy (spelling twins excluded) with 95\% clustered intervals per model, mean over three paraphrases; mean-human, copy, reversal, wrong-variant and random-legal baselines; API models on the core only. Text: which models exceed the human band, which sit at the wrong-variant floor; the ordering by variant (expected: \var{2}, a whole-syllable swap with tones held, easiest; \var{3}, the tone swap, hardest) reported pooled and on non-degenerate items; \task{T3} against the 50\% floor of the paired design.}
+\placeholder{Table~\ref{tab:main} reading: models above the human band and at the wrong-variant floor; variant ordering on non-degenerate items (expected \var{2} easiest, \var{3} hardest); \task{T3} against 50\%.}
 
 \begin{table*}[t]
-  \centering\small
+  \centering\small\setlength{\tabcolsep}{3.5pt}
   \begin{tabular}{@{}lrrrrrrr@{}}
     \toprule
     & \multicolumn{4}{c}{\task{T1} transformation, strict (by variant)} & \task{T2} & \multicolumn{2}{c}{\task{T3} (no spelling twins)} \\
@@ -23,35 +23,35 @@ The predictions below are fixed in a dated commit before any test-split run (App
     Copy / reversal & 0.0 & 0.0 & 0.0 & 0.0 & 0.0 & 50.0 & 50.0 \\
     Wrong-variant rule & \placeholder{--} & \placeholder{--} & \placeholder{--} & \placeholder{--} & \placeholder{--} & \placeholder{--} & -- \\
     \midrule
-    \placeholder{one row per model, grouped as in Table~\ref{tab:models}} & & & & & & & \\
+    \placeholder{per model} & & & & & & & \\
     \bottomrule
   \end{tabular}
-  \caption{Accuracy (\%) with 95\% intervals from a bootstrap over base pairs, mean over three paraphrases (range, lenient \task{T1} and the spelling-twin column in Appendix~\ref{app:extra}). Copy and reversal score zero on \task{T1}/\task{T2} by construction and 50\% on the balanced \task{T3}; the wrong-variant rule applies another named variant. The human row is the mean over raters on the 246 double-judged items, on which every model is also scored. Log-prob.: open models only; the yes/no forced choice (\texttt{t3\_yesno\_lp}) and the BLiMP-style pair score (\texttt{t3\_pair\_lp}, raw and per-token, in Appendix~\ref{app:extra}) are separate quantities and are never compared with the generated answer. \placeholder{TODO: filled by \texttt{noilai.stats.tables} from the scored runs.}}
+  \caption{Accuracy (\%) with 95\% base-pair bootstrap intervals, mean over three paraphrases (range, lenient \task{T1} and spelling twins in Appendix~\ref{app:extra}). Human row: mean rater on the 246 double-judged items, on which every model is also scored. Log-prob.: open models only, never compared with the generated answer. \placeholder{TODO: filled by \texttt{noilai.stats.tables} from the scored runs.}}
   \label{tab:main}
 \end{table*}
 
 \paragraph{What predicts failure (E2).}
-\placeholder{Figure~\ref{fig:alignment}: item-level accuracy against boundary alignment among split syllables and against tokens per syllable; the coefficients with base-pair cluster-bootstrap intervals from the fixed-effect fit and the random-slope check; the within-tokenizer contrast between single-token and split syllables, which identifies the effect without cross-model confounds once frequency is controlled.} \placeholder{Verdict on \hyp{1}: sign of both coefficients and the nested likelihood-ratio / $\Delta$AIC test; the per-tokenizer misaligned-split counts against the 300 floor; agreement of the GEE fit; the share of per-model slopes with the predicted sign.} \placeholder{The SEA-LION E2B vs.\ Gemma~4 E2B pair, if the tokenizer files are byte-identical: what Southeast Asian training changes with tokenization fixed (one pair; suggests, never isolates).} \placeholder{Verdict on \hyp{2}: PhoGPT's per-syllable NLL and \task{T1} accuracy against the two size-matched models.}
+\placeholder{Figure~\ref{fig:alignment} reading; verdict on \hyp{1} (coefficients, likelihood-ratio test, floor counts, GEE agreement, share of per-model slopes with the predicted sign); the tokenizer-fixed SEA-LION pair (suggests, never isolates); \hyp{2}.}
 
 \begin{figure}[t]
   \centering
-  \fbox{\parbox{0.95\columnwidth}{\centering\vspace{2.5cm}\placeholder{Figure 2: accuracy vs.\ boundary alignment and tokens per syllable; coefficients with bootstrap intervals}\vspace{2.5cm}}}
+  \fbox{\parbox{0.95\columnwidth}{\centering\vspace{1.8cm}\placeholder{Figure 2: accuracy vs.\ boundary alignment and tokens per syllable; coefficients with bootstrap intervals}\vspace{1.8cm}}}
   \caption{\placeholder{Item-level accuracy as a function of boundary alignment among split syllables (left) and tokens per syllable (right), pooled over models with 95\% intervals; coefficients from the fixed-effect fit with base-pair cluster-bootstrap intervals (inset).}}
   \label{fig:alignment}
 \end{figure}
 
 \paragraph{Explicit input.}
-\placeholder{Accuracy when each syllable is given already decomposed into onset, rime and tone, against the raw format, per model. Near-ceiling accuracy here places the bottleneck on sub-token access rather than rule logic; accuracy that stays low places it on the rule.}
+\placeholder{Decomposed vs.\ raw input per model: near ceiling places the bottleneck on access, low on the rule.}
 
 \paragraph{Error taxonomy.}
-\placeholder{Figure~\ref{fig:errors}: shares of the eleven error classes (unparseable, lenient-only, copy, reversal, wrong variant, spelling, homophone, doublet, component by onset/rime/tone, illegal) by model group and variant. Expectations: tone errors dominate \var{3} and \var{4}; spelling errors concentrate on items with a \vi{c}$>$\vi{k}, \vi{g}$>$\vi{gh} or \vi{ng}$>$\vi{ngh} trigger; copy and reversal errors concentrate in the smallest models.}
+\placeholder{Figure~\ref{fig:errors} reading against the registered expectations: spelling errors on trigger items, copy and reversal in the smallest models.}
 
 \begin{figure}[t]
   \centering
-  \fbox{\parbox{0.95\columnwidth}{\centering\vspace{2.5cm}\placeholder{Figure 3: error breakdown by model group}\vspace{2.5cm}}}
+  \fbox{\parbox{0.95\columnwidth}{\centering\vspace{1.8cm}\placeholder{Figure 3: error breakdown by model group}\vspace{1.8cm}}}
   \caption{\placeholder{Error classes as shares of all \task{T1} outputs, by model group and variant.}}
   \label{fig:errors}
 \end{figure}
 
 \paragraph{Ablations and memorization.}
-\placeholder{Effects of instruction language, number of demonstrations, name-only vs.\ explained instructions, thinking mode and character-spaced input, as estimates with intervals. Verdict on \hyp{6}: the matched attested--generated difference pooled over models with standardized mean differences after matching, and the four contamination discriminators.}
+\placeholder{Ablations; \hyp{6} with balance and the four discriminators.}

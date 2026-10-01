@@ -111,7 +111,7 @@ def render(manifest: dict, manifest_path: str, attested: tuple[int | None, int |
     if note:
         lines.append(f"% note: {note}")
     lines.append(r"\begin{table}[t]")
-    lines.append(r"\centering\small")
+    lines.append(r"\centering\small\setlength{\tabcolsep}{2pt}")
     lines.append(r"\begin{tabular}{@{}llrrrrr@{}}")
     lines.append(r"\toprule")
     lines.append(r"Task & Variant & Dev & Test & Core & Total & Pool \\")
@@ -122,7 +122,7 @@ def render(manifest: dict, manifest_path: str, attested: tuple[int | None, int |
         for i, v in enumerate(VARIANTS):
             c = cells[(t, v)]
             pool = "--" if c["pool"] is None else f"{c['pool']:,}"
-            first = rf"\multirow{{{len(VARIANTS) + 1}}}{{*}}{{\task{{{t}}} {TASK_NAMES[t]}}}" if i == 0 else ""
+            first = rf"\multirow{{{len(VARIANTS) + 1}}}{{*}}{{\task{{{t}}}}}" if i == 0 else ""
             lines.append(f"{first} & \\var{{{v[1]}}} & {c['dev']:,} & {c['test']:,} & {c['core']:,} & {c['total']:,} & {pool} \\\\")
             for k in sub:
                 sub[k] += c[k]
@@ -139,18 +139,18 @@ def render(manifest: dict, manifest_path: str, attested: tuple[int | None, int |
         att_cell = f"{n_att:,}"
         vul_cell = f"{n_vulgar:,}"
     lines.append(f"Attested & & -- & {att_cell} & -- & {att_cell} & \\\\")
-    lines.append(f"\\quad of which flagged vulgar & & & {vul_cell} & & & \\\\")
+    lines.append(f"\\quad flagged vulgar & & & {vul_cell} & & & \\\\")
     lines.append(r"\midrule")
-    lines.append(r"Base pairs & & \multicolumn{5}{l}{" + f"{int(manifest.get('n_base_pairs', 0)):,} (split by pair; dev fraction "
+    lines.append(r"Base pairs & & \multicolumn{5}{l}{" + f"{int(manifest.get('n_base_pairs', 0)):,} (dev "
                  f"{(manifest.get('generator_args') or {}).get('dev_frac', 0.2)})" + r"} \\")
-    lines.append(r"Validation $\alpha$ & & \multicolumn{5}{l}{\placeholder{$\alpha$ = TODO, 95\% CI TODO; 1,000 items, 200 triple-judged}} \\")
+    lines.append(r"Validation $\alpha$ & & \multicolumn{5}{l}{\placeholder{$\alpha$, 95\% CI}} \\")
     lines.append(r"\bottomrule")
     lines.append(r"\end{tabular}")
     smoke_note = (r" \placeholder{" + SMOKE_MARK + r": these counts come from a reduced build "
                   f"({int(manifest.get('n_items', 0)):,} items); the frozen release replaces them.}}") if smoke else ""
     if note:
         smoke_note += r" \placeholder{" + note + "}"
-    lines.append(r"\caption{\noilai{} item counts by task, variant and split. Core is the balanced subset of the "
+    lines.append(r"\caption{\noilai{} item counts by task (\task{T1} transformation, \task{T2} decoding, \task{T3} validity), variant and split; base pairs are split whole, and $\alpha$ is over 1,000 validated items, 200 judged by all three validators. Core is the balanced subset of the "
                  r"test split that API-served models see (\task{T3}: yes/no pairs kept together). Pool is the "
                  r"number of legal, non-identity items available per cell before capping (\task{T1}, \task{T2}); "
                  r"the drop rate follows from it. Attested examples are folk and literary "
