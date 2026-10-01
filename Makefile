@@ -37,3 +37,11 @@ baseline:
 
 lint:
 	$(PY) -m ruff check noilai scripts tests
+
+# Code bundle for the notebooks while the repository is private (README "Running from a private
+# repository"): one file, pinned to the commit it was made from, uploaded to a private Kaggle dataset.
+bundle:
+	mkdir -p dist
+	git bundle create dist/noilai-main.bundle main
+	git rev-parse main > dist/noilai-main.bundle.commit
+	@echo "bundle at dist/noilai-main.bundle for commit $$(cat dist/noilai-main.bundle.commit)"

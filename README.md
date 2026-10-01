@@ -347,6 +347,29 @@ per the ARR policy on generative assistance.
   refuses the superseded 20 × 40 baseline forms; `data/validation/` and `data/human/` are ignored.
   Still no model run.
 
+## Running from a private repository
+
+The notebooks never clone over HTTPS while the repository is private: they read the code from a
+**git bundle in a private Kaggle dataset** (`BUNDLE_PATH`, the default in every parameters cell) and
+fall back to `REPO_URL` with a `GITHUB_TOKEN` Kaggle Secret only when no bundle is attached. The
+bundle pins the exact commit, needs no token on the GPU machine, and `pip install` runs from the
+local clone, so nothing contacts GitHub. Setup, once per code change you want on Kaggle:
+
+```bash
+make bundle                                   # dist/noilai-main.bundle (+ .commit) from the local main
+kaggle datasets init -p dist                  # first time only; edit dist/dataset-metadata.json:
+                                              #   "id": "<kaggle-user>/noilai-bundle", "title": "noilai-bundle"
+kaggle datasets create -p dist --dir-mode zip # first time only; the dataset is private by default
+kaggle datasets version -p dist -m "code @ $(cat dist/noilai-main.bundle.commit)"   # every later change
+```
+
+Then, in the notebook's parameters cell, leave `BUNDLE_PATH = "/kaggle/input/noilai-bundle/noilai-main.bundle"`
+and attach the dataset `noilai-bundle` to the notebook (Add Input → Your Datasets). The clone cell
+prints the checked-out `HEAD`; compare it with `dist/noilai-main.bundle.commit`. The frozen item files
+travel the same way in a second private dataset (`ITEMS_DATASET_DIR`, default `/kaggle/input/noilai-release`,
+holding the `data/release/<version>/` tree from the private archive). On Colab the bundle and the
+release tree live under `MyDrive/noilai/` instead; the paths are the parameters-cell defaults.
+
 ## Origin
 
 This repository was split out of a branch of `BEEEEEEBAGON/ntcf` (an unrelated paper) on 1 October 2026
