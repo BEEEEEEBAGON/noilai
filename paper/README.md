@@ -1,21 +1,27 @@
 # paper/ — ACL 2027 manuscript sources
 
-`main.tex` (review mode: `\usepackage[review]{acl}`) inputs eight section files, the
+`claims.md` is the claim ledger: every contribution and claim, its evidence (design-document section,
+data file and hash, verified citation, or the pending experiment), the strongest allowed wording and the
+wording that would overclaim. Edit the ledger first, then the prose.
+
+`main.tex` (review mode: `\usepackage[review]{acl}`) inputs nine section files (Related Work is
+`sec_related.tex`), the
 mandatory Limitations, the Ethical Considerations (with the anonymized Reproducibility
 paragraph) and the appendices. Every result is a red `\placeholder{...}`; no number is
 typed by hand.
 
 ## Build
 
-pdflatex is not installed on the build machine. On a TeX Live 2024+ installation with the
-`vntex` package (T5 font encoding; `\usepackage[T1,T5]{fontenc}` is what makes the Vietnamese
-letters, `\h{}` and `\horn{}` work):
+Needs TeX Live with the `vntex` package (T5 font encoding; `\usepackage[T1,T5]{fontenc}` is what
+makes the Vietnamese letters, `\h{}` and `\horn{}` work). Verified on 1 October 2026 with TeX Live 2023
+(Ubuntu 24.04: `texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended texlive-lang-other`):
+no errors, no undefined citations or references, body ends on page 8, Limitations opens page 9.
 
 ```bash
 cd paper && pdflatex main && bibtex main && pdflatex main && pdflatex main
 ```
 
-Until then, `tests/test_paper.py` stands in for the compile check: inputs resolve, cite keys
+`tests/test_paper.py` adds the checks a compile does not make: inputs resolve, cite keys
 exist, braces balance, Limitations present, `TODO` only inside `\placeholder`, refs have labels,
 no identifying information, and the generator scripts reproduce the committed tables.
 
@@ -51,3 +57,13 @@ XCOPA, model reports, statistics classics, patching methods, and the closest-wor
 `tests/test_paper.py` checks that every `\cite` key resolves, that no key occurs in both files
 (BibTeX's "Repeated entry"), that every placeholder entry still carries its mark, and that the
 Vietnamese accent macros of the placeholder file re-render to the intended NFC strings.
+
+On 1 October 2026 the related-work round added 24 entries verified against the ACL Anthology XML
+(`acl-org/acl-anthology`, `data/xml/`, via raw.githubusercontent.com, since aclanthology.org is
+egress-blocked here) and generated from it rather than typed; seven of them replace placeholder
+entries (Kaushal & Mahowald, Itzhak & Levy, Rust et al., Ahia et al., Pham & Pham, Phun-Bench,
+KoWit-24), whose cite keys moved to Anthology ids. "Verified" means the title, authors and venue
+match the XML and the claim made in the paper matches the abstract; numbers inside the papers were
+not checked. BibTeX has no comment syntax inside an entry, so notes are `comment = {...}` fields
+(ignored by `acl_natbib.bst`), and stacked accents are braced (`{\`{\^{o}}}`) so that natbib can
+format the citation labels.
