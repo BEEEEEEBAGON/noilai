@@ -212,3 +212,13 @@ on CPU in 34 s (item gate, deterministic rescoring, statistics and results hashe
 catches a one-byte change). Two defects found and fixed on the way (DEVIATIONS rows of 1 October: HF log-probability
 memory, paired-difference interval). Its accuracies are those of random weights and are not reported anywhere.
 
+## 2026-10-01 — CPU cost of the pilot's operations for a Gemma-3-1B-sized model (no model outputs) [RL-2026-10-01-06]
+
+Engineering measurement for the compute plan, not a result about any model: `scripts/cpu_bench.py` →
+`data/audit/cpu_bench_gemma3_1b_shape.json`. A Gemma3ForCausalLM with gemma-3-1b-it's published dimensions and RANDOM
+weights (the arithmetic of the trained model) in float32 on the build machine's 4 CPU cores (torch 2.14.1), medians:
+one pass over a 520-token prompt 2.95 s, over a 950-token prompt 5.58 s; a 3-token continuation on a copy of the
+prompt's cache 0.14–0.16 s; generating 24 tokens after a 520-token prompt 5.6 s at batch 1 (29.2 s for 8 prompts),
+after a 950-token prompt 8.0 s (51.3 s for 8). Batching gains little on 4 cores. Kaggle CPU sessions have different
+cores [UNCERTAIN: verify]; `docs/COMPUTE_PLAN.md` derives its CPU pilot estimates from these numbers with that caveat.
+
