@@ -9,7 +9,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-import pin_panel as PP  # noqa: E402
+import pin_panel as PP
 
 
 def test_committed_manifest_hash_is_intact_and_matches_models_yaml():

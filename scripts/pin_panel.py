@@ -117,13 +117,15 @@ def resolve_entry(e: dict, api, download) -> dict:
                last_modified=str(getattr(info, "last_modified", None) or getattr(info, "lastModified", "") or ""),
                siblings=sorted(s.rfilename for s in (getattr(info, "siblings", None) or []))[:200])
     files = {}
+    file_errors = {}
     template = None
     for fn in TOKENIZER_FILES:
         if rec["siblings"] and fn not in rec["siblings"]:
             continue
         try:
             p = Path(download(repo, fn, sha))
-        except Exception:
+        except Exception as exc:                  # recorded, not fatal: some repositories ship only some files
+            file_errors[fn] = f"{type(exc).__name__}: {str(exc)[:120]}"
             continue
         files[fn] = sha256_file(p)
         if fn == "chat_template.jinja":
@@ -136,6 +138,8 @@ def resolve_entry(e: dict, api, download) -> dict:
     if isinstance(template, list):                # several named templates
         template = canonical(template)
     rec["tokenizer_files"] = files
+    if file_errors:
+        rec["tokenizer_file_errors"] = file_errors
     rec["chat_template_sha256"] = sha256_bytes(template.encode("utf-8")) if template else None
     return rec
 
