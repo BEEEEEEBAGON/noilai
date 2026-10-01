@@ -1,4 +1,4 @@
-# Data formats (v0.2 schema)
+# Data formats (v0.3 schema)
 
 All files are UTF-8, NFC, one JSON object per line. Vietnamese text in item files is
 lowercase, NFC, stored in the **baseline tone-mark placement (old style, `hòa`)** with

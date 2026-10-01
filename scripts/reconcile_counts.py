@@ -3,7 +3,7 @@
 
     python scripts/reconcile_counts.py --out data/audit/counts.json
 
-    python scripts/reconcile_counts.py --out data/audit/counts.json --release data/release/v0.2
+    python scripts/reconcile_counts.py --out data/audit/counts.json --release data/release/v0.3
 
 Reports, from the files in data/external and data/audit: Hunspell entries / lowercase /
 parsable / rejected / standard; inventory structures and extension; distinct rimes (parser

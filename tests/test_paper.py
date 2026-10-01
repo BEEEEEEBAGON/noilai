@@ -737,7 +737,7 @@ def test_human_baseline_assignment_is_a_connected_double_coverage_design():
     t = _doc("HUMAN_BASELINE_FORM.md")
     assert "offset = 1 + (k // N_RESP) % (N_RESP - 1)" in t and "`offset = 1 + (k // 20) % 19`" in t
     assert "shared_items_per_rater_pair" in t and "{1: 140, 2: 50}" in t
-    assert "data/release/v0.2/noilai_main.jsonl" in t and "noilai_core.jsonl" not in t.split("```bash")[1].split("```")[0]
+    assert "data/release/v0.3/noilai_main.jsonl" in t and "noilai_core.jsonl" not in t.split("```bash")[1].split("```")[0]
     assert "offset of 10" not in t and "Assignment: a balanced incomplete block" not in t
     assert "140 pairs one, 50 pairs two" in _doc("PREREGISTRATION.md")
 
@@ -745,9 +745,9 @@ def test_human_baseline_assignment_is_a_connected_double_coverage_design():
 def test_human_baseline_snippet_runs_on_the_release(tmp_path):
     """The snippet in the doc, executed against the committed main sample, writes 20 forms of 30
     items with the documented coverage (skipped when the release files are not on disk)."""
-    items = ROOT / "data" / "release" / "v0.2" / "noilai_main.jsonl"
+    items = ROOT / "data" / "release" / "v0.3" / "noilai_main.jsonl"
     if not items.exists():
-        pytest.skip("data/release/v0.2/noilai_main.jsonl not built")
+        pytest.skip("data/release/v0.3/noilai_main.jsonl not built")
     doc = _doc("HUMAN_BASELINE_FORM.md")
     m = re.search(r"```bash\n\S+python - <<'EOF'\n(.*?)\nEOF\n```", doc, re.DOTALL)
     assert m, "the doc's python snippet is not where the test expects it"
@@ -806,9 +806,9 @@ def test_worked_patching_pair_in_the_paper_passes_the_alignment_filter():
 
 # ------------------------------------------------------------------ data statement facts
 def test_data_statement_release_facts_are_generated_and_current():
-    manifest = ROOT / "data" / "release" / "v0.2" / "manifest.json"
+    manifest = ROOT / "data" / "release" / "v0.3" / "manifest.json"
     if not manifest.exists():
-        pytest.skip("no v0.2 manifest")
+        pytest.skip("no v0.3 manifest")
     r = subprocess.run([PY, "paper/gen_data_statement_facts.py", "--manifest", str(manifest), "--check"],
                        cwd=ROOT, text=True, capture_output=True, check=False)
     assert r.returncode == 0, "docs/DATA_STATEMENT.md release facts are stale; re-run paper/gen_data_statement_facts.py"
@@ -924,7 +924,7 @@ def test_attested_counts_in_the_prose_are_generated_macros():
     for m in ("nAttested", "nAttestedExact", "nAttestedApprox", "nAttestedVerified"):
         assert "\\" + m + "{}" in bench, m
     assert r"\placeholder{22} rows" not in bench and r"\placeholder{16} reproduced" not in bench
-    attested = ROOT / "data" / "release" / "v0.2" / "attested.jsonl"
+    attested = ROOT / "data" / "release" / "v0.3" / "attested.jsonl"
     if attested.exists():
         rows = [json.loads(ln) for ln in attested.read_text(encoding="utf-8").splitlines() if ln.strip()]
         assert int(macros["nAttested"]) == len(rows) >= 20
@@ -941,7 +941,7 @@ def test_attested_counts_in_the_prose_are_generated_macros():
 # (4.6); superseded statements the red team retired do not come back. Every check has a non-vacuity guard.
 DD = DOCS / "DESIGN_DECISIONS.md"
 PREREG = DOCS / "PREREGISTRATION.md"
-MANIFEST = ROOT / "data" / "release" / "v0.2" / "manifest.json"
+MANIFEST = ROOT / "data" / "release" / "v0.3" / "manifest.json"
 COUNTS = ROOT / "data" / "audit" / "counts.json"
 ROWS = ROOT / "data" / "audit" / "gemma3_rows.csv"
 
@@ -1011,9 +1011,9 @@ def test_data_format_arm_names_are_the_runners_names_and_the_aliases_are_the_pre
 def test_data_format_documents_the_three_valued_exactness_tag_and_the_release_uses_it():
     t = _read(DOCS / "DATA_FORMAT.md")
     assert "approx(merger:" in t and "approx(substitution:" in t and "approx(<merger>)" not in t
-    attested = ROOT / "data" / "release" / "v0.2" / "attested.jsonl"
+    attested = ROOT / "data" / "release" / "v0.3" / "attested.jsonl"
     if not attested.exists():
-        pytest.skip("no v0.2 attested.jsonl")
+        pytest.skip("no v0.3 attested.jsonl")
     values = {json.loads(ln)["exactness"] for ln in attested.read_text(encoding="utf-8").splitlines() if ln.strip()}
     assert len(values) >= 3 and "exact" in values
     kinds = set()
@@ -1061,10 +1061,11 @@ def test_superseded_statements_are_absent_from_the_documents():
 # The withheld build seeds, stored as SHA-256 digests so that this file does not carry them either: the digest of the
 # v0.2 build seed (its manifest.json still carries the integer until the orchestrator's v0.3 rebuild removes v0.2) plus
 # whatever `seed` the local private manifest holds. Strings of 6+ digits in every scanned file are hashed and compared.
-_WITHHELD_SEED_DIGESTS = {"cbd9fd1d20e2824c265299eb311b5487a723d656748e9cdaa97b6de78dca794d"}
+_WITHHELD_SEED_DIGESTS = {"cbd9fd1d20e2824c265299eb311b5487a723d656748e9cdaa97b6de78dca794d",  # v0.2 build seed
+                          "1c676a5899977322802beca918fe8558d535fce4520f1b64da8943e32751a81d"}  # v0.3 build seed (data/release/v0.3/manifest_private.json)
 # public release manifests that were written BEFORE write_release split the private keys out (DESIGN_DECISIONS 4.6); the
 # orchestrator removes them at the v0.3 rebuild — delete the entry here when a directory is gone or rebuilt
-_LEGACY_PUBLIC_MANIFESTS = {"v0.1", "v0.2"}
+_LEGACY_PUBLIC_MANIFESTS = set()
 
 
 def _withheld_seed_digests() -> set[str]:
@@ -1119,13 +1120,13 @@ def test_build_seed_appears_in_no_tracked_source_document_or_config():
 # ------------------------------------------------------------------ figures reproduce from the named files (DD 12.43)
 def _manifest():
     if not MANIFEST.exists():
-        pytest.skip("no v0.2 manifest")
+        pytest.skip("no v0.3 manifest")
     return json.load(MANIFEST.open(encoding="utf-8"))
 
 
-def test_results_log_v02_entry_matches_the_committed_manifest_and_attested_file():
+def test_results_log_v03_entry_matches_the_committed_manifest_and_attested_file():
     m = _manifest()
-    log = _norm(_read(DOCS / "RESULTS_LOG.md").split("[RL-2026-09-30-05]")[1].split("## ")[0])
+    log = _norm(_read(DOCS / "RESULTS_LOG.md").split("[RL-2026-10-01-01]")[1].split("## ")[0])
     split, task = defaultdict(int), defaultdict(int)
     for k, n in m["counts"].items():
         t, _v, s = k.split("-")
@@ -1138,7 +1139,7 @@ def test_results_log_v02_entry_matches_the_committed_manifest_and_attested_file(
     expected = [f"{int(m['n_items']):,} items (T1 {task['T1']:,}, T2 {task['T2']:,}, T3 {task['T3']:,})",
                 f"dev {split['dev']:,} / test {split['test']:,}", f"core {sum(m['core_counts'].values()):,}",
                 f"Vulgar-flagged items {sum(m['vulgar_counts'].values())}", f"C2-affected items {sum(m['c2_affected_counts'].values())}",
-                f"taboo phrase {d['base:vulgar_input']} (`base:vulgar_input`)", f"identity {identity:,}, plain reversal {reversal:,}",
+                f"taboo phrase {sum(v for k, v in d.items() if k.startswith('base:vulgar_input'))} (`base:vulgar_input:*`", f"identity {identity:,}, plain reversal {reversal:,}",
                 f"illegal {illegal:,}", f"excluded {m['n_marginal_rimes']} (`n_marginal_rimes`)",
                 m["content_sha256"], m["git_commit"][:7]]
     for e in expected:
@@ -1200,7 +1201,7 @@ def test_nfd_length_figures_in_the_h3_row_reproduce():
     assert f"longer for {round(longer * 100)}% of words" in _read(DOCS / "RISKS.md")
     assert f"longer for {round(longer * 100)}\\% of words, carries {round(ratio * 100)}\\% more tokens" in (PAPER / "sec_counterfactuals.tex").read_text(encoding="utf-8")
     log = _norm(_read(DOCS / "RESULTS_LOG.md").split("[RL-2026-09-30-06]")[1])
-    assert f"{longer * 100:.1f}% of the 500 census words" in log and f"{ratio * 100:.1f}% above NFC" in log
+    assert f"{longer * 100:.1f}% of the 1,000 census strings" in log and f"{ratio * 100:.1f}% above NFC" in log
 
 
 def test_single_token_share_by_tone_reproduces_from_the_audit_rows():

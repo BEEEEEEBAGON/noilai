@@ -9,10 +9,10 @@ order does not matter (units are sorted by id before shuffling) and the sampled 
 SHA-256, the seed and the per-cell counts go into the run manifest (`run.py`) or into a
 sample file (`write_sample_file`, for `scripts/sample_items.py`).
 
-    s = stratified_sample(items, 4200, seed=20261004)
+    s = stratified_sample(items, 4200, seed=DEFAULT_SEED)
     s.per_cell           -> {"T1-V1": 350, ..., "T3-V4": 350}
     s.items              -> the sampled items, sorted by item_id
-    write_sample_file(s, "data/release/v0.2/noilai_main4200.jsonl", header=read_header(src))
+    write_sample_file(s, "data/release/v0.3/noilai_main4200.jsonl", header=read_header(src))
 
 Quotas: n is split over the cells as evenly as possible (the first n mod k cells get one
 more); a T3 quota is rounded down to an even number of items (pairs). A cell whose pool is
@@ -32,7 +32,7 @@ from pathlib import Path
 from ..gen import variants as V
 
 CELL_TASKS = ("T1", "T2", "T3")
-DEFAULT_SEED = 20261004
+DEFAULT_SEED = 20261205   # public --sample seed (smoke/pilot only); never the withheld build seed, DD 4.6
 
 
 def is_vulgar(item: dict) -> bool:

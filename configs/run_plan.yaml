@@ -47,7 +47,7 @@ run_eval_cli: scripts/run_eval.py
 run_eval_out_style: run_id_root      # run_id_root -> "--run-id <id>__<name> --out-root <runs_root>"; out -> "--out <runs_root>/<id>__<name>"
 runs_root: data/runs
 compute_log: data/compute_log.csv    # [UNCERTAIN: verify] location pending the author's confirmation (README, open question)
-release: data/release/v0.2           # DESIGN_DECISIONS 12.30: v0.1 and v0.2 are superseded; v0.3 is rebuilt at the generator-freeze commit (stage 1) -- bump this key then and re-record the item_files hashes
+release: data/release/v0.3           # DESIGN_DECISIONS 12.30: v0.1 and v0.2 are superseded; v0.3 is rebuilt at the generator-freeze commit (stage 1) -- bump this key then and re-record the item_files hashes
 release_manifest: "{release}/manifest.json"
 
 api:
@@ -71,7 +71,7 @@ item_files:
   noilai_core:
     path: "{release}/noilai_core.jsonl"
     sha256: null
-    description: "balanced core: 125 per T1/T2 cell, 62 yes/no pairs per T3 cell (1,496 items in v0.2; DD 4.5 allows 1,496-1,500); the only NóiLái test items an API may see, and only a provider with no-training terms (DD 11.2: Groq; never Gemini's unpaid tier); the source of the derived core subsets"
+    description: "balanced core: 125 per T1/T2 cell, 62 yes/no pairs per T3 cell (1,496 items in v0.3; DD 4.5 allows 1,496-1,500); the only NóiLái test items an API may see, and only a provider with no-training terms (DD 11.2: Groq; never Gemini's unpaid tier); the source of the derived core subsets"
     canary_required: true
   noilai_dev:
     path: "{release}/noilai_dev.jsonl"
@@ -88,7 +88,7 @@ item_files:
   attested:
     path: "{release}/attested.jsonl"
     sha256: null
-    description: "200-400 attested folk/literary examples (34 rows in v0.2, V1-V6 labels); items with vulgar=yes never reach an API or the human form"
+    description: "200-400 attested folk/literary examples (34 rows in v0.3, V1-V6 labels); items with vulgar=yes never reach an API or the human form"
     canary_required: false
   xcopa_vi_test:
     path: data/external/xcopa_test_vi.jsonl

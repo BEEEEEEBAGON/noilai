@@ -119,18 +119,66 @@ RL-2026-09-30-01) and `data/audit/gemma3.json`; `tests/test_paper.py` recomputes
   single-token syllable is scored 1.0 in the all-syllable mean): NFC 0.917 over 4,652 split syllables,
   NFD 0.215 over 6,130. The all-syllable means 0.94 / 0.27 of RL-2026-09-30-01 stand, labelled as such; the
   reading "when they are split the boundary is overwhelmingly at a linguistic boundary" refers to 0.92,
-  not 0.94. Once `noilai.audit.tokenizers.audit_inventory` emits `boundary_alignment_among_split_mean`
-  (`n_split`), the summary field replaces this recomputation.
-- **NFD length**: the NFD sequence is longer for 92.2% of the 500 census words (`gemma3.json`
-  `normalization_census.nfd_longer_frac`), and the NFD tokens per syllable are 58.8% above NFC
+  not 0.94. `counts.json` `tokenizer_audit.gemma3.summary.{nfc,nfd}.boundary_alignment_among_split_mean`
+  (0.917 / 0.215; `n_split` 4,652 / 6,130) now carries the figure (RL-2026-10-01-03).
+- **NFD length**: the NFD sequence is longer for 91.0% of the 1,000 census strings (500 Viet74K words +
+  500 `noilai_main` inputs, `gemma3.json` `probe_set`; `normalization_census.nfd_longer_frac`, regenerated
+  on v0.3, RL-2026-10-01-02), and the NFD tokens per syllable are 58.8% above NFC
   (2.8308 / 1.7826 − 1). "92% longer" in earlier drafts conflated the two; the design document's H3 row now
   quotes both.
 - **Single-token share by tone, NFC** (the 6,594 NFC rows whose syllable parses, grouped by parsed tone):
   ngang 50.8%, sắc 28.3%, hỏi 23.2%, huyền 23.0%, nặng 22.4%, ngã 18.4% — i.e. 51% vs 18–28%, the
-  structural-baseline motivation of DESIGN_DECISIONS 9.1. Once `scripts/reconcile_counts.py` emits
-  `single_token_by_tone`, that field replaces this recomputation.
+  structural-baseline motivation of DESIGN_DECISIONS 9.1. `counts.json` `tokenizer_audit.gemma3.single_token_by_tone`
+  now carries the figure (RL-2026-10-01-03).
 - **Agreement illustration** (DESIGN_DECISIONS 10.1; simulated with `noilai.stats.agreement` on 200,000
   binary units at 96% prevalence, `numpy.random.default_rng(0)`, two coders with independent symmetric
   error): 1% error each → raw agreement 0.980, Krippendorff's α 0.788, Gwet's AC1 0.978; 2% error each → raw agreement 0.961,
   Krippendorff's α 0.645, Gwet's AC1 0.956. The earlier "α = 0.84 against 98% raw agreement at 2% error" did not
   reproduce and is replaced.
+
+## 2026-10-01 — Benchmark build v0.3: the stage-1 freeze build (generator output, no model outputs) [RL-2026-10-01-01]
+
+Source: `data/release/v0.3/manifest.json` (public manifest: no seed, no canary GUID; `canary_sha256`
+`07fb9d791fee3ad0b00d03393557e78b7924211f0eb2a75297b57bc3addd8ca5`; the seed and the GUID are in the git-ignored
+`manifest_private.json`, DESIGN_DECISIONS 4.6 item 51) and `data/release/v0.3/attested.jsonl`; every
+number below is the sum or count over those files and `tests/test_paper.py` recomputes each of them.
+Generator commit bf74af0 (dirty tree: the review follow-ups were uncommitted at build time; rebuilt from the clean freeze commit below); content SHA-256
+`92d332e58b0e4d5d3dbf637900cd574dd2b6aac83ffecc2865c7a274ea208e11`. Built after the adversarial review's generator
+fixes (T2 gold never the input or its reversal, pair-only vulgar screen on inputs, T3 strata recomputed
+for the twin, dictionary-count marginal rimes, five-stratum pseudo quota, reserved-output screen,
+whole-base-pair split for flagged items, `spelled` = the stored word, attested storage old-style with
+engine-derived exactness). 10,000 items (T1 4,000, T2 2,000, T3 4,000) from
+2,500 base pairs (1,500 lexical drawn, `n_lexical_base_pairs`); dev 2,000 / test 8,000; core 1,496.
+Vulgar-flagged items 143 (`vulgar_counts`; the input screen is pair-only, so inputs such as *chim cu*
+now enter and their flagged outputs go to the gated test split); base pairs dropped because the input
+pair itself is a taboo phrase 0 (`base:vulgar_input:*`, per blocklist entry: ); base pairs moved whole from dev to
+test because one item was flagged 8 (`dev_base_pairs_moved_for_vulgar`). C2-affected items 288
+(`c2_affected_counts`). Six-variant outputs dropped over the 2,500 pairs: identity 1,766, plain reversal 1,766
+(mirror images across V1/V6, V2/V3, V4/V5), illegal 4,636. Marginal rimes excluded 20 (`n_marginal_rimes`);
+the loan set plus every rime with fewer than four dictionary types, `marginal_rimes`). Degenerate items per
+cell (`degenerate_counts`; V4 cells have none by construction): T1-V1 303, T1-V2 35, T1-V3 107, T2-V1 187, T2-V2 25, T2-V3 76, T3-V1 306, T3-V2 42, T3-V3 118.
+Seeded sub-samples (`samples`): `noilai_main.jsonl` 4,200 items (350 per cell, core included, public
+sampling seed 20261201), `noilai_c2.jsonl` 500 items (all C2-affected, disjoint from the release, seed 20261202).
+Attested seed: 34 rows, 28 reproduced exactly, 6 approximate (4 substitution, 2 merger), 24 H6-eligible,
+5 three-syllable, 1 vulgar-flagged, 0 native-verified. Supersedes RL-2026-09-30-05 (v0.2); the v0.1
+and v0.2 directories are removed from the repository.
+
+## 2026-10-01 — Tokenizer census regenerated on v0.3 with the three-valued verdicts (no model outputs) [RL-2026-10-01-02]
+
+Source: `data/audit/gemma3.json`, `data/audit/gemma2.json` (`scripts/audit_tokenizers.py --items
+data/release/v0.3/noilai_main.jsonl --census-seed 0`). Probe set: 500 multi-syllable Viet74K words plus
+500 `noilai_main` inputs (1,000 strings). Gemma 3: `verdict_nfd` passes_through, `verdict_pc` passes_through;
+identical token ids under NFD for 1.3% of the strings; the NFD sequence is longer for 91.0% of
+the strings; tokens per syllable NFC 1.78 / NFD 2.83 (unchanged: the inventory audit does not depend
+on the probe set). The 92.2%/500-word figure of RL-2026-09-30-06 is superseded.
+
+## 2026-10-01 — Reconciliation script emitters (no model outputs) [RL-2026-10-01-03]
+
+Source: `data/audit/counts.json` (`scripts/reconcile_counts.py --release data/release/v0.3`). New fields:
+`tokenizer_audit.<name>.summary.<enc>.boundary_alignment_among_split_mean` and `n_split` (NFC 0.917 over
+4,652 split syllables, NFD 0.215 over 6,130), `tokenizer_audit.<name>.single_token_by_tone`,
+`tokenizer_audit.<name>.verdict_nfd`/`verdict_pc`, `hunspell.onset_written`, `hunspell.coda_tone`,
+`byte_length`, `inventory.rimes_orthographic`, `wordlist.two_syllable_entries` (49,103) and
+`wordlist.distinct_canonical_pairs` (47,535), and the `release_strata` block (per task × variant
+degenerate counts, output-lexical share and C2-affected test counts over the v0.3 dev + test files).
+`data/audit/placement_xcopa*.json` carry per-file token counts (`scripts/count_placement.py`).

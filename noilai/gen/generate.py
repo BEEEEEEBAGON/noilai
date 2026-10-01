@@ -681,7 +681,7 @@ class Generator:
                 it["do_not_train"] = True
                 it["evaluation_only"] = True
         items.sort(key=lambda it: it["item_id"])
-        return {"items": items, "canary": canary, "n_base_pairs": len(pairs),
+        return {"items": items, "canary": canary, "n_base_pairs": len(pairs), "n_lexical_base_pairs": sum(1 for p in pairs if p.source == "lexicon"),
                 "cell_pool_sizes": {f"{k[0]}-{k[1]}": len(v) for k, v in sorted(cells.items())},
                 "drops": dict(sorted(self.drops.items())), "style": self.style, "exclude_qu": self.exclude_qu,
                 "n_reserved_syllables": len(self.reserved.syllables), "n_reserved_pairs": len(self.reserved.pairs),
@@ -809,6 +809,7 @@ def write_release(build: dict, out_dir: Path, manifest_extra: dict | None = None
     manifest = {
         "n_items": len(items),
         "n_base_pairs": build["n_base_pairs"],
+        "n_lexical_base_pairs": build.get("n_lexical_base_pairs"),
         "counts": {f"{t}-{v}-{s}": c for (t, v, s), c in sorted(counts.items())},
         "core_counts": dict(Counter(f"{it['task']}-{it['variant']}" for it in items if it["in_core"])),
         "vulgar_counts": dict(Counter(f"{it['task']}-{it['variant']}" for it in items if it.get("vulgar"))),

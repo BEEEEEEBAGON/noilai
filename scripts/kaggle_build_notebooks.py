@@ -351,7 +351,7 @@ if ITEMS_DATASET_DIR:
     src = Path(ITEMS_DATASET_DIR)
     if not src.exists():
         raise SystemExit(f"ITEMS_DATASET_DIR {src} not found: attach the private dataset that holds data/release")
-    rel = Path(KRP.load_plan()["release"])            # e.g. data/release/v0.2: the plan's `release` key decides where the files go
+    rel = Path(KRP.load_plan()["release"])            # e.g. data/release/v0.3: the plan's `release` key decides where the files go
     dest = PROJECT / rel
     if (src / rel.name).exists():                      # the dataset holds the data/release tree (one directory per version)
         shutil.copytree(src / rel.name, dest, dirs_exist_ok=True)

@@ -26,7 +26,7 @@ With thanks and best regards,
 
 1. Question and why it is open (four sentences; cite EXECUTE's language coverage, "Spelling-out", the tokenizer-building preprints).
 2. Instrument: nói lái in one figure — "mèo cái → mài kéo" with the Gemma 3 token boundaries (from `paper/figures/fig1_tokens.tex`).
-3. What exists: generator (counts from `data/release/v0.2/manifest.json`; v0.3 at the freeze), scoring, validation plan, pre-registration (commit hash).
+3. What exists: generator (counts from `data/release/v0.3/manifest.json`; v0.3 at the freeze), scoring, validation plan, pre-registration (commit hash).
 4. Pilot numbers: three models × 200 items, accuracy per variant with clustered 95% CIs (from `scripts/score_run.py`), copy rate, error classes; NFC vs NFD on the same items.
 5. What the co-author would own, and the timeline to 4 January.
 6. Honest risks: qu- convention, attested examples that bend the rule, API terms, no IRB.

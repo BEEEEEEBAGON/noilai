@@ -45,14 +45,14 @@
       "nfd",
       "pc"
     ],
-    "nfd_same_ids_frac": 0.015,
-    "nfd_longer_frac": 0.905,
+    "nfd_same_ids_frac": 0.013,
+    "nfd_longer_frac": 0.91,
     "nfd_byte_fallback_frac": 0.0,
     "nfd_roundtrip_ok_frac": 1.0,
     "nfd_roundtrip_failures": [],
     "verdict_nfd": "passes_through",
-    "pc_same_ids_frac": 0.063,
-    "pc_longer_frac": 0.779,
+    "pc_same_ids_frac": 0.057,
+    "pc_longer_frac": 0.794,
     "pc_byte_fallback_frac": 0.0,
     "pc_roundtrip_ok_frac": 1.0,
     "pc_roundtrip_failures": [],
@@ -72,7 +72,7 @@
       "n": 1000,
       "n_words": 500,
       "n_items": 500,
-      "items_file": "data/release/v0.2/noilai_main.jsonl",
+      "items_file": "data/release/v0.3/noilai_main.jsonl",
       "seed": 0,
       "rule": "500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)"
     }

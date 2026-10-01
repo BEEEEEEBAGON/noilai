@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """Table 1 of the paper: item counts by task x variant x split, from a build manifest.
 
-    python paper/gen_table1.py --manifest data/release/v0.2/manifest.json \
-        --attested data/release/v0.2/attested.jsonl --out paper/tables/table1_counts.tex
+    python paper/gen_table1.py --manifest data/release/v0.3/manifest.json \
+        --attested data/release/v0.3/attested.jsonl --out paper/tables/table1_counts.tex
 
 The manifest is the one `scripts/build_data.py` writes next to the item files
 (docs/DATA_FORMAT.md). Nothing in the emitted table is typed by hand: every number is

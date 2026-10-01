@@ -29,7 +29,7 @@ from noilai.audit.tokenizers import (
 )
 from noilai.vi import lexicon as L
 
-DEFAULT_ITEMS = ROOT / "data" / "release" / "v0.2" / "noilai_main.jsonl"
+DEFAULT_ITEMS = ROOT / "data" / "release" / "v0.3" / "noilai_main.jsonl"
 
 
 def run(adapter, out: Path, syllables, phrases, probe_set_source: dict | None = None):

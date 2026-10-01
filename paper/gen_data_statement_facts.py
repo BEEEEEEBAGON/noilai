@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """Release facts of the data statement, generated from the release manifest and attested file.
 
-    python paper/gen_data_statement_facts.py --manifest data/release/v0.2/manifest.json \
-        --attested data/release/v0.2/attested.jsonl --doc docs/DATA_STATEMENT.md
+    python paper/gen_data_statement_facts.py --manifest data/release/v0.3/manifest.json \
+        --attested data/release/v0.3/attested.jsonl --doc docs/DATA_STATEMENT.md
     python paper/gen_data_statement_facts.py ... --check      # exit 1 if the committed block is stale
 
 docs/DATA_STATEMENT.md is released with the data, so its numbers must not be typed: this
@@ -135,7 +135,7 @@ def splice(doc: str, block: str) -> str:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--manifest", type=Path, default=ROOT / "data" / "release" / "v0.2" / "manifest.json")
+    ap.add_argument("--manifest", type=Path, default=ROOT / "data" / "release" / "v0.3" / "manifest.json")
     ap.add_argument("--attested", type=Path, default=None, help="release attested.jsonl (default: next to the manifest)")
     ap.add_argument("--doc", type=Path, default=ROOT / "docs" / "DATA_STATEMENT.md")
     ap.add_argument("--tex", type=Path, default=ROOT / "paper" / "tables" / "attested_facts.tex",

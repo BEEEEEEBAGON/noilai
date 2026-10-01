@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 """Run one model on one item file.
 
-    python scripts/run_eval.py --items data/release/v0.2/noilai_core.jsonl --model-config gemma-3-1b-it \
+    python scripts/run_eval.py --items data/release/v0.3/noilai_core.jsonl --model-config gemma-3-1b-it \
         --tasks T1 T2 T3 --variants V1 V2 V3 V4 --paraphrases p0 p1 p2 --shots 3 --arms nfc nfd
 
-    python scripts/run_eval.py --items data/release/v0.2/noilai_main.jsonl --model-config gemma-3-1b-it \
+    python scripts/run_eval.py --items data/release/v0.3/noilai_main.jsonl --model-config gemma-3-1b-it \
         --tasks T1 T2 T3                              # the paper's main sample is a seeded FILE (scripts/sample_items.py)
 
-    python scripts/run_eval.py --items data/release/v0.2/noilai_dev.jsonl --backend echo --smoke --limit 20 --score
-    python scripts/run_eval.py --items data/release/v0.2/noilai_dev.jsonl --model-config gemma-3-1b-it \
+    python scripts/run_eval.py --items data/release/v0.3/noilai_dev.jsonl --backend echo --smoke --limit 20 --score
+    python scripts/run_eval.py --items data/release/v0.3/noilai_dev.jsonl --model-config gemma-3-1b-it \
         --smoke --sample 240 --sample-seed 7          # SMOKE/PILOT ONLY: a run-time stratified draw
     python scripts/run_eval.py --items data/external/xcopa_test_vi.jsonl --model-config gemma-3-1b-it \
         --arms nfc nfd placement_new strip_tones
@@ -125,7 +125,7 @@ def resolve_entry(args) -> dict:
         entry = B.get_model_entry(cfg, args.model_config)
     else:
         entry = {"name": args.model_id or args.backend or "model", "model_id": args.model_id, "hf_id": args.model_id,
-                 "backend": args.backend, "seed": 20261004, "max_new_tokens": 64}
+                 "backend": args.backend, "seed": 20261203, "max_new_tokens": 64}
     if args.dtype:
         entry["dtype"] = args.dtype
     if args.device:

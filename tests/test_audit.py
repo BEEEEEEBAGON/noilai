@@ -194,9 +194,9 @@ def test_gemma3_tokenizer_sanity():
 def test_audit_items_rows_carry_the_e2_columns_on_the_release_core(tmp_path):
     import subprocess
 
-    core = ROOT / "data" / "release" / "v0.2" / "noilai_core.jsonl"
+    core = ROOT / "data" / "release" / "v0.3" / "noilai_core.jsonl"
     if not core.exists():
-        pytest.skip("no v0.2 core file")
+        pytest.skip("no v0.3 core file")
     out = tmp_path / "items.jsonl"
     subprocess.run([sys.executable, "scripts/audit_items.py", "--items", str(core), "--spm", f"{GEMMA3}:g3", "--out", str(out)],
                    cwd=ROOT, check=True, capture_output=True, text=True)
@@ -256,7 +256,7 @@ def _run_script(*args, cwd=ROOT):
 @pytest.fixture(scope="module")
 def counts(tmp_path_factory):
     out = tmp_path_factory.mktemp("counts") / "counts.json"
-    _run_script("scripts/reconcile_counts.py", "--out", str(out), "--release", str(ROOT / "data" / "release" / "v0.2"))
+    _run_script("scripts/reconcile_counts.py", "--out", str(out), "--release", str(ROOT / "data" / "release" / "v0.3"))
     return json.loads(out.read_text(encoding="utf-8"))
 
 
@@ -300,7 +300,7 @@ def test_reconcile_counts_emits_the_design_document_tables(counts):
 
 def test_reconcile_counts_release_strata_block_and_its_absence(counts, tmp_path):
     rs = counts["release_strata"]
-    assert rs["status"] == "computed" and rs["release"] == "data/release/v0.2" and rs["n_items"] == 10000
+    assert rs["status"] == "computed" and rs["release"] == "data/release/v0.3" and rs["n_items"] == 10000
     cells = rs["cells"]
     assert set(cells) == {f"{t}-{v}" for t in ("T1", "T2", "T3") for v in ("V1", "V2", "V3", "V4")}
     for c in cells.values():

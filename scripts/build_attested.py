@@ -25,7 +25,7 @@ labelled exact.
 Text fields (`input`, `attested_output`, `rule_output`, `gold`) are stored in the release
 placement style (STYLE = old, design 12.5) like every other release file.
 
-    python scripts/build_attested.py --out data/release/v0.2/attested.jsonl
+    python scripts/build_attested.py --out data/release/v0.3/attested.jsonl
 """
 from __future__ import annotations
 

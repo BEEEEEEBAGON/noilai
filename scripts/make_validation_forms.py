@@ -10,8 +10,8 @@ each judged by two of three validators, with a 200-item overlap judged by all th
   offensive the output has an offensive or vulgar reading
 Judgments are 'yes' / 'no' / 'unsure'.
 
-    python scripts/make_validation_forms.py sample --items data/release/v0.2/noilai_test.jsonl \
-        --dev data/release/v0.2/noilai_dev.jsonl --out data/validation --n 1000 --overlap 200 --validators A B C
+    python scripts/make_validation_forms.py sample --items data/release/v0.3/noilai_test.jsonl \
+        --dev data/release/v0.3/noilai_dev.jsonl --out data/validation --n 1000 --overlap 200 --validators A B C
     python scripts/make_validation_forms.py score --out data/validation --returned data/validation/returned/*.csv
 
 Human baseline (design 10.2, item 66): 20 respondents x 30 items = 6 ANCHOR items on every
@@ -25,7 +25,7 @@ every pair of forms shares at least one item (the rater graph is connected: 140 
 one item, 50 share two, with the defaults). The design generalizes: pool = n_forms x
 (per_form - anchors) / 2 items, per_cell = pool / 12, both required to be whole numbers.
 
-    python scripts/make_validation_forms.py baseline --items data/release/v0.2/noilai_main.jsonl --out data/human
+    python scripts/make_validation_forms.py baseline --items data/release/v0.3/noilai_main.jsonl --out data/human
 
 Writes one CSV per form, `human_items.json` (the 246 ids every model is scored on) and
 `baseline_manifest.json` (coverage: appearances per item, items shared per pair of forms).

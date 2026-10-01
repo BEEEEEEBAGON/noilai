@@ -10,17 +10,17 @@ Purpose: a human level of performance on the same items, scored by the same code
 - **Order:** each form's 30 items in a seeded random order (T1, T2, T3 interleaved), one **instruction-check item** inserted (an anchor-style item whose answer is given in the instructions; a wrong answer excludes the form).
 - **Coverage check:** the builder prints, per item, the number of respondents (must be 20 for anchors, 2 for the rest) and, per cell, the number of items (20).
 
-The current `scripts/make_validation_forms.py baseline` subcommand produces a different design (cyclic 40-per-form forms without anchors or exact double coverage); it must be extended or replaced before the forms are sent — see the open question in the session report. The assignment above is small enough to build with the snippet below, which writes one CSV per respondent in the same column layout the script uses (`item_id, task, variant, prompt_vi, answer`), so the existing scoring path applies.
+`scripts/make_validation_forms.py baseline --items data/release/<version>/noilai_main.jsonl --out data/human --n-forms 20 --per-form 30 --seed 20261102` builds these forms (`make baseline`); the snippet below is kept as the readable statement of the assignment.
 
 ```bash
 /home/user/venv-noilai/bin/python - <<'EOF'
-# [to be moved into scripts/make_validation_forms.py by its owner]
+# [reference implementation; the script's baseline_design() is the one that runs]
 import csv, json, random
 from collections import defaultdict
 from pathlib import Path
 SEED, N_RESP, PER_CELL = 20261102, 20, 20   # a public sampling seed; never the (withheld) build seed, DESIGN_DECISIONS 4.6
 rng = random.Random(SEED)
-ITEMS = "data/release/v0.2/noilai_main.jsonl"      # the run plan's open-model main sample (v0.3 at the freeze)
+ITEMS = "data/release/v0.3/noilai_main.jsonl"      # the run plan's open-model main sample (v0.3 at the freeze)
 rows = [json.loads(l) for l in open(ITEMS, encoding="utf-8") if l.strip()]
 items = [it for it in rows if "task" in it]        # skip the canary header record
 items = [it for it in items if not it.get("vulgar") and it.get("twin_type") != "spelling"]

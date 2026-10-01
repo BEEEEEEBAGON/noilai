@@ -480,8 +480,8 @@ def test_run_plan_references_only_existing_models_item_files_and_lines(plan, mod
     ids = [r["id"] for r in plan["runs"]]
     assert len(ids) == len(set(ids))
     assert {"pilot", "smoke", "E1", "E1_ablation", "E3", "reasoning", "bf16_drift", "E4"} <= {r["experiment"] for r in plan["runs"]}
-    # every {release} placeholder resolves to the one release directory (DD 12.30: v0.2)
-    assert plan["release"] == "data/release/v0.2"
+    # every {release} placeholder resolves to the one release directory (DD 12.30: v0.3)
+    assert plan["release"] == "data/release/v0.3"
     for key, spec in plan["item_files"].items():
         assert "{release}" not in spec["path"], key
         if "{release}" in spec["path_template"]:
@@ -579,7 +579,7 @@ def test_build_command_matches_the_specified_cli_and_guards(plan, models_cfg):
     cmd = KRP.build_command(run, "gemma-3-1b-it", plan, models_cfg, project_root=Path("/proj"), python="py")
     assert cmd[:2] == ["py", "/proj/scripts/run_eval.py"]
     joined = " ".join(cmd)
-    for flag in ("--model-config gemma-3-1b-it", "--items data/release/v0.2/noilai_main.jsonl", "--tasks T1 T2 T3",
+    for flag in ("--model-config gemma-3-1b-it", "--items data/release/v0.3/noilai_main.jsonl", "--tasks T1 T2 T3",
                  "--variants V1 V2 V3 V4", "--paraphrases p0 p1 p2", "--shots 3", "--arms nfc",
                  "--resume", "--run-id E1_main__gemma-3-1b-it --out-root data/runs"):
         assert flag in joined, flag
@@ -604,7 +604,7 @@ def test_build_command_matches_the_specified_cli_and_guards(plan, models_cfg):
     assert "--variants" not in xcopa and "--tasks XCOPA" in " ".join(xcopa) and "--arms nfc nfd pc strip_tones strip_all" in " ".join(xcopa)
     assert "--arms nfc nfd pc strip_tones strip_all" in " ".join(KRP.build_command(KRP.find_run(plan, "E3_noilai"), "gemma-3-1b-it", plan, models_cfg, python="py"))
     api = KRP.build_command(KRP.find_run(plan, "E1_api_core"), "gpt-oss-20b", plan, models_cfg, python="py")
-    assert "--in-core-only" in api and "--limit" not in api and "--items data/release/v0.2/noilai_core.jsonl" in " ".join(api)
+    assert "--in-core-only" in api and "--limit" not in api and "--items data/release/v0.3/noilai_core.jsonl" in " ".join(api)
     assert KRP.OPT_OUT_FLAG not in api
     # DD 6.1 / 6.2: the scope and engine keys become the CLI's flags
     assert "--arm-scope item" in " ".join(KRP.build_command(KRP.find_run(plan, "E3_scope_item"), "gemma-3-1b-it", plan, models_cfg, python="py"))
@@ -997,7 +997,7 @@ def test_verify_items_hash_canary_and_manifest(tmp_path):
     # the real plan's gated files require a canary (and the header); dev does not
     assert KVI.load_item_file_spec("noilai_test")["canary_required"] is True
     assert KVI.load_item_file_spec("noilai_dev")["canary_required"] is False
-    assert KVI.load_item_file_spec("noilai_main")["path"] == "data/release/v0.2/noilai_main.jsonl"
+    assert KVI.load_item_file_spec("noilai_main")["path"] == "data/release/v0.3/noilai_main.jsonl"
     with pytest.raises(KeyError):
         KVI.load_item_file_spec("nope")
 
@@ -1330,7 +1330,7 @@ def test_build_command_refuses_a_canary_file_for_a_provider_that_trains_on_input
     assert KRP.OPT_OUT_FLAG in KRP.build_command(run, "gemini-flash", plan, cfg)
     # a dev file (no canary) is not guarded by this rule (the dev-derived API set of DD 4.5 goes to any provider)
     dev_run = dict(run, items="noilai_dev")
-    assert "--items data/release/v0.2/noilai_dev.jsonl" in " ".join(KRP.build_command(dev_run, "gemini-flash", plan, models_cfg))
+    assert "--items data/release/v0.3/noilai_dev.jsonl" in " ".join(KRP.build_command(dev_run, "gemini-flash", plan, models_cfg))
     # execute reports the refusal and goes on with the permitted model of a mixed set; the CLI exits 1
     proj = _stub_project(tmp_path, plan, with_items=False)
     res = KRP.execute("E1_api_core", models=["gemini-flash", "gpt-oss-20b"], platform="api", plan=plan, models_cfg=models_cfg,

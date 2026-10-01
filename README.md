@@ -98,13 +98,13 @@ Base pairs are real two-syllable words (Viet74K) and pseudo-pairs sampled from a
 syllables; every output syllable must pass `Inventory.is_legal` (attested onset+rime, tone
 allowed by the coda); the split is by base pair (`base_pair_id`, the cluster the bootstrap
 resamples); the **core** of about 1,500 items (125 per T1/T2 cell, 62 yes/no pairs = 124 items
-per T3 cell; 1,496 in v0.2) is the only NóiLái test data an API may see, and only a provider with
+per T3 cell; 1,496 in v0.3) is the only NóiLái test data an API may see, and only a provider with
 no-training terms (Groq); a provider whose tier trains on inputs (Gemini unpaid) never receives it
 (DD 11.2: a paid key with a verified opt-out, or the dev-derived API set, reported separately —
 the run driver refuses the combination until the author decides, DD 13.18); every test-split row carries
 the canary `NOILAI-CANARY-<uuid>` and every test/core file begins with the BIG-bench header
 record (`{"_header": ..., "canary": ..., "do_not_train": true, "evaluation_only": true}`) that
-loaders skip by key. The current working build is `data/release/v0.2`; DD 12.30 supersedes it by
+loaders skip by key. The current working build is `data/release/v0.3`; DD 12.30 supersedes it by
 v0.3 at the generator freeze (bump the run plan's `release:` key then and re-record the hashes).
 Sub-samples are seeded files, never drawn at run time (DD 4.5 / 12.32): `scripts/sample_items.py
 main` writes the 4,200-item open-model sample (`noilai_main.jsonl`, 350 per cell, contains the
@@ -276,8 +276,8 @@ upstream file is kept with a `.UNVERIFIED` suffix and the build stops).
 | `gemma3_tokenizer.model`, `gemma2_tokenizer.model` | google/gemma_pytorch | Apache-2.0 repository | tokenizer audit without hub access |
 
 The GPL lists are consulted at build time (legality, lexicality, frequency proxies) and the items
-are produced by the rule engine, but the lexical base pairs ARE Viet74K entries: 1,189 two-syllable
-Viet74K entries appear verbatim as inputs or gold of the released lexical items in v0.2 (6,008 items
+are produced by the rule engine, but the lexical base pairs ARE Viet74K entries: 1,183 two-syllable
+Viet74K entries appear verbatim as inputs or gold of the released lexical items in v0.3 (6,012 items
 across dev and test; counted from the release files, `tests/test_cloud.py` keeps this number
 current), and are released under the terms `docs/DATA_STATEMENT.md` §H and DD 4.1 / 11.1 / 12.22
 state: written permission from the lists' authors (requested 30 September 2026) or, failing a reply
@@ -317,7 +317,7 @@ per the ARR policy on generative assistance.
   (`--run-id`/`--out-root`) and a test keeps the two in step. No model has been run yet; every
   Vietnamese string awaits native validation.
 * **2026-09-30 (cloud kit review)** — The item-file gate accepts and checks the BIG-bench header
-  record (DD 4.6); the run plan points at `data/release/v0.2` through one `release:` key, replaces
+  record (DD 4.6); the run plan points at `data/release/v0.3` through one `release:` key, replaces
   every `--limit` sample by a seeded file (`noilai_main` from `scripts/sample_items.py`; derived
   core subsets and the two pilot files from `derive` blocks), adds the explicit-input main result
   (DD 12.17), the four prompt ablations, the E3 C2-enriched line and the TPU smoke line, and
@@ -343,6 +343,6 @@ per the ARR policy on generative assistance.
   token export (the GIT_ASKPASS fallback was unrunnable), take `ACCOUNT_HOLDER_ROLE`,
   `ALLOW_UNPINNED_REVISION`, `ALLOW_UNCAPPED_API` and push every 30 minutes; the E4 pair is the
   aligned *công tử* / *công tự*; `record_environment` probes the engine interpreter; `pyproject`
-  pins vLLM 0.30.0 and llama-cpp-python 0.3.35; the Makefile builds v0.2 with the sampled files and
+  pins vLLM 0.30.0 and llama-cpp-python 0.3.35; the Makefile builds v0.3 with the sampled files and
   refuses the superseded 20 × 40 baseline forms; `data/validation/` and `data/human/` are ignored.
   Still no model run.

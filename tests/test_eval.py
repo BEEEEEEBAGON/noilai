@@ -29,7 +29,7 @@ from noilai.vi.syllable import Syllable, parse, spell, try_parse
 
 ROOT = Path(__file__).resolve().parents[1]
 PY = sys.executable
-RELEASE = ROOT / "data" / "release" / "v0.2"
+RELEASE = ROOT / "data" / "release" / "v0.3"
 
 
 # ------------------------------------------------------------------ fixtures
