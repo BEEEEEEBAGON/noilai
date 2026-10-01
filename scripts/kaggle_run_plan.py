@@ -197,7 +197,32 @@ def expand_models(run: dict, plan: dict, models_cfg: dict) -> list[str]:
 
 # ------------------------------------------------------------------ commands
 def run_dir(plan: dict, run: dict, model: str) -> str:
-    return f"{plan.get('runs_root', 'data/runs')}/{run['id']}__{model}"
+    suffix = f"__{run['chunk_tag']}" if run.get("chunk_tag") else ""
+    return f"{plan.get('runs_root', 'data/runs')}/{run['id']}__{model}{suffix}"
+
+
+NARROWABLE = ("paraphrases", "arms", "tasks", "variants")
+
+
+def narrow_run(run: dict, overrides: dict | None, tag: str | None = None) -> dict:
+    """A compute chunk's view of a run line (docs/COMPUTE_PLAN.md): it may only NARROW the line's paraphrases, arms,
+    tasks or variants (never add one), and writes to its own run directory `<run>__<model>__<tag>` so that a manifest
+    always describes exactly the rows beside it. The analysis pools the directories of a line by its run id."""
+    if not overrides:
+        return run
+    bad = set(overrides) - set(NARROWABLE)
+    if bad:
+        raise ValueError(f"a chunk may only narrow {NARROWABLE}, not {sorted(bad)}")
+    out = dict(run)
+    for k, v in overrides.items():
+        wider = set(v) - set(run.get(k) or [])
+        if wider:
+            raise ValueError(f"chunk override widens {k} of {run['id']!r} by {sorted(wider)}")
+        if not v:
+            raise ValueError(f"chunk override empties {k} of {run['id']!r}")
+        out[k] = list(v)
+    out["chunk_tag"] = tag or "-".join(f"{k}-{'+'.join(v)}" for k, v in sorted(overrides.items()))
+    return out
 
 
 def is_api(entry: dict) -> bool:
@@ -737,7 +762,8 @@ def execute(run_id: str, models: Sequence[str] | None = None, platform: str = "k
             python: str = sys.executable, session_hardware: str | None = None, allow_hardware_mismatch: bool = False,
             session_t0: float | None = None, max_session_hours: float | None = None,
             after_each: Callable[[dict], None] | None = None, verify: bool = True, poll_s: float = 5.0,
-            allow_unpinned_revision: bool = False) -> list[dict]:
+            allow_unpinned_revision: bool = False, line_overrides: dict | None = None,
+            chunk_tag: str | None = None) -> list[dict]:
     """Run every (run, model) command in order; return one result dict per model.
 
     Statuses: 'dry-run', 'ok', 'failed (<rc>)', 'parked: ...' (an API day's cap reached; resume
@@ -748,7 +774,7 @@ def execute(run_id: str, models: Sequence[str] | None = None, platform: str = "k
     """
     plan = plan or load_plan()
     models_cfg = models_cfg or load_models()
-    run = find_run(plan, run_id)
+    run = narrow_run(find_run(plan, run_id), line_overrides, chunk_tag)
     names = list(models) if models else expand_models(run, plan, models_cfg)
     log_path = Path(log_path) if log_path else Path(project_root) / plan.get("compute_log", "data/compute_log.csv")
     lpath = ledger_path(plan, project_root)

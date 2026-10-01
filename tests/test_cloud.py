@@ -1601,3 +1601,18 @@ def test_normalizing_tokenizers_skip_the_nfd_and_pc_arms_as_zero_by_construction
     assert KRP.census_skipped_arms(e3, models_cfg["by_name"]["llama-3.1-8b-instruct"]) == {}      # not censused: nothing skipped
     monkeypatch.setattr(RUN, "AUDIT_DIR", ROOT / "data" / "audit")
     assert KRP.census_skipped_arms(e3, models_cfg["by_name"]["gemma-3-1b-it"]) == {}              # passes through
+
+
+def test_a_chunk_may_only_narrow_its_line_and_writes_its_own_run_directory(plan):
+    """docs/COMPUTE_PLAN.md: a compute chunk narrows a run line (e.g. paraphrases p0+p1 now, p2 later, the DD 8.5 cut
+    before any model) and gets its own run directory so that every manifest describes exactly its rows."""
+    import kaggle_run_plan as KRP
+    e1 = KRP.find_run(plan, "E1_main")
+    n = KRP.narrow_run(e1, {"paraphrases": ["p0", "p1"]}, "p0p1")
+    assert n["paraphrases"] == ["p0", "p1"] and KRP.run_dir(plan, n, "gemma-3-4b-it").endswith("E1_main__gemma-3-4b-it__p0p1")
+    assert KRP.run_dir(plan, e1, "gemma-3-4b-it").endswith("E1_main__gemma-3-4b-it")
+    with pytest.raises(ValueError, match="widens"):
+        KRP.narrow_run(KRP.find_run(plan, "E1_explicit_input"), {"paraphrases": ["p0", "p1"]})
+    with pytest.raises(ValueError, match="only narrow"):
+        KRP.narrow_run(e1, {"items": "noilai_test"})
+    assert KRP.narrow_run(e1, None) is e1

@@ -569,7 +569,8 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
                                   extra=RUN_EXTRA, python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
                                   allow_hardware_mismatch=ALLOW_HARDWARE_MISMATCH, session_t0=SESSION_T0,
                                   max_session_hours=MAX_SESSION_HOURS, after_each=after_each_model,
-                                  allow_unpinned_revision=ALLOW_UNPINNED_REVISION)
+                                  allow_unpinned_revision=ALLOW_UNPINNED_REVISION,
+                                  line_overrides=globals().get("LINE_OVERRIDES"), chunk_tag=globals().get("CHUNK_TAG"))
         finally:
             _stop_push.set()
             _pusher.join(timeout=5)
@@ -708,7 +709,8 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
                                        extra=RUN_EXTRA, python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
                                        allow_hardware_mismatch=ALLOW_HARDWARE_MISMATCH, session_t0=SESSION_T0,
                                        max_session_hours=MAX_SESSION_HOURS, after_each=after_each_model,
-                                       allow_unpinned_revision=ALLOW_UNPINNED_REVISION)
+                                       allow_unpinned_revision=ALLOW_UNPINNED_REVISION,
+                                       line_overrides=globals().get("LINE_OVERRIDES"), chunk_tag=globals().get("CHUNK_TAG"))
         finally:
             _stop_push.set()
             _pusher.join(timeout=5)
@@ -1442,6 +1444,14 @@ def write_all(out_dir: Path = NOTEBOOK_DIR) -> list[Path]:
     paths = []
     for name, nb in build_all().items():
         p = out_dir / f"{name}.ipynb"
+        if p.exists():                          # keep the ids of unchanged cells: a re-write then diffs only what changed
+            old = nbformat.read(str(p), as_version=4)
+            if sources(old) == sources(nb):
+                continue
+            ids = {(c.cell_type, c.source): c.get("id") for c in old.cells}
+            for c in nb.cells:
+                if ids.get((c.cell_type, c.source)):
+                    c["id"] = ids[(c.cell_type, c.source)]
         nbformat.write(nb, str(p))
         paths.append(p)
     return paths
