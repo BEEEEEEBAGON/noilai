@@ -44,7 +44,7 @@ reproduces its committed table.
 | `tables/tokenizer_audit.tex` (+ `.json`) | `gen_tokenizer_audit.py [--audit data/audit] [--check]` | `data/audit/counts.json` and the per-tokenizer `gemma3.json` / `gemma2.json`: tokens per syllable, single-token share, alignment over all and over split syllables, onset|rime split rate, tone-isolation rate and the census verdict, as the table `tab:tokaudit` in the compute appendix |
 
 The committed Table 1 comes from `data/release/v0.3/manifest.json` (10,000 items, plan defaults, built at
-generator commit f94f655 on a dirty tree) with `--release`, which the header records as "generator arguments
+generator commit f94f655 of the original repository, which maps to 62f63ae here per `docs/MIGRATION.md`, on a clean tree) with `--release`, which the header records as "generator arguments
 match the plan; declared the frozen release by --release". Neither the table header, the release-facts file
 nor the data-statement block prints the build seed (DESIGN_DECISIONS 4.6); the canary GUID appears only as its
 SHA-256.
