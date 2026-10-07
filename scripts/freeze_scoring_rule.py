@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import hashlib
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -69,14 +70,36 @@ def main(argv=None) -> int:
         print("scoring rule unchanged since the freeze")
         return 0
     if args.record:
-        g = yaml.safe_load(args.gates.read_text(encoding="utf-8")) if args.gates.exists() else {}
-        g = g or {}
-        g["scoring_rule_freeze"] = {"commit": git_head(args.root), "files_sha256": digest,
-                                    "frozen_on": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d"), "files": covered}
-        args.gates.parent.mkdir(parents=True, exist_ok=True)
-        args.gates.write_text(yaml.safe_dump(g, sort_keys=False, allow_unicode=True), encoding="utf-8")
+        record(args.gates, git_head(args.root), digest, dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d"))
         print("recorded in", args.gates)
     return 0
+
+
+def record(gates: Path, commit: str | None, digest: str, frozen_on: str) -> None:
+    """Write the three values of the `scoring_rule_freeze:` block IN PLACE, keeping every comment of the
+    gates file (a YAML dump would drop them); the block is appended when the file lacks it."""
+    gates.parent.mkdir(parents=True, exist_ok=True)
+    text = gates.read_text(encoding="utf-8") if gates.exists() else ""
+    values = {"commit": commit, "files_sha256": digest, "frozen_on": frozen_on}
+    if re.search(r"(?m)^scoring_rule_freeze:\s*$", text):
+        head, _, block = text.partition("scoring_rule_freeze:")
+        lines = block.split("\n")
+        seen = set()
+        for i, line in enumerate(lines):
+            m = re.match(r"^(\s+)(commit|files_sha256|frozen_on):\s*(.*)$", line)
+            if m and m.group(2) not in seen:
+                val = values[m.group(2)]
+                lines[i] = f"{m.group(1)}{m.group(2)}: {'null' if val is None else val}"
+                seen.add(m.group(2))
+        for key in ("commit", "files_sha256", "frozen_on"):
+            if key not in seen:
+                lines.insert(1, f"  {key}: {'null' if values[key] is None else values[key]}")
+        text = head + "scoring_rule_freeze:" + "\n".join(lines)
+    else:
+        text = text.rstrip("\n") + ("\n\n" if text else "") + "scoring_rule_freeze:\n" + "".join(
+            f"  {k}: {'null' if v is None else v}\n" for k, v in values.items())
+    gates.write_text(text, encoding="utf-8")
+    yaml.safe_load(text)                      # still valid YAML
 
 
 if __name__ == "__main__":

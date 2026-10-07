@@ -126,3 +126,18 @@ def test_progress_meter_counts_only_done_and_hash_verified_units(tmp_path):
     P.write_status(block, status)
     t = status.read_text(encoding="utf-8")
     assert "hand text" in t and "## after" in t and "old" not in t and block in t
+
+
+def test_scoring_rule_freeze_records_in_place_and_keeps_comments(tmp_path):
+    F = importlib.import_module("freeze_scoring_rule")
+    gates = tmp_path / "gates.yaml"
+    gates.write_text("# header comment\npreregistration:\n  registration_url: null\n\nscoring_rule_freeze:\n  # kept\n  commit: null\n  files_sha256: null\n  frozen_on: null\n", encoding="utf-8")
+    assert F.main(["--gates", str(gates), "--check"]) == 1                     # nothing recorded yet
+    assert F.main(["--gates", str(gates), "--record"]) == 0
+    text = gates.read_text(encoding="utf-8")
+    assert "# header comment" in text and "# kept" in text and "registration_url: null" in text
+    rec = yaml.safe_load(text)["scoring_rule_freeze"]
+    assert rec["files_sha256"] == F.scoring_rule_sha256()[0] and rec["frozen_on"]
+    assert F.main(["--gates", str(gates), "--check"]) == 0
+    empty = tmp_path / "new.yaml"
+    assert F.main(["--gates", str(empty), "--record"]) == 0 and yaml.safe_load(empty.read_text())["scoring_rule_freeze"]["files_sha256"]
