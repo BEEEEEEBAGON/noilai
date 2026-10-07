@@ -67,7 +67,7 @@ docs/           PLAN_2026-09-30.md (founding plan), DATA_FORMAT.md (item, output
 paper/          ACL 2027 LaTeX sources
 tests/          pytest (test_vi, test_gen, test_audit, test_stats, test_constants, test_probe, test_eval, test_scripts,
                 test_release, test_e2, test_paper, test_cloud, test_exploratory_plan, test_ledger, test_pin_panel, test_gates,
-                test_interim_analysis)
+                test_interim_analysis, test_ingest_sheets)
 ```
 
 ## Quick start
