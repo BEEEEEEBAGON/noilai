@@ -269,6 +269,8 @@ def test_validation_sheets_are_checked_and_scored_through_cmd_score(tmp_path, it
     from noilai.gen.generate import load_items
 
     items = [it for it in load_items(item_file) if it["task"] == "T1"][:40]
+    n = len(items)                       # 40 on the local smoke build; CI's small seeded build has fewer T1 dev items
+    assert n >= 6
     ret = tmp_path / "returned"
     ret.mkdir()
     fields = ["item_id", "task", "variant", "input", "candidate", "question_vi", "correct", "spelling", "lexical", "offensive",
@@ -292,13 +294,13 @@ def test_validation_sheets_are_checked_and_scored_through_cmd_score(tmp_path, it
     out, vout = tmp_path / "out", tmp_path / "val"
     r = _run("--items", str(item_file), "--validation-returned", str(ret / "*.csv"), "--out", str(out), "--validation-out", str(vout))
     rep = json.loads((out / "validation_report.json").read_text(encoding="utf-8"))
-    assert rep["coders"] == ["A", "B"] and rep["n_ratings_per_coder"] == {"A": 40, "B": 40}
+    assert rep["coders"] == ["A", "B"] and rep["n_ratings_per_coder"] == {"A": n, "B": n}
     assert {"alpha", "alpha_ci", "percent_agreement", "n_ratings", "ac1", "ac1_ci", "marginals"} <= set(rep["correct"])
-    assert rep["correct"]["n_ratings"] == 79 and rep["spelling"]["ac1"] == 1.0           # the blanked 'maybe' is unrated
-    assert rep["generator_precision"]["n_items"] == 38                                    # two items without a majority
+    assert rep["correct"]["n_ratings"] == 2 * n - 1 and rep["spelling"]["ac1"] == 1.0    # the blanked 'maybe' is unrated
+    assert rep["generator_precision"]["n_items"] == n - 2                                 # two items without a majority
     assert [p["check"] for p in rep["problems"]] == ["invalid_label", "duplicate_rating", "unknown_item_id"]
     fa = next(f for f in rep["files"] if f["file"] == "validation_form_A.csv")
-    assert fa["dropped_columns"] == ["validator_email"] and fa["n_unrated"] == {"correct": 1} and fa["n_rated"]["correct"] == 39
+    assert fa["dropped_columns"] == ["validator_email"] and fa["n_unrated"] == {"correct": 1} and fa["n_rated"]["correct"] == n - 1
     assert (vout / "validation_report.json").exists() and rep["scored_by"].endswith("cmd_score")
     _no_personal_data(out)
     _no_personal_data(vout)
