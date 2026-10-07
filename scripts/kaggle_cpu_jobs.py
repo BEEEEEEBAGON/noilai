@@ -41,8 +41,8 @@ experiments/ is then saved from /kaggle/working.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import importlib
-dt = importlib.import_module("datetime")   # scripts/datetime.py, imported after the path insert
 import hashlib
 import json
 import shlex
@@ -51,12 +51,11 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"            # the scripts run beside this driver; --project-root only moves data/
 sys.path.insert(0, str(SCRIPTS))
-from typing import TYPE_CHECKING
-
 KVI = importlib.import_module("kaggle_verify_items")   # scripts/kaggle_verify_items.py, imported after the path insert
 
 if TYPE_CHECKING:
