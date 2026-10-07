@@ -105,7 +105,7 @@ def test_the_repository_gates_file_has_the_documented_shape_and_every_reader_acc
     assert g["decisions"]["gemini_route"]["allowed"] == ["paid_key_opt_out", "dev_derived_set", "drop"]
     route = g["decisions"]["gemini_route"]["value"]
     assert route is None or route in g["decisions"]["gemini_route"]["allowed"]
-    assert {"commit", "files_sha256", "frozen_on"} <= set(g["scoring_rule_freeze"])    # --record adds `files`
+    assert set(g["scoring_rule_freeze"]) == {"commit", "files_sha256", "frozen_on"}    # what --record writes in place
     # every gate value is null (not yet recorded) or a recorded scalar, never a structure
     for keys, _label in (*KRP.CONFIRMATORY_REQUIREMENTS, *KRP.API_REQUIREMENTS):
         value = KRP.gate_value(g, keys)

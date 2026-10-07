@@ -10,10 +10,8 @@
 # before anyone looks at a confirmatory result. A null below means "not yet recorded", and every null
 # in a gate keeps that gate closed. Only the author fills this file (DD 13: "only the author can
 # decide"); the assistant never guesses a value. The driver ignores the gate only when this file is
-# absent (tests use temporary project roots).
-#
-# Caution: `scripts/freeze_scoring_rule.py --record` rewrites this file with yaml.safe_dump, which drops
-# these comments; keep a copy of the header, or re-add it, when that happens.
+# absent (tests use temporary project roots). `scripts/freeze_scoring_rule.py --record` edits the
+# `scoring_rule_freeze` values in place and keeps every comment.
 
 preregistration:
   # DD 8.8 / PREREGISTRATION header: the two registration commits, each the `git rev-parse HEAD` of the
