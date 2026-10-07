@@ -35,7 +35,12 @@ Cell conventions
     manifests"); the clone itself is ephemeral;
   * the run cells pass the account holder's ROLE (never a name; DD 11.2) as --account-holder,
     refuse unpinned revisions unless ALLOW_UNPINNED_REVISION (DD 7.1), and push the outputs
-    every PUSH_EVERY_MINUTES while a model runs, not only after it.
+    every PUSH_EVERY_MINUTES while a model runs, not only after it;
+  * the plan a session executes is a parameter, PLAN_PATH (default configs/run_plan.yaml, the
+    pre-registered matrix; configs/run_plan_exploratory.yaml holds the DEV-ONLY exploratory
+    lines): the item gate (d) and every run cell load it with kaggle_run_plan.load_plan and pass
+    it to the driver (`plan=PLAN`, `--plan` to kaggle_verify_items.py), so that no one edits the
+    pre-registered plan to launch an exploratory line.
 """
 from __future__ import annotations
 
@@ -339,11 +344,13 @@ FETCH_VERIFY = '''
 # (d) third-party resources (SHA-256 against data/HASHES.json) and the item file(s) of the runs this
 # notebook will execute: the keys are DERIVED from the run ids (plus the smoke run) unless
 # VERIFY_ITEM_KEYS lists them; a seeded sub-sample the plan derives from another file is written first
-# (--materialize). Each file is checked for its hash against configs/run_plan.yaml, the header record,
+# (--materialize). Each file is checked for its hash against the plan (PLAN_PATH), the header record,
 # the canary on every row and its row/cell counts. A failure stops the notebook here.
 import shutil, subprocess, sys
 from pathlib import Path
 import kaggle_run_plan as KRP
+PLAN = KRP.load_plan(Path(PLAN_PATH))                 # the plan this session executes (parameters cell); the run cells load it again
+print("plan:", PLAN_PATH, "with runs", [r["id"] for r in PLAN["runs"]])
 r = subprocess.run([sys.executable, "scripts/fetch_resources.py"], check=False)
 if r.returncode:
     raise SystemExit("resource fetch or hash check failed (see above)")
@@ -351,7 +358,7 @@ if ITEMS_DATASET_DIR:
     src = Path(ITEMS_DATASET_DIR)
     if not src.exists():
         raise SystemExit(f"ITEMS_DATASET_DIR {src} not found: attach the private dataset that holds data/release")
-    rel = Path(KRP.load_plan()["release"])            # e.g. data/release/v0.3: the plan's `release` key decides where the files go
+    rel = Path(PLAN["release"])                       # e.g. data/release/v0.3: the plan's `release` key decides where the files go
     dest = PROJECT / rel
     if (src / rel.name).exists():                      # the dataset holds the data/release tree (one directory per version)
         shutil.copytree(src / rel.name, dest, dirs_exist_ok=True)
@@ -361,10 +368,10 @@ if ITEMS_DATASET_DIR:
         raise SystemExit(f"{src} holds neither {rel.name}/ nor a release manifest.json: attach the frozen release")
     print("release copied from", src, "to", dest)
 _run_ids = list(globals().get("RUN_IDS") or [globals().get("RUN_ID")]) + list(globals().get("SMOKE_RUN_IDS") or [])
-KEYS = VERIFY_ITEM_KEYS or KRP.item_keys_for_runs(KRP.load_plan(), [r for r in _run_ids if r])
+KEYS = VERIFY_ITEM_KEYS or KRP.item_keys_for_runs(PLAN, [r for r in _run_ids if r])
 print("item files to verify:", KEYS)
 for key in KEYS:
-    r = subprocess.run([sys.executable, "scripts/kaggle_verify_items.py", "--key", key, "--materialize"], check=False)
+    r = subprocess.run([sys.executable, "scripts/kaggle_verify_items.py", "--plan", PLAN_PATH, "--key", key, "--materialize"], check=False)
     if r.returncode:
         raise SystemExit(f"item file {key} failed verification; nothing runs on it")
 '''
@@ -431,16 +438,18 @@ print("log copied to", out / "compute_log.csv", "-> merge into the repository's 
 def build_kaggle_t4() -> nbformat.NotebookNode:
     cells = [
         md("""
-        # NóiLái — Kaggle 2×T4 evaluation runs
+        # NóiLái — Kaggle 2xT4 evaluation runs
 
-        Runs one line of `configs/run_plan.yaml` (default `E1_main`) over a list of models from
-        `configs/models.yaml` with `scripts/run_eval.py --resume`, on Kaggle's free 2×T4 session
+        Runs one line of the plan named by `PLAN_PATH` (`configs/run_plan.yaml`, the pre-registered
+        matrix, default line `E1_main`; or `configs/run_plan_exploratory.yaml`, the dev-only exploratory
+        lines `floor_pilot_dev` / `throughput_dev`) over a list of models from
+        `configs/models.yaml` with `scripts/run_eval.py --resume`, on Kaggle's free 2xT4 session
         (12 h max, ~30 GPU-h/week; ≤ 9 h of work per session, outputs pushed after every model).
         Models configured for other hardware (the TPU trio, the Modal L4) are skipped by the
         session guard, never run on the wrong device. Every cell is non-interactive: set the
         **parameters** cell, then *Run all*. Attach before starting:
 
-        * accelerator **GPU T4 ×2**; internet on;
+        * accelerator **GPU T4 x2**; internet on;
         * Kaggle Secrets: `GITHUB_TOKEN` (repository read, only if no bundle), `HF_TOKEN`
           (gated Gemma/Llama/Vistral), `KAGGLE_USERNAME` + `KAGGLE_KEY` (dataset push);
         * a private dataset holding `noilai-main.bundle` (`git bundle create noilai-main.bundle main`)
@@ -469,7 +478,8 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
         HF_HOME = "/kaggle/tmp/hf"                          # model cache outside the working dir [UNCERTAIN: verify the quota of /kaggle/tmp]
         ITEMS_DATASET_DIR = "/kaggle/input/noilai-release"  # private dataset with the frozen data/release/<version>/ tree (or that tree's parent); None if the clone has it
         RUNS_RESTORE_DIR = "/kaggle/input/noilai-runs"      # the private runs dataset (KAGGLE_DATASET_SLUG) attached as input: restored into data/runs by (b') so --resume and the ledger continue; None on the very first session
-        VERIFY_ITEM_KEYS = None          # None = derived from RUN_ID and the smoke run by (d); or list keys of configs/run_plan.yaml item_files
+        VERIFY_ITEM_KEYS = None          # None = derived from RUN_ID and the smoke run by (d); or list keys of the plan's item_files
+        PLAN_PATH = "configs/run_plan.yaml"   # the plan this session executes: the pre-registered matrix, or "configs/run_plan_exploratory.yaml" (DEV-ONLY exploratory lines floor_pilot_dev / throughput_dev; it has no smoke line, so set SMOKE_RUN_IDS = [] with it); RUN_ID and SMOKE_RUN_IDS must be lines of it
 
         INSTALL_MODE = "venv"            # "venv": vLLM into /kaggle/tmp (DD 7.3: vLLM 0.30 pins torch 2.13, Kaggle ships 2.10); "kaggle_vllm": the Kaggle-built wheel; "system"
         VENV_DIR = "/kaggle/tmp/vllm-venv"
@@ -480,7 +490,7 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
         GITHUB_TOKEN_SECRET = "GITHUB_TOKEN"
         HF_TOKEN_SECRET = "HF_TOKEN"
 
-        RUN_ID = "E1_main"               # a run id from configs/run_plan.yaml (kaggle_run_plan.py --list)
+        RUN_ID = "E1_main"               # a run id of PLAN_PATH (kaggle_run_plan.py --plan <PLAN_PATH> --list)
         MODELS = ["gemma-3-1b-it"]       # subset of the run's models; [] = every model of the run that this session's hardware can run
         SMOKE_RUN_IDS = ["smoke_20"]     # (e) the smoke line, 20 items on SMOKE_MODEL before the run
         SMOKE_MODEL = "gemma-3-1b-it"
@@ -516,17 +526,19 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
         spent on a broken environment.
         """),
         code('''
-        # RUN CELL (e): smoke test. Flags come from run_plan.yaml (smoke_20) via scripts/kaggle_run_plan.py;
+        # RUN CELL (e): smoke test. Flags come from the plan's smoke line (smoke_20) via scripts/kaggle_run_plan.py;
         # the process runs on the engine's interpreter (RUN_PYTHON) and the session guards apply.
         import shlex
+        from pathlib import Path
         import kaggle_run_plan as KRP
+        PLAN = KRP.load_plan(Path(PLAN_PATH))      # the plan of this session (parameters cell): every run id below is one of its lines
         RUN_EXTRA = shlex.split(EXTRA_ARGS) + (["--account-holder", ACCOUNT_HOLDER_ROLE] if ACCOUNT_HOLDER_ROLE else [])   # role only, never a name (DD 11.2)
         if not ACCOUNT_HOLDER_ROLE:
             print("WARNING: ACCOUNT_HOLDER_ROLE is empty; the manifests will record account_holder 'unknown' (DD 11.2 asks for the role)")
         SMOKE_RESULTS = []
         for smoke_id in SMOKE_RUN_IDS:
             SMOKE_RESULTS += KRP.execute(smoke_id, models=[SMOKE_MODEL], platform=PLATFORM, dry_run=DRY_RUN,
-                                         continue_on_error=False, extra=RUN_EXTRA, python=RUN_PYTHON,
+                                         continue_on_error=False, extra=RUN_EXTRA, plan=PLAN, python=RUN_PYTHON,
                                          session_hardware=SESSION_HARDWARE, allow_hardware_mismatch=ALLOW_HARDWARE_MISMATCH,
                                          session_t0=SESSION_T0, max_session_hours=MAX_SESSION_HOURS)
         for r in SMOKE_RESULTS:
@@ -544,7 +556,7 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
         model runs and after every model; a self-hosted model whose `revision` is unpinned is skipped
         (DD 7.1) unless `ALLOW_UNPINNED_REVISION`. Each model's wall time is appended to
         `data/compute_log.csv` (a provisional 0-hour row at its start, the final row at its end) with THIS
-        session's device type and count (2 × T4), whatever hardware the model is configured for.
+        session's device type and count (2 x T4), whatever hardware the model is configured for.
         """),
         code('''
         # RUN CELL (f): the run matrix line RUN_ID over MODELS, with --resume. Adjust flags in
@@ -553,7 +565,9 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
         # flushed per row, so the pushed copy is resumable); the driver writes a provisional 0-hour compute-log
         # row at each model's start, so a session killed mid-model leaves its start on record.
         import json, threading
+        from pathlib import Path
         import kaggle_run_plan as KRP
+        PLAN = KRP.load_plan(Path(PLAN_PATH))      # loaded again here so that an edited PLAN_PATH takes effect without re-running (e)
         _stop_push = threading.Event()
 
         def _periodic_push():
@@ -571,7 +585,7 @@ def build_kaggle_t4() -> nbformat.NotebookNode:
         try:
             for job in JOBS:
                 RESULTS += KRP.execute(job["run"], models=job.get("models") or None, platform=PLATFORM, dry_run=DRY_RUN,
-                                       continue_on_error=True, extra=RUN_EXTRA, python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
+                                       continue_on_error=True, extra=RUN_EXTRA, plan=PLAN, python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
                                        allow_hardware_mismatch=ALLOW_HARDWARE_MISMATCH, session_t0=SESSION_T0,
                                        max_session_hours=MAX_SESSION_HOURS, after_each=after_each_model,
                                        allow_unpinned_revision=ALLOW_UNPINNED_REVISION,
@@ -597,12 +611,13 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
         md("""
         # NóiLái — Kaggle TPU v5e-8 runs (vLLM-TPU)
 
-        The TPU variant of the T4 notebook, same structure: the three large models (`tpu_main`:
+        The TPU variant of the T4 notebook, same structure (the plan a session runs is `PLAN_PATH`,
+        the pre-registered `configs/run_plan.yaml` by default): the three large models (`tpu_main`:
         Gemma 3 12B, Qwen3.8-27B, Qwen-SEA-LION-v4.5-27B-IT in bf16, tensor parallel over the 8
         chips), the bf16 drift check (`bf16_drift_200`: 200 core items per T4 model, unquantized;
         `phogpt-4b-chat--bf16` is configured for the Modal L4 and skipped here by the session guard)
         and the 27B reasoning sub-study (`reasoning_500_tpu`). Sessions last 9 h (~20 TPU-h/week),
-        one at a time; the vLLM-TPU startup takes 6–22 minutes per model, so keep `MODELS` short
+        one at a time; the vLLM-TPU startup takes 6-22 minutes per model, so keep `MODELS` short
         per session and rely on `--resume` (cell (b') restores the previous session's runs tree from
         the `noilai-runs` dataset first); outputs are pushed every `PUSH_EVERY_MINUTES` and after every
         model. Attach: accelerator **TPU VM v5e-8**, internet on, the same secrets and private
@@ -626,6 +641,7 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
         ITEMS_DATASET_DIR = "/kaggle/input/noilai-release"
         RUNS_RESTORE_DIR = "/kaggle/input/noilai-runs"      # the private runs dataset attached as input; restored by (b') so --resume continues
         VERIFY_ITEM_KEYS = None          # None = derived from RUN_IDS and SMOKE_RUN_IDS by (d)
+        PLAN_PATH = "configs/run_plan.yaml"   # the plan this session executes (its TPU lines are listed under RUN_IDS); "configs/run_plan_exploratory.yaml" holds DEV-ONLY exploratory lines, none of them a TPU line today
 
         VLLM_TPU_PACKAGE = "vllm-tpu"    # [UNCERTAIN: verify] the TPU build's package name for the pinned version (kaggle-tpu-lab documents the working recipe)
         VLLM_TPU_VERSION = None          # [UNCERTAIN: verify] pin once the smoke cell passes; None = latest (recorded by (c))
@@ -633,7 +649,7 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
         GITHUB_TOKEN_SECRET = "GITHUB_TOKEN"
         HF_TOKEN_SECRET = "HF_TOKEN"
 
-        RUN_IDS = ["tpu_main"]           # any of: tpu_main, bf16_drift_200, reasoning_500_tpu
+        RUN_IDS = ["tpu_main"]           # lines of PLAN_PATH; any of: tpu_main, bf16_drift_200, reasoning_500_tpu
         MODELS = ["gemma-3-12b-it"]      # subset of each run's models; [] = every model the TPU session can run
         SMOKE_RUN_IDS = ["smoke_20_tpu"] # (e) the TPU smoke line on SMOKE_MODEL
         SMOKE_MODEL = "gemma-3-12b-it"
@@ -671,14 +687,16 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
         code('''
         # RUN CELL (e): smoke test (smoke_20_tpu) on the TPU model.
         import shlex
+        from pathlib import Path
         import kaggle_run_plan as KRP
+        PLAN = KRP.load_plan(Path(PLAN_PATH))      # the plan of this session (parameters cell)
         RUN_EXTRA = shlex.split(EXTRA_ARGS) + (["--account-holder", ACCOUNT_HOLDER_ROLE] if ACCOUNT_HOLDER_ROLE else [])   # role only (DD 11.2)
         if not ACCOUNT_HOLDER_ROLE:
             print("WARNING: ACCOUNT_HOLDER_ROLE is empty; the manifests will record account_holder 'unknown' (DD 11.2 asks for the role)")
         SMOKE_RESULTS = []
         for smoke_id in SMOKE_RUN_IDS:
             SMOKE_RESULTS += KRP.execute(smoke_id, models=[SMOKE_MODEL], platform=PLATFORM, dry_run=DRY_RUN,
-                                         continue_on_error=False, extra=RUN_EXTRA, python=RUN_PYTHON,
+                                         continue_on_error=False, extra=RUN_EXTRA, plan=PLAN, python=RUN_PYTHON,
                                          session_hardware=SESSION_HARDWARE, allow_hardware_mismatch=ALLOW_HARDWARE_MISMATCH,
                                          session_t0=SESSION_T0, max_session_hours=MAX_SESSION_HOURS)
         for r in SMOKE_RESULTS:
@@ -696,7 +714,9 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
         # RUN CELL (f): each run id in RUN_IDS over MODELS (or all of the run's TPU-runnable models), --resume;
         # the outputs are pushed every PUSH_EVERY_MINUTES while a model runs (see the T4 notebook's run cell).
         import json, threading
+        from pathlib import Path
         import kaggle_run_plan as KRP
+        PLAN = KRP.load_plan(Path(PLAN_PATH))      # loaded again here so that an edited PLAN_PATH takes effect without re-running (e)
         _stop_push = threading.Event()
 
         def _periodic_push():
@@ -714,7 +734,7 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
         try:
             for job in JOBS:
                 RESULTS += KRP.execute(job["run"], models=job.get("models") or None, platform=PLATFORM, dry_run=DRY_RUN,
-                                       continue_on_error=True, extra=RUN_EXTRA, python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
+                                       continue_on_error=True, extra=RUN_EXTRA, plan=PLAN, python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
                                        allow_hardware_mismatch=ALLOW_HARDWARE_MISMATCH, session_t0=SESSION_T0,
                                        max_session_hours=MAX_SESSION_HOURS, after_each=after_each_model,
                                        allow_unpinned_revision=ALLOW_UNPINNED_REVISION,
@@ -738,10 +758,10 @@ def build_kaggle_tpu() -> nbformat.NotebookNode:
 def build_colab_probe() -> nbformat.NotebookNode:
     cells = [
         md("""
-        # NóiLái — E4 skeleton: tone/onset/rime probes and patching in Gemma 3 (Colab / Kaggle 2×T4)
+        # NóiLái — E4 skeleton: tone/onset/rime probes and patching in Gemma 3 (Colab / Kaggle 2xT4)
 
         Loads **Gemma 3 1B (IT)** in float32 on one T4 (fp32 ≈ 4 GB), or **Gemma 3 4B (IT)** as the
-        text-only `Gemma3ForCausalLM` (skips the SigLIP tower) **sharded over 2×T4** with
+        text-only `Gemma3ForCausalLM` (skips the SigLIP tower) **sharded over 2xT4** with
         `device_map="auto"` (fp32 ≈ 15.5 GB does not fit one T4; DESIGN_DECISIONS 9.5). Gemma 3 must
         never run in fp16; bf16 only on a bf16-capable GPU (L4/A100) and then with the 200-pair drift
         check. The notebook extracts residual-stream states at each syllable's last sub-token under
@@ -753,7 +773,7 @@ def build_colab_probe() -> nbformat.NotebookNode:
         (gated Gemma), `GITHUB_TOKEN` if no bundle.
 
         The two cells tagged `e4` are the experiment and are meant to be edited as E4 takes shape
-        (plan §2.6, weeks of Nov 23 – Dec 6). E4 is reported regardless of outcome (DD 8.8, item 26):
+        (plan §2.6, weeks of Nov 23 - Dec 6). E4 is reported regardless of outcome (DD 8.8, item 26):
         "clean" patching is a feasibility criterion for the main text, never a result criterion.
         """),
         code('''
@@ -771,6 +791,7 @@ def build_colab_probe() -> nbformat.NotebookNode:
         HF_HOME = "/content/hf"
         ITEMS_DATASET_DIR = None                            # probes use the syllable inventory, not the item files
         VERIFY_ITEM_KEYS = []
+        PLAN_PATH = "configs/run_plan.yaml"                 # read by the shared gate cell (d); E4 is not a run_eval line of any plan
         OUT_DIR = DRIVE_DIR + "/probe"
 
         VLLM_VERSION = None                                 # not used here: probes run through transformers
@@ -856,7 +877,7 @@ def build_colab_probe() -> nbformat.NotebookNode:
         ### E4 CELL — layer-wise probes with control tasks
         Tone-bearing syllables from the inventory are placed in carrier sentences (NFC and NFD), the
         residual stream at the syllable's last sub-token is extracted at every layer, and a probe per
-        layer predicts tone / onset / rime with a syllable-disjoint split; selectivity = real − control.
+        layer predicts tone / onset / rime with a syllable-disjoint split; selectivity = real - control.
         Edit freely as E4 develops; this is the skeleton called for by the plan.
         """),
         code('''
@@ -1043,6 +1064,7 @@ def build_api_runs() -> nbformat.NotebookNode:
         ITEMS_DATASET_DIR = "/content/drive/MyDrive/noilai/release"        # the frozen data/release tree; None if the clone has it
         RUNS_RESTORE_DIR = "/content/drive/MyDrive/noilai/runs_api"        # where the last cell copied data/runs (+ the ledger) to; restored by (b') so --resume and the ledger continue; on Kaggle: /kaggle/input/noilai-runs
         VERIFY_ITEM_KEYS = None          # None = derived from RUN_IDS by (d)
+        PLAN_PATH = "configs/run_plan.yaml"   # the plan this session executes: the API lines live in the pre-registered matrix only (the dev-only exploratory plan has no API line)
 
         GITHUB_TOKEN_SECRET = "GITHUB_TOKEN"
         API_KEY_SECRETS = ["GEMINI_API_KEY", "GROQ_API_KEY"]   # names only; values stay in the secret store
@@ -1082,8 +1104,9 @@ def build_api_runs() -> nbformat.NotebookNode:
         # API keys into the environment (names from configs/models.yaml providers.*.api_key_env); found / not found only.
         # Session overrides of the Gemini caps are applied to the IN-MEMORY config the driver receives (MODELS_CFG),
         # never written to configs/models.yaml (that would strip its comments and dirty every manifest's git state).
+        from pathlib import Path
         import kaggle_run_plan as KRP
-        PLAN, MODELS_CFG = KRP.load_plan(), KRP.load_models()
+        PLAN, MODELS_CFG = KRP.load_plan(Path(PLAN_PATH)), KRP.load_models()
         wanted = sorted({p["api_key_env"] for p in MODELS_CFG["providers"].values()} & set(API_KEY_SECRETS))
         FOUND = {name: _export(name) for name in wanted}
         if not any(FOUND.values()):
@@ -1219,27 +1242,31 @@ print("environment recorded at", ENV_RECORD)
 '''
 
 PIN_CELL = '''
-# (c') panel pins for the models of this session (DESIGN_DECISIONS 7.1): resolve each model's Hub revision, licence,
-# gating and tokenizer SHA-256 (scripts/pin_panel.py), write the hashes into the clone's configs/models.yaml, verify,
-# and keep the manifest with the outputs. A gated model whose licence the HF account has not accepted fails here,
-# with the reason, before anything runs. The repository's models.yaml is updated from this manifest by the author
-# (the panel-freeze commit), never by the notebook.
-import json, shutil, subprocess, sys
+# (c') panel pins for the models of this session (DESIGN_DECISIONS 7.1): scripts/pin_panel.py resolves each model's Hub
+# revision (the full commit hash), its gating and the SHA-256 of its tokenizer files, writes the pins JSON next to the
+# outputs (WORK_DIR/noilai_runs_out/panel_pins.json, saved with the notebook version) and applies the hashes to the
+# CLONE's configs/models.yaml (--apply re-parses the rewritten file and refuses a conflicting pin). The session pins only
+# its MODELS (--partial: the other panel entries stay as they are). A gated model whose licence the HF account has not
+# accepted fails here, with the reason, before anything runs. A notebook never writes the repository's configs/models.yaml:
+# it is updated at home from experiments/panel_pins.json, produced by `scripts/kaggle_cpu_jobs.py pin` (RUNBOOK section 3),
+# with `scripts/pin_panel.py --apply --from experiments/panel_pins.json` (the panel-freeze commit).
+import json, subprocess, sys
 from pathlib import Path
 if PIN_MODELS:
-    r = subprocess.run([sys.executable, "scripts/pin_panel.py", "--names", *MODELS, "--apply"], capture_output=True, text=True, check=False)
+    pins = Path(WORK_DIR) / "noilai_runs_out" / "panel_pins.json"
+    pins.parent.mkdir(parents=True, exist_ok=True)
+    r = subprocess.run([sys.executable, "scripts/pin_panel.py", "--names", *MODELS, "--apply", "--partial", "--out", str(pins)],
+                       capture_output=True, text=True, check=False)
     print(r.stdout[-2000:], r.stderr[-2000:])
-    man = json.loads((PROJECT / "configs" / "panel_manifest.json").read_text())
-    errors = [(e["name"], e.get("error") or e.get("note")) for e in man["entries"] if e["status"] != "pinned"]
-    out = Path(WORK_DIR) / "noilai_runs_out"
-    out.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(PROJECT / "configs" / "panel_manifest.json", out / "panel_manifest.json")
-    if errors:
-        raise SystemExit(f"not pinned: {errors} (accept the model licence on the Hub with the HF_TOKEN account, or fix the id)")
-    v = subprocess.run([sys.executable, "scripts/pin_panel.py", "--verify"], capture_output=True, text=True, check=False)
-    print(v.stdout)
-    if v.returncode:
-        raise SystemExit("pin manifest does not verify")
+    if not pins.exists():
+        raise SystemExit(f"pin_panel.py wrote no {pins.name} (exit {r.returncode}): read its output above")
+    doc = json.loads(pins.read_text())
+    errors = [(rec["name"], rec.get("error")) for rec in doc["records"] if rec["hf_id_status"] != "found" or not rec["revision"]]
+    if errors or r.returncode:
+        raise SystemExit(f"not pinned (pin_panel.py exit {r.returncode}): {errors} "
+                         "(accept the model licence on the Hub with the HF_TOKEN account, or fix the id)")
+    for rec in doc["records"]:
+        print("pinned", rec["name"], rec["hf_id"], "@", rec["revision"])
 else:
     print("PIN_MODELS is False: the runs below are rehearsals (ALLOW_UNPINNED_REVISION must be True; manifests record revision null)")
 '''
@@ -1312,7 +1339,8 @@ def build_kaggle_cpu_pilot() -> nbformat.NotebookNode:
         HF_HOME = "/kaggle/tmp/hf"
         ITEMS_DATASET_DIR = "/kaggle/input/noilai-release"
         RUNS_RESTORE_DIR = "/kaggle/input/noilai-runs"      # None on the very first session
-        VERIFY_ITEM_KEYS = None
+        VERIFY_ITEM_KEYS = None          # None = derived from RUN_IDS by (d)
+        PLAN_PATH = "configs/run_plan.yaml"   # the plan this session executes (RUN_IDS are lines of it): the CPU route runs the pre-registered smoke and Gate 1 pilot lines; configs/run_plan_exploratory.yaml holds the DEV-ONLY exploratory lines (none of them a CPU line)
 
         GITHUB_TOKEN_SECRET = "GITHUB_TOKEN"
         HF_TOKEN_SECRET = "HF_TOKEN"
@@ -1357,7 +1385,9 @@ def build_kaggle_cpu_pilot() -> nbformat.NotebookNode:
         # RUN CELL (e): the first real run. The CPU route = the HF backend in float32 on a session with no accelerator
         # (configs carry t4 hardware, hence the documented mismatch flag; the compute log records device "cpu" x 0).
         import shlex
+        from pathlib import Path
         import kaggle_run_plan as KRP
+        PLAN = KRP.load_plan(Path(PLAN_PATH))      # the plan of this session (parameters cell): every run id below is one of its lines
         CPU_EXTRA = ["--backend", "hf", "--device", "cpu", "--dtype", "float32"]
         RUN_DIR_TAG = "cpu"      # data/runs/<run>__<model>__cpu: a T4 run of the same line keeps its own directory, so the first
                                  # GPU smoke really runs and its outputs can be compared with these row by row
@@ -1365,7 +1395,7 @@ def build_kaggle_cpu_pilot() -> nbformat.NotebookNode:
         if not ACCOUNT_HOLDER_ROLE:
             print("WARNING: ACCOUNT_HOLDER_ROLE is empty; the manifests will record account_holder 'unknown' (DD 11.2 asks for the role)")
         SMOKE_RESULTS = KRP.execute("smoke_20", models=MODELS, platform=PLATFORM, dry_run=DRY_RUN, continue_on_error=False,
-                                    extra=RUN_EXTRA, python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
+                                    extra=RUN_EXTRA, plan=PLAN, python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
                                     allow_hardware_mismatch=True, session_t0=SESSION_T0, max_session_hours=MAX_SESSION_HOURS,
                                     after_each=after_each_model, allow_unpinned_revision=ALLOW_UNPINNED_REVISION,
                                     chunk_tag=RUN_DIR_TAG)
@@ -1384,6 +1414,9 @@ def build_kaggle_cpu_pilot() -> nbformat.NotebookNode:
         # RUN CELL (f): the pilot lines, one model at a time, resumable (--resume via the driver); a background push
         # every PUSH_EVERY_MINUTES keeps a killed session's rows.
         import threading
+        from pathlib import Path
+        import kaggle_run_plan as KRP
+        PLAN = KRP.load_plan(Path(PLAN_PATH))      # loaded again here so that an edited PLAN_PATH takes effect without re-running (e)
         RESULTS = []
         if MODE == "pilot":
             _stop_push = threading.Event()
@@ -1400,7 +1433,7 @@ def build_kaggle_cpu_pilot() -> nbformat.NotebookNode:
                 for run_id in [r for r in RUN_IDS if r != "smoke_20"]:
                     extra = RUN_EXTRA + (["--t1-forced-choice"] if FORCED_CHOICE and run_id.startswith("pilot_t1") else [])
                     RESULTS += KRP.execute(run_id, models=MODELS, platform=PLATFORM, dry_run=DRY_RUN, continue_on_error=True,
-                                           extra=extra, python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
+                                           extra=extra, plan=PLAN, python=RUN_PYTHON, session_hardware=SESSION_HARDWARE,
                                            allow_hardware_mismatch=True, session_t0=SESSION_T0,
                                            max_session_hours=MAX_SESSION_HOURS, after_each=after_each_model,
                                            allow_unpinned_revision=ALLOW_UNPINNED_REVISION, chunk_tag=RUN_DIR_TAG)
