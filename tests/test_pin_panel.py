@@ -166,6 +166,23 @@ def test_a_short_or_missing_sha_is_an_error_not_a_pin(tmp_path):
     assert rec["hf_id_status"] == PP.STATUS_ERROR and rec["revision"] is None and "no full commit hash" in rec["error"]
 
 
+def test_an_unreachable_hub_during_download_is_an_error_not_an_absent_file(tmp_path):
+    """LocalEntryNotFoundError (offline, nothing cached) carries EntryNotFoundError in its MRO but is a
+    transport failure: the record must say so instead of reporting `found` with no tokenizer hashes."""
+    from huggingface_hub.errors import LocalEntryNotFoundError
+
+    class Offline(FakeResolver):
+        def download(self, hf_id, filename, revision):
+            raise LocalEntryNotFoundError("outgoing traffic has been disabled")
+
+    rec = PP.resolve_hf_id("org/m", Offline(tmp_path))
+    assert rec["hf_id_status"] == PP.STATUS_ERROR and "LocalEntryNotFoundError" in rec["error"]
+    assert rec["revision"] == fake_sha("org/m") and rec["tokenizer_sha256"] == {}
+    # a plain absent file (RemoteEntryNotFoundError) is still skipped silently
+    rec = PP.resolve_hf_id("org/m", FakeResolver(tmp_path, files=["tokenizer.json"]))
+    assert rec["hf_id_status"] == PP.STATUS_FOUND and set(rec["tokenizer_sha256"]) == {"tokenizer.json"} and rec["error"] is None
+
+
 # ------------------------------------------------------------------ apply
 def _pins_for(cfg, tmp_path, behaviour=None):
     hub = FakeResolver(tmp_path, behaviour)

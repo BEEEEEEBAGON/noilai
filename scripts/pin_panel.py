@@ -167,6 +167,14 @@ def classify_error(exc: BaseException) -> str:
     return STATUS_ERROR
 
 
+def _is_absent_file(exc: BaseException) -> bool:
+    """hf_hub_download's "the repository has no such file" (EntryNotFoundError / RemoteEntryNotFoundError);
+    a LocalEntryNotFoundError is the opposite case, the hub could not be reached and the cache has no copy,
+    so it stays an error rather than an empty tokenizer record."""
+    names = {c.__name__ for c in type(exc).__mro__}
+    return "EntryNotFoundError" in names and "LocalEntryNotFoundError" not in names
+
+
 def _error_text(exc: BaseException) -> str:
     return f"{type(exc).__name__}: {exc}"[:_ERROR_CHARS]
 
@@ -197,7 +205,7 @@ def resolve_hf_id(hf_id: str, resolver) -> dict:
             path = resolver.download(hf_id, filename, sha)
         except Exception as e:
             kind = classify_error(e)
-            if kind == STATUS_NOT_FOUND or any("EntryNotFoundError" in c.__name__ for c in type(e).__mro__):
+            if kind == STATUS_NOT_FOUND or _is_absent_file(e):
                 continue                                   # the file is not in the repository
             rec.update(hf_id_status=kind, error=_error_text(e))
             return rec
@@ -380,7 +388,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--models-config", type=Path, default=MODELS_FILE)
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT, help="where the resolution JSON goes")
-    ap.add_argument("--names", nargs="*", default=None, help="resolve only these entries")
+    ap.add_argument("--names", nargs="+", default=None, help="resolve only these entries")
     ap.add_argument("--include-api", action="store_true",
                     help="also resolve API entries that carry an hf_id (tokenizer record only; never applied)")
     ap.add_argument("--token-env", default="HF_TOKEN", help="environment variable holding the hub token")
