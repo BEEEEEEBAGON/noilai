@@ -1,8 +1,10 @@
 """scripts/interim_analysis.py, the per-session interim analysis on completed units only (CLAUDE.md step 4),
 exercised on local echo runs of a NON-frozen build: the INTERIM label and n on the title and every table,
 the base-pair cluster-bootstrap cells, rescoring through score_run when scores.jsonl is absent, a run whose
-item file is missing reported as unscorable instead of a crash, the ledger's done-only selection, the
-fallback to a runs directory without a ledger, and the refusal to write under paper/."""
+item file is missing reported as unscorable instead of a crash, the ledger's done-only selection, tagged run
+directories (`<run>__<model>__<tag>`, the chunk plan's cpu / p0p1 / p2) located from the ledger's `tag` column
+and pooled per line, results_hashes.json read when present, the fallback to a runs directory without a
+ledger, and the refusal to write under paper/."""
 import csv
 import importlib
 import json
@@ -156,7 +158,7 @@ def test_ledger_mode_analyses_done_units_only_and_carries_the_hash_gate(runs, tm
     shutil.copytree(runs / "interim_test", runs2 / "by_path__echo")            # found through result_file
     shutil.copytree(runs / "interim_mixed", runs2 / "by_name__echo-mixed")      # found as <runs>/<run_id>__<model>
     shutil.copytree(runs / "interim_test", runs2 / "arm_line__echo")           # done unit is an arm the run has no rows for
-    cols = ["unit_id", "run_id", "model", "arm", "status", "hash_verified", "result_file", "scores_file", "notes"]
+    cols = ["unit_id", "run_id", "model", "arm", "tag", "status", "hash_verified", "result_file", "notes"]
     rows = [
         {"unit_id": "by_path__echo__nfc", "run_id": "by_path", "model": "echo", "arm": "nfc", "status": "done",
          "hash_verified": "no", "result_file": str(runs2 / "by_path__echo" / "outputs.jsonl")},
@@ -184,20 +186,72 @@ def test_ledger_mode_analyses_done_units_only_and_carries_the_hash_gate(runs, tm
     text = (out / f"{DATE}_interim.md").read_text(encoding="utf-8")
     assert rep["source"]["mode"] == "ledger" and rep["source"]["ledger"] == str(ledger)
     by_run = {x["run_id"]: x for x in rep["runs"]}
-    assert set(by_run) == {"interim_test", "interim_mixed"}                    # the manifests' run ids
-    assert by_run["interim_test"]["unit_ids"] == ["by_path__echo__nfc"] and by_run["interim_test"]["hash_verified"] == "no"
+    assert set(by_run) == {"interim_mixed"}                                    # the hash-failed unit is not analysed (DD 4.6)
     assert by_run["interim_mixed"]["unit_ids"] == ["by_name__echo-mixed__nfc"] and by_run["interim_mixed"]["hash_verified"] == "yes"
-    assert "| no |" in text and rep["n"]["runs"] == 2 and rep["n"]["models"] == 2
+    assert "| no |" not in text and rep["n"]["runs"] == 1 and rep["n"]["models"] == 1
     uns = {Path(u["run_dir"]).name: u for u in rep["unscorable"]}
     assert set(uns) == {"arm_line__echo"} and "nfd" in uns["arm_line__echo"]["reason"]
     assert uns["arm_line__echo"]["unit_ids"] == ["arm_line__echo__nfd"]
     skipped = {s["unit_id"]: s["reason"] for s in rep["skipped"]}
-    assert set(skipped) == {"validation__A"} and "no run directory" in skipped["validation__A"]
-    assert "validation__A" in text
+    assert set(skipped) == {"validation__A", "by_path__echo__nfc"} and "no run directory" in skipped["validation__A"]
+    assert "hash" in skipped["by_path__echo__nfc"] and "DD 4.6" in skipped["by_path__echo__nfc"]
+    assert "validation__A" in text and "by_path__echo__nfc" in text
     # the same ledger through the function API, with the real ledger's status vocabulary
     refs = IA.completed_from_ledger(ledger, runs2, [])
-    assert sorted(ref.run_dir.name for ref in refs) == ["arm_line__echo", "by_name__echo-mixed", "by_path__echo"]
+    assert sorted(ref.run_dir.name for ref in refs) == ["arm_line__echo", "by_name__echo-mixed"]
     assert next(ref for ref in refs if ref.run_dir.name == "arm_line__echo").arms == {"nfd"}
+    # untagged runs: the line is the run id, no tag, cells carry the line
+    assert all(r["line"] == r["run_id"] and r["tag"] == "" and r["results_sha256"] is None for r in rep["runs"])
+    assert {c["run_id"] for c in rep["cells"]} == {"interim_mixed"} and all(c["tag"] == "" for c in rep["cells"])
+
+
+def test_tagged_run_directories_are_located_from_the_ledger_and_pooled_per_line(runs, tmp_path):
+    """The chunk plan's run directories `<run>__<model>__<tag>`: a done ledger row with a `tag` is found at the tagged
+    path; the p0p1 and p2 directories of one (line, model) are pooled into one set of cells (DD 8.5 paraphrase split)
+    with the tags in a column; results_hashes.json's `results_sha256` is carried into the run table."""
+    runs2 = tmp_path / "runs"
+    runs2.mkdir()
+    a = _copy_run(runs / "interim_mixed", runs2 / "pool__echo-mixed__p0p1", run_id="pool__echo-mixed__p0p1")
+    _copy_run(runs / "interim_mixed", runs2 / "pool__echo-mixed__p2", run_id="pool__echo-mixed__p2")
+    _copy_run(runs / "interim_test", runs2 / "solo__echo__cpu", run_id="solo__echo__cpu")
+    (a / "results_hashes.json").write_text(json.dumps({"outputs.jsonl": "0" * 64, "results_sha256": "ab" * 32}), encoding="utf-8")
+    cols = ["unit_id", "run_id", "model", "arm", "tag", "status", "hash_verified", "result_file", "notes"]
+    rows = [
+        {"unit_id": "pool__echo-mixed__nfc__p0p1", "run_id": "pool", "model": "echo-mixed", "arm": "nfc", "tag": "p0p1", "status": "done", "hash_verified": "yes"},
+        {"unit_id": "pool__echo-mixed__nfc__p2", "run_id": "pool", "model": "echo-mixed", "arm": "nfc", "tag": "p2", "status": "done", "hash_verified": "yes"},
+        {"unit_id": "solo__echo__nfc__cpu", "run_id": "solo", "model": "echo", "arm": "nfc", "tag": "cpu", "status": "done", "hash_verified": "yes"},
+        {"unit_id": "solo__echo__nfc", "run_id": "solo", "model": "echo", "arm": "nfc", "tag": "", "status": "done", "hash_verified": "yes"},
+    ]
+    ledger = tmp_path / "ledger.csv"
+    with open(ledger, "w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=cols)
+        w.writeheader()
+        for row in rows:
+            w.writerow({c: row.get(c, "") for c in cols})
+    assert IA.locate_run_dir(rows[0], runs2) == runs2 / "pool__echo-mixed__p0p1"
+    assert IA.locate_run_dir(rows[2], runs2) == runs2 / "solo__echo__cpu"
+    assert IA.locate_run_dir(rows[3], runs2) is None                         # the untagged T4 directory does not exist
+    assert IA.split_run_id("pool__echo-mixed__p2") == ("pool", "p2") and IA.split_run_id("x__m") == ("x", "") and IA.split_run_id("plain") == ("plain", "")
+    out = tmp_path / "interim"
+    r = _driver("--ledger", str(ledger), "--runs", str(runs2), "--out", str(out), "--date", DATE, "--n-boot", str(N_BOOT), "--quiet")
+    assert r.returncode == 0, r.stderr
+    rep = json.loads((out / f"{DATE}_interim.json").read_text(encoding="utf-8"))
+    text = (out / f"{DATE}_interim.md").read_text(encoding="utf-8")
+    by_run = {x["run_id"]: x for x in rep["runs"]}
+    assert set(by_run) == {"pool__echo-mixed__p0p1", "pool__echo-mixed__p2", "solo__echo__cpu"}
+    assert by_run["pool__echo-mixed__p0p1"]["line"] == "pool" and by_run["pool__echo-mixed__p0p1"]["tag"] == "p0p1"
+    assert by_run["pool__echo-mixed__p0p1"]["results_sha256"] == "ab" * 32 and by_run["pool__echo-mixed__p2"]["results_sha256"] is None
+    assert by_run["solo__echo__cpu"]["unit_ids"] == ["solo__echo__nfc__cpu"] and by_run["solo__echo__cpu"]["hash_verified"] == "yes"
+    assert rep["n"]["runs"] == 3 and rep["n"]["lines"] == 2 and rep["n"]["models"] == 2
+    pooled = [c for c in rep["cells"] if c["run_id"] == "pool"]
+    solo = [c for c in rep["cells"] if c["run_id"] == "solo"]
+    assert pooled and all(c["tag"] == "p0p1+p2" and c["model"] == "echo-mixed" for c in pooled)
+    assert sum(c["n_rows"] for c in pooled) == 2 * by_run["pool__echo-mixed__p0p1"]["n_rows"]   # both directories' rows in one set of cells
+    assert all(c["n_items"] == c["n_rows"] // 2 for c in pooled)                                # the same items twice: pooled, not duplicated cells
+    assert solo and all(c["tag"] == "cpu" for c in solo) and sum(c["n_rows"] for c in solo) == by_run["solo__echo__cpu"]["n_rows"]
+    assert "| `pool` | p0p1+p2 |" in text and "| `solo` | cpu |" in text and f"`{'ab' * 6}`" in text
+    skipped = {s["unit_id"]: s["reason"] for s in rep["skipped"]}
+    assert set(skipped) == {"solo__echo__nfc"} and "no run directory" in skipped["solo__echo__nfc"]
 
 
 def test_a_missing_ledger_falls_back_to_the_runs_directory_and_empty_runs_still_write_a_labelled_report(runs, tmp_path):
@@ -215,7 +269,7 @@ def test_a_missing_ledger_falls_back_to_the_runs_directory_and_empty_runs_still_
     text = (out2 / f"{DATE}_interim.md").read_text(encoding="utf-8")
     assert text.startswith("# INTERIM analysis") and "n = 0 items, 0 base pairs, 0 models" in text and IA.NOTICE in text
     rep = json.loads((out2 / f"{DATE}_interim.json").read_text(encoding="utf-8"))
-    assert rep["n"] == {"items": 0, "base_pairs": 0, "models": 0, "runs": 0, "cells": 0, "unscorable": 0, "skipped": 0}
+    assert rep["n"] == {"items": 0, "base_pairs": 0, "models": 0, "runs": 0, "lines": 0, "cells": 0, "unscorable": 0, "skipped": 0}
     r = _driver("--runs", str(empty), "--out", str(tmp_path / "x"), "--date", "7 Oct 2026")
     assert r.returncode == 2 and "YYYY-MM-DD" in r.stderr
 

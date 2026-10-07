@@ -12,17 +12,23 @@ present). With a ledger (--ledger, or the default experiments/ledger.csv when ne
 a ledger (--runs alone, or a --ledger path that does not exist) every directory under --runs whose
 manifest.json has status `finished` counts; unfinished runs are listed as skipped.
 
-For each completed run the driver reads manifest.json (identity.model_key, data.arms,
-item_file.path / sha256), then scores.jsonl as written by scripts/score_run.py. When scores.jsonl is
-absent and the item file resolves (score_run.resolve_items_path), the run is scored here through
-score_run.score_run_dir; when the item file cannot be found the run is reported as UNSCORABLE and
-skipped, never a crash. Per (task, variant, arm, prompt_id) it computes strict accuracy with the
-base-pair cluster bootstrap of noilai.stats.bootstrap (DESIGN_DECISIONS 8.2: clusters =
-`base_pair_id`, carried in the score rows or recovered from the item file by item_id; B =
-constants.BOOTSTRAP_B with a fixed seed; stratified by base-pair type, lexical vs pseudo; BCa from
-constants.BCA_MIN_CLUSTERS base pairs; Wilson on n / DEFF for cells with fewer than
-constants.SMALL_CELL_MAX_BASE_PAIRS base pairs or at 0 % / 100 %), the number of items and of base
-pairs, the realized design effect and the unparseable rate (DESIGN_DECISIONS 8.9).
+A run directory is `<runs>/<run>__<model>[__<tag>]` (kaggle_run_plan.run_dir; the chunk plan's tags
+`cpu`, `p0p1`, `p2`): a ledger row with a `tag` is located at the tagged path, the recorded result_file's
+parent and the untagged path are tried as well. For each completed run the driver reads manifest.json
+(identity.run_id, identity.model_key, data.arms, item_file.path / sha256), results_hashes.json when
+scripts/check_run.py wrote it (its `results_sha256` is printed beside the hash gate), then scores.jsonl
+as written by scripts/score_run.py. When scores.jsonl is absent and the item file resolves
+(score_run.resolve_items_path), the run is scored here through score_run.score_run_dir; when the item
+file cannot be found the run is reported as UNSCORABLE and skipped, never a crash. The cells are
+computed PER LINE: the score rows of every directory of one (run line, model) are pooled, so a
+paraphrase split (`p0p1` + `p2`, DD 8.5) is one set of cells with the tags shown in a column. Per
+(task, variant, arm, prompt_id) it computes strict accuracy with the base-pair cluster bootstrap of
+noilai.stats.bootstrap (DESIGN_DECISIONS 8.2: clusters = `base_pair_id`, carried in the score rows or
+recovered from the item file by item_id; B = constants.BOOTSTRAP_B with a fixed seed; stratified by
+base-pair type, lexical vs pseudo; BCa from constants.BCA_MIN_CLUSTERS base pairs; Wilson on n / DEFF
+for cells with fewer than constants.SMALL_CELL_MAX_BASE_PAIRS base pairs or at 0 % / 100 %), the
+number of items and of base pairs, the realized design effect and the unparseable rate
+(DESIGN_DECISIONS 8.9).
 
 Outputs: <out>/<UTC date>_interim.md and <out>/<UTC date>_interim.json with the same numbers. The
 title and every table are labelled INTERIM with n (items, base pairs, models), and both files carry
@@ -90,16 +96,19 @@ def read_ledger(path: Path) -> list[dict]:
 
 
 def locate_run_dir(row: dict, runs_root: Path) -> Path | None:
-    """The run directory of a done ledger row: the parent of its scores_file / result_file (as
-    recorded, relative to the project root, or by name under --runs), else <runs>/<run_id>__<model>
-    (the ingest convention of scripts/ledger.py). None when no candidate holds a manifest.json."""
+    """The run directory of a done ledger row: the parent of its result_file (as recorded, relative to
+    the project root, or by name under --runs), else <runs>/<run_id>__<model>__<tag> when the row carries
+    a tag, else <runs>/<run_id>__<model> (the run-directory convention of kaggle_run_plan.run_dir and
+    scripts/ledger.py). None when no candidate holds a manifest.json."""
     candidates: list[Path] = []
-    for key in ("scores_file", "result_file"):
-        recorded = (row.get(key) or "").strip()
-        if recorded:
-            parent = Path(recorded).parent
-            candidates += [parent, ROOT / parent, runs_root / parent.name]
+    recorded = (row.get("result_file") or "").strip()
+    if recorded:
+        parent = Path(recorded).parent
+        candidates += [parent, ROOT / parent, runs_root / parent.name]
     if row.get("run_id") and row.get("model"):
+        tag = (row.get("tag") or "").strip()
+        if tag:
+            candidates.append(runs_root / f"{row['run_id']}__{row['model']}__{tag}")
         candidates.append(runs_root / f"{row['run_id']}__{row['model']}")
     for cand in candidates:
         if (cand / "manifest.json").exists():
@@ -107,11 +116,38 @@ def locate_run_dir(row: dict, runs_root: Path) -> Path | None:
     return None
 
 
+def split_run_id(run_id: str) -> tuple[str, str]:
+    """(line, tag) of a run id `<run>__<model>[__<tag>]`; a run id without `__` is its own line."""
+    parts = run_id.split("__")
+    if len(parts) == 3:
+        return parts[0], parts[2]
+    if len(parts) == 2:
+        return parts[0], ""
+    return run_id, ""
+
+
+def read_results_hashes(run_dir: Path) -> str | None:
+    """`results_sha256` of scripts/check_run.py's results_hashes.json when present."""
+    path = run_dir / "results_hashes.json"
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8")).get("results_sha256")
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
 def completed_from_ledger(ledger: Path, runs_root: Path, skipped: list[dict]) -> list[RunRef]:
     """The run directories of the ledger's done units, one RunRef per directory with the done arms."""
     refs: dict[Path, RunRef] = {}
     for row in read_ledger(ledger):
         if row.get("status") != COMPLETED_LEDGER_STATUS:
+            continue
+        if (row.get("hash_verified") or "").strip().lower() == "no":
+            # DESIGN_DECISIONS 4.6: a run on an item file whose hash differs from the plan's is not a benchmark result
+            skipped.append({"unit_id": row.get("unit_id"), "run_dir": row.get("result_file") or None,
+                            "reason": "done but the item-file hash does not match the plan (DD 4.6): not analysed; "
+                                      "ledger.py ingest exits 1 on it"})
             continue
         run_dir = locate_run_dir(row, runs_root)
         if run_dir is None:
@@ -228,13 +264,14 @@ def cell_ci(rows: list[dict], n_boot: int, seed: int) -> dict:
             "unparseable_rate": n_unparseable / len(rows)}
 
 
-def analyse_run(ref: RunRef, n_boot: int, seed: int, rescore: bool) -> tuple[dict, list[dict], set, set]:
-    """One completed run: its summary row, its cells, and the item and base-pair ids it covers."""
+def analyse_run(ref: RunRef, rescore: bool) -> tuple[dict, list[dict]]:
+    """One completed run directory: its summary row and its score rows (the completed arms only)."""
     manifest = read_manifest(ref.run_dir)
     identity = manifest.get("identity") or {}
     info = manifest.get("item_file") if isinstance(manifest.get("item_file"), dict) else {}
     data = manifest.get("data") or {}
     run_id = identity.get("run_id") or manifest.get("run_id") or ref.run_dir.name
+    line, tag = split_run_id(run_id)
     model = identity.get("model_key") or (manifest.get("model") or {}).get("name") or "?"
     if manifest.get("status") == STATUS_THINKING:        # DESIGN_DECISIONS 7.3: thinking text in a main run MUST be 0
         raise Unscorable(f"manifest status {STATUS_THINKING!r} ({manifest.get('n_thinking_chars_total')} thinking "
@@ -245,33 +282,51 @@ def analyse_run(ref: RunRef, n_boot: int, seed: int, rescore: bool) -> tuple[dic
         rows = [r for r in rows if (r.get("arm") or "nfc") in ref.arms]
         if not rows:
             raise Unscorable(f"no score rows for the completed arms {sorted(ref.arms)}")
-    groups: dict[tuple, list[dict]] = defaultdict(list)
-    for r in rows:
-        groups[tuple(str(r.get(k)) for k in CELL_KEYS)].append(r)
-    cells = [{"model": model, "run_id": run_id, **dict(zip(CELL_KEYS, key, strict=True)),
-              **cell_ci(groups[key], n_boot, seed)} for key in sorted(groups)]
     item_ids = {r.get("item_id") for r in rows}
     base_pairs = {r[CLUSTER_KEY] for r in rows}
-    run = {"run_id": run_id, "model": model, "run_dir": str(ref.run_dir), "unit_ids": list(ref.unit_ids),
-           "hash_verified": ref.hash_verified, "manifest_status": manifest.get("status"),
+    run = {"run_id": run_id, "line": line, "tag": tag, "model": model, "run_dir": str(ref.run_dir),
+           "unit_ids": list(ref.unit_ids), "hash_verified": ref.hash_verified, "manifest_status": manifest.get("status"),
            "item_file": info.get("path") or data.get("item_file"),
            "item_file_sha256": info.get("sha256") or data.get("item_file_sha256"),
+           "results_sha256": read_results_hashes(ref.run_dir),
            "manifest_arms": data.get("arms"), "arms": sorted({r.get("arm") or "nfc" for r in rows}),
            "prompt_ids": sorted({str(r.get("prompt_id")) for r in rows}),
            "n_rows": len(rows), "n_items": len(item_ids), "n_base_pairs": len(base_pairs),
            "scored_now": scored_now, "cluster_note": note}
-    return run, cells, item_ids, base_pairs
+    return run, rows
+
+
+def line_cells(runs: list[dict], rows_by_run: dict[str, list[dict]], n_boot: int, seed: int) -> list[dict]:
+    """The cells per (run line, model): the score rows of every directory of the line are pooled (a p0p1 + p2
+    paraphrase split is one line), the directories' tags shown as one column."""
+    pooled: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    tags: dict[tuple[str, str], set[str]] = defaultdict(set)
+    for run in runs:
+        key = (run["line"], run["model"])
+        pooled[key].extend(rows_by_run[run["run_id"]])
+        if run["tag"]:
+            tags[key].add(run["tag"])
+    cells = []
+    for key in sorted(pooled):
+        line, model = key
+        groups: dict[tuple, list[dict]] = defaultdict(list)
+        for r in pooled[key]:
+            groups[tuple(str(r.get(k)) for k in CELL_KEYS)].append(r)
+        cells += [{"model": model, "run_id": line, "tag": "+".join(sorted(tags[key])), **dict(zip(CELL_KEYS, g, strict=True)),
+                   **cell_ci(groups[g], n_boot, seed)} for g in sorted(groups)]
+    return cells
 
 
 def analyse(refs: list[RunRef], n_boot: int, seed: int, rescore: bool, source: dict, skipped: list[dict],
             date: str) -> dict:
-    """The report: every completed run that could be scored, its cells, the unscorable runs, n."""
-    runs, cells, unscorable = [], [], []
+    """The report: every completed run that could be scored, the cells per line, the unscorable runs, n."""
+    runs, unscorable = [], []
+    rows_by_run: dict[str, list[dict]] = {}
     all_items: set = set()
     all_pairs: set = set()
     for ref in refs:
         try:
-            run, run_cells, item_ids, base_pairs = analyse_run(ref, n_boot, seed, rescore)
+            run, rows = analyse_run(ref, rescore)
         except Unscorable as e:
             unscorable.append({"run_dir": str(ref.run_dir), "unit_ids": list(ref.unit_ids), "reason": str(e)})
             continue
@@ -280,11 +335,13 @@ def analyse(refs: list[RunRef], n_boot: int, seed: int, rescore: bool, source: d
                                "reason": f"unreadable run directory: {e}"})
             continue
         runs.append(run)
-        cells.extend(run_cells)
-        all_items |= item_ids
-        all_pairs |= base_pairs
+        rows_by_run[run["run_id"]] = rows
+        all_items |= {r.get("item_id") for r in rows}
+        all_pairs |= {r[CLUSTER_KEY] for r in rows}
+    cells = line_cells(runs, rows_by_run, n_boot, seed)
     n = {"items": len(all_items), "base_pairs": len(all_pairs), "models": len({r["model"] for r in runs}),
-         "runs": len(runs), "cells": len(cells), "unscorable": len(unscorable), "skipped": len(skipped)}
+         "runs": len(runs), "lines": len({(r["line"], r["model"]) for r in runs}), "cells": len(cells),
+         "unscorable": len(unscorable), "skipped": len(skipped)}
     return {"label": LABEL, "notice": NOTICE, "date": date,
             "generated_utc": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%MZ"), "source": source,
             "n": n, "bootstrap": {"n_boot": n_boot, "seed": seed, "cluster": CLUSTER_KEY, "strata": STRATUM_KEY,
@@ -311,33 +368,35 @@ def render_markdown(rep: dict) -> str:
     n, b, src = rep["n"], rep["bootstrap"], rep["source"]
     where = f"`{src['ledger']}` (done units) and `{src['runs']}`" if src["mode"] == "ledger" else f"`{src['runs']}` (no ledger)"
     provenance = (f"_Generated by `scripts/interim_analysis.py` on {rep['generated_utc']} from {where}: {n['runs']} "
-                  f"completed runs analysed, {n['unscorable']} unscorable, {n['skipped']} skipped. Intervals: base-pair "
+                  f"completed run directories analysed ({n['lines']} lines x models, directories of one line pooled), "
+                  f"{n['unscorable']} unscorable, {n['skipped']} skipped. Intervals: base-pair "
                   f"cluster bootstrap, B = {b['n_boot']}, seed {b['seed']}, clusters = `{b['cluster']}`, stratified by "
                   f"`{b['strata']}`, {int(CI_LEVEL * 100)} % level; `wilson_deff` for cells with fewer than "
                   f"{b['small_cell_max_base_pairs']} base pairs or at 0 % / 100 %, `bca` from {b['bca_min_clusters']} "
                   f"base pairs, `percentile` otherwise ({b['design']})._")
     L = [f"# {LABEL} analysis {rep['date']} ({n_label(n)})", "", f"**{rep['notice']}**", "", provenance, ""]
     L += [f"## {LABEL}: completed runs ({n_label(n)})", "",
-          "| run | model | item file | sha256 | hash gate | arms | prompts | rows | items | base pairs | note |",
-          "|---|---|---|---|---|---|---|---|---|---|---|"]
+          "| run directory | line | tag | model | item file | sha256 | hash gate | results sha256 | arms | prompts | rows | items | base pairs | note |",
+          "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in rep["runs"]:
         notes = [x for x in (("scored here" if r["scored_now"] else None), r["cluster_note"]) if x]
-        L.append(f"| `{r['run_id']}` | {r['model']} | {Path(r['item_file'] or '-').name} | `{_short_sha(r['item_file_sha256'])}` "
-                 f"| {r['hash_verified']} | {', '.join(r['arms'])} | {', '.join(r['prompt_ids'])} | {r['n_rows']} "
+        L.append(f"| `{r['run_id']}` | `{r['line']}` | {r['tag'] or '-'} | {r['model']} | {Path(r['item_file'] or '-').name} "
+                 f"| `{_short_sha(r['item_file_sha256'])}` | {r['hash_verified']} | `{_short_sha(r['results_sha256'])}` "
+                 f"| {', '.join(r['arms'])} | {', '.join(r['prompt_ids'])} | {r['n_rows']} "
                  f"| {r['n_items']} | {r['n_base_pairs']} | {'; '.join(notes) or ''} |")
     if not rep["runs"]:
-        L.append("| (no completed run) | | | | | | | | | | |")
-    L += ["", f"## {LABEL}: strict accuracy per cell ({n_label(n)})", "",
-          ("| model | run | task | variant | arm | prompt | accuracy % [95 % CI] | method | items | base pairs "
+        L.append("| (no completed run) | | | | | | | | | | | | | |")
+    L += ["", f"## {LABEL}: strict accuracy per cell, pooled per line ({n_label(n)})", "",
+          ("| model | line | tags | task | variant | arm | prompt | accuracy % [95 % CI] | method | items | base pairs "
            "| DEFF | unparseable % | flag |"),
-          "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+          "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for c in rep["cells"]:
         flags = [x for x in (("SMALL CELL" if c["small_cell"] else None), (None if c["stratified"] else "unstratified")) if x]
-        L.append(f"| {c['model']} | `{c['run_id']}` | {c['task']} | {c['variant']} | {c['arm']} | {c['prompt_id']} "
+        L.append(f"| {c['model']} | `{c['run_id']}` | {c['tag'] or '-'} | {c['task']} | {c['variant']} | {c['arm']} | {c['prompt_id']} "
                  f"| {pct(c['estimate'])} [{pct(c['lo'])}, {pct(c['hi'])}] | {c['method']} | {c['n_items']} "
                  f"| {c['n_base_pairs']} | {c['deff']:.2f} | {pct(c['unparseable_rate'])} | {', '.join(flags)} |")
     if not rep["cells"]:
-        L.append("| (no cell) | | | | | | | | | | | | |")
+        L.append("| (no cell) | | | | | | | | | | | | | |")
     L += ["", f"## {LABEL}: unscorable runs ({n['unscorable']} of {n['unscorable'] + n['runs']} completed; {n_label(n)})", "",
           "| run directory | units | reason |", "|---|---|---|"]
     for u in rep["unscorable"]:
