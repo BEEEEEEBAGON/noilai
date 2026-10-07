@@ -13,9 +13,10 @@ as they read in 2026; where a label may have moved it is marked "(as of 2026)". 
 ## 0. One-time setup
 
 1. **Who holds the accounts (DD 11.2).** Kaggle, Hugging Face, Google and Groq require users to be 18
-   or older (Kaggle and Groq: `minimum_age` still `null` in `configs/models.yaml`, to be read off their
-   terms). If the author is under 18 at run time, an eligible adult collaborator opens and holds every
-   account whose terms require it; no account is ever opened with a misstated age. Decide the ROLE
+   or older (Groq and OpenRouter: `terms.minimum_age` still `null` in `configs/models.yaml`; Kaggle's
+   clause is `[UNCERTAIN: exact current wording]` in DD 11.2; read them off the terms). If the author
+   is under 18 at run time, an eligible adult collaborator opens and holds every account whose terms
+   require it; no account is ever opened with a misstated age. Decide the ROLE
    string that every manifest will record (`ACCOUNT_HOLDER_ROLE`, e.g. `"author"` or
    `"adult collaborator"`; never a name) and record the age findings in `configs/models.yaml`
    (`terms.minimum_age`) and `docs/RISKS.md` through the assistant.
@@ -42,9 +43,12 @@ as they read in 2026; where a label may have moved it is marked "(as of 2026)". 
    (`data/release/sealed/`, which no notebook may ever read). The derived files (`pilot_t1_200`,
    `noilai_api_para300`, `noilai_reasoning500`, `noilai_bf16_200`, `noilai_scope500`, the two
    exploratory dev sets) are NOT uploaded: cell (d) materializes them from the frozen files with the
-   plan's seeds. CLI alternative from the author's machine (needs a token, step 7):
-   `kaggle datasets init -p data/release` → edit `data/release/dataset-metadata.json` (`"id":
-   "<kaggle-user>/noilai-release"`) → `kaggle datasets create -p data/release --dir-mode zip`.
+   plan's seeds. CLI alternative from the author's machine (needs a token, step 7), from a CLEAN copy
+   so that neither `manifest_private.json` nor `sealed/` leaves the machine: `mkdir -p
+   /tmp/noilai-release/v0.3 && cp data/release/v0.3/manifest.json data/release/v0.3/*.jsonl
+   /tmp/noilai-release/v0.3/` → `kaggle datasets init -p /tmp/noilai-release` → edit its
+   `dataset-metadata.json` (`"id": "<kaggle-user>/noilai-release"`, `"title": "noilai-release"`) →
+   `kaggle datasets create -p /tmp/noilai-release --dir-mode zip` → `rm -r /tmp/noilai-release`.
 5. **Private dataset `noilai-bundle`** (the code, pinned to a commit). On the author's machine, on the
    branch to run (`make bundle` bundles `main`; for another branch run the same two commands with its
    name and set `REPO_REF` to it): `make bundle` → `dist/noilai-main.bundle` and
@@ -72,8 +76,9 @@ as they read in 2026; where a label may have moved it is marked "(as of 2026)". 
    needs it. The notebooks report each secret as found / not found and never print a value.
 8. **Read the real quota** and send the numbers to the assistant. In the notebook editor's right-hand
    **Notebook / Session options** panel, the **Accelerator** dropdown lists each option with "N hrs
-   left this week" and the reset time (as of 2026 this is the quota page; `experiments/quota.yaml`
-   assumes 30 GPU-h, 20 TPU-h, reset Saturday 00:00 UTC, all `[UNCERTAIN: verify]`). To learn whether
+   left this week" and the reset time (as of 2026 this is the quota page; `experiments/quota.yaml`'s
+   comment also names **Settings → "Your GPU/TPU quota"**, look in both; the file assumes 30 GPU-h,
+   20 TPU-h, reset Saturday 00:00 UTC, all `[UNCERTAIN: verify]`). To learn whether
    CPU sessions count against the GPU hours: note the GPU figure, run a CPU session (accelerator
    **None**) for ~30 min, read it again; record the answer in `experiments/quota.yaml`
    (`cpu_sessions_count_against_gpu_quota`) and the real hours and reset day in the same file.
@@ -134,8 +139,8 @@ as they read in 2026; where a label may have moved it is marked "(as of 2026)". 
    `dist/noilai-main.bundle.commit`, (b')
    `restored {...}` or "nothing to restore", (c) ~10 min of pip, (d) `item files to verify: [...]`
    followed by one JSON summary per file, (e) `smoke_20 gemma-3-1b-it -> ok`, (f) one `[done ]
-   <model>: ok, H h, N new outputs` line per model with a dataset push after each, (g) the final push,
-   (h) `compute log: ... checklist C1`.
+   <model>: ok, H h, N new outputs, T tokens` line per model with a dataset push after each, (g) the
+   final push, (h) `compute log: N entries ...` with the device-hour totals and `log copied to ...`.
 8. **Done** looks like: the version carries a green tick ("Successfully ran"); the run cell's JSON
    lists every model with `"status": "ok"` (or a named `skipped: ...` / `refused: ...` /
    `failed (<rc>)`, each a sentence you can read); the version's **Output** tab lists
@@ -210,7 +215,10 @@ quota unless step 0.8 says otherwise).
    ```
 
    (Sources that do not exist are reported `[skip]` and left out, so the same cell works before
-   `noilai-runs` exists.) The files are also under the version's **Output** tab
+   `noilai-runs` exists; prefer running it after the §1 smoke session has created the dataset: a
+   first version without `runs/` makes the next GPU session's (b') copy `audit/` and `panel_pins.json`
+   under `data/runs/`, harmless but untidy, and `ledger.py ingest` ignores a directory without a
+   `manifest.json`.) The files are also under the version's **Output** tab
    (`repo/data/audit/`, `repo/experiments/panel_pins.json`) for a download by hand.
 4. Back home (§5): `python3 scripts/pin_panel.py --apply --from experiments/panel_pins.json` writes the
    hashes into `configs/models.yaml` (`--partial` keeps unresolved entries null; `--dry-run` shows the
@@ -242,7 +250,8 @@ quota unless step 0.8 says otherwise).
    `WORK_DIR = "/kaggle/working"`, `ITEMS_DATASET_DIR = "/kaggle/input/noilai-release"`,
    `MOUNT_DRIVE = False`, `API_KEY_SECRETS = ["GROQ_API_KEY"]`, `MODELS = ["gpt-oss-120b", "gpt-oss-20b"]`
    (the two Groq entries; `reasoning_500_api` uses `gpt-oss-120b--thinking` / `gpt-oss-20b--thinking`),
-   `ACCOUNT_HOLDER_ROLE = "<role>"`. `ALLOW_UNCAPPED_API` stays `False`.
+   `ACCOUNT_HOLDER_ROLE = "<role>"`. `RUN_IDS` is a LIST (default the three E1/E3 API lines; add
+   `"reasoning_500_api"` for the cost curve; no HF token is needed). `ALLOW_UNCAPPED_API` stays `False`.
 5. Day 1: `RUNS_RESTORE_DIR = None`. The API notebook has no dataset push: its last cell copies
    `data/runs` (+ `api_ledger.json` + `compute_log.csv`) to `/kaggle/working/noilai_runs_out`, which the
    version keeps. Day 2 onward: **Add Input → Your Work → Notebooks** → this notebook's latest version,

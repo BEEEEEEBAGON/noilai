@@ -340,6 +340,28 @@ def test_small_helpers():
     assert IS.personal_columns(header, [["t", EMAIL, "a", "b", "c", "d"]]) == [1]
 
 
+def test_item_question_headers_quoting_a_name_like_word_are_not_dropped():
+    """A Google Forms header quotes the item's input, and the lexicon has "cung tên" and "tên lửa": a header carrying
+    an item id is a question column, dropped only when its values look like e-mails; a bare name header is dropped."""
+    header = ["Timestamp", "Họ và tên", "[T1-V1-000001] Nói lái kiểu V1 của “cung tên” là gì?", "[T2-V1-000002] “tên lửa”"]
+    assert IS.personal_columns(header, [["t", NAME, "nêt cung", "lửa tên"]]) == [1]
+    assert IS.personal_columns(header, [["t", NAME, EMAIL, "lửa tên"]]) == [1, 2]
+    roles = IS.classify_headers(header, {"T1-V1-000001", "T2-V1-000002"}, "instruction_check", "tool_use")
+    assert [r for r, _ in roles] == ["other", "other", "item", "item"]
+
+
+def test_blank_instruction_check_is_missing_not_failed():
+    """A skipped check (a blank cell in a wide export, the untouched template row in a long sheet) is counted as
+    missing and does not exclude the respondent; an answered wrong one does (PREREGISTRATION section 5 item 7)."""
+    answers = {f"T1-V1-{k:06d}": "a b" for k in range(4)}
+    blank = IS.Respondent("01", "01", "f", dict(answers), tool_use=False, instruction_check="")
+    none = IS.Respondent("02", "02", "f", dict(answers), tool_use=False, instruction_check=None)
+    wrong = IS.Respondent("03", "03", "f", dict(answers), tool_use=False, instruction_check="Không")
+    kept, excluded, tally = IS.apply_exclusions([blank, none, wrong], min_answered=3, check_expected="Có", check_item=None)
+    assert [R.form for R in kept] == ["01", "02"] and [e["reasons"] for e in excluded] == [["failed_instruction_check"]]
+    assert tally["instruction_check"] == {"missing": 2, "failed": 1}
+
+
 def test_template_prints_an_empty_long_sheet():
     r = _run("--template")
     lines = r.stdout.strip().splitlines()

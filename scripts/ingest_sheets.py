@@ -196,10 +196,13 @@ def column_index(header: list[str], *names: str) -> int | None:
 
 
 def personal_columns(header: list[str], body: list[list[str]]) -> list[int]:
-    """Columns dropped on reading: a header naming a person, or values that look like e-mail addresses."""
+    """Columns dropped on reading: a header naming a person, or values that look like e-mail addresses. A header
+    carrying an item-shaped id is a question column (a Google Forms header quotes the item's input, and the lexicon
+    has phrases such as "cung tên" or "tên lửa"), so only its values can disqualify it."""
     out = []
     for i, h in enumerate(header):
-        if PERSONAL_HEADER.search(h) or any(EMAIL.search(r[i]) for r in body if i < len(r)):
+        values_look_like_emails = any(EMAIL.search(r[i]) for r in body if i < len(r))
+        if values_look_like_emails or (PERSONAL_HEADER.search(h) and not ITEM_ID_SHAPE.search(h)):
             out.append(i)
     return out
 
@@ -392,8 +395,8 @@ def load_baseline_file(path: Path, known_ids: set[str], check_id: str, tool_id: 
 
 
 def check_passes(answer: str | None, expected: str | None, item: dict | None) -> bool | None:
-    """None when the check cannot be judged (no answer recorded, or nothing to compare with)."""
-    if answer is None:
+    """None when the check cannot be judged (no answer recorded or a blank cell, or nothing to compare with)."""
+    if answer is None or not answer.strip():
         return None
     if expected is not None:
         if parse_yesno(expected) is not None:
@@ -419,8 +422,8 @@ def apply_exclusions(resps: list[Respondent], min_answered: int, check_expected:
             reasons.append("tool_use")
         tally["tool_use"]["yes" if R.tool_use is True else ("no" if R.tool_use is False else "unreported")] += 1
         passed = check_passes(R.instruction_check, check_expected, check_item)
-        if R.instruction_check is None:
-            tally["instruction_check"]["missing"] += 1
+        if R.instruction_check is None or not R.instruction_check.strip():
+            tally["instruction_check"]["missing"] += 1       # no row, or a blank cell (a skipped question): counted, not excluded
         elif passed is None:
             tally["instruction_check"]["unjudged"] += 1       # answered, but no expected answer and no release item to score it
         elif passed:
