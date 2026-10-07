@@ -1,0 +1,201 @@
+# configs/run_plan_exploratory.yaml -- the DEV-ONLY exploratory run plan.
+#
+# This file is NOT the pre-registered run matrix: that is configs/run_plan.yaml, which this file
+# never changes and whose lines it never duplicates except the two Gate 1 pilots (verbatim, below,
+# so that the pilot can be launched from either plan). Every line here is exploratory
+# (`exploratory: true`), reads the public dev split or XCOPA only (`dev_only: true`), and feeds no
+# paper table: PREREGISTRATION section 1 ("every analysis not listed here is exploratory and is
+# labelled as such"). No item file in this plan carries a canary (`canary_required: true` marks a
+# test-split file; DD 4.6), none is the core, none is sealed, and no run is API-served.
+#
+# The same driver executes it through its --plan flag; the notebooks' PLAN_PATH parameter
+# (scripts/kaggle_build_notebooks.py) names the plan a session runs:
+#
+#   python scripts/kaggle_run_plan.py --plan configs/run_plan_exploratory.yaml --list
+#   python scripts/kaggle_run_plan.py --plan configs/run_plan_exploratory.yaml --materialize   # the two seeded dev files
+#   python scripts/kaggle_run_plan.py --plan configs/run_plan_exploratory.yaml --run floor_pilot_dev --dry-run
+#   python scripts/kaggle_run_plan.py --plan configs/run_plan_exploratory.yaml --run throughput_dev \
+#       --platform kaggle --session-hardware 2xt4 --max-session-hours 9
+#
+# Item files follow the pre-registered plan's rules (DD 4.5 / 12.32): no line samples at run time;
+# every sub-sample is a seeded FILE derived deterministically from another item file by
+# `--materialize` (seed + per-cell counts; T3 drawn as yes/no pairs; vulgar rows excluded). The two
+# new derived files have seeds of their own (20261012, 20261013), distinct from every seed of
+# configs/run_plan.yaml, so that no exploratory draw coincides with a pre-registered one.
+# `sha256` of the dev split and of XCOPA are the frozen hashes (the gate refuses any other file);
+# the derived files' hashes are null until the author materializes them from the frozen release.
+#
+# Hours: the two pilots count toward the pre-registered `pilots_and_smoke` line from whichever plan
+# launches them; the two exploratory lines count toward `exploratory`, which is OUTSIDE the plan's
+# 70-150 GPU-hour subtotal (configs/run_plan.yaml, `gpu_subtotal`) but drawn from the same Kaggle
+# quota (~30 GPU-h/week), so they are booked and logged like every other run (checklist C1).
+
+version: 1
+date: 2026-10-07
+preregistered: false
+plan: docs/PLAN_2026-09-30.md
+design: docs/DESIGN_DECISIONS.md
+preregistered_plan: configs/run_plan.yaml   # the matrix this file supplements and never edits
+run_eval_cli: scripts/run_eval.py
+run_eval_out_style: run_id_root      # as configs/run_plan.yaml: "--run-id <id>__<name> --out-root <runs_root>"
+runs_root: data/runs
+compute_log: data/compute_log.csv    # the same log as the pre-registered plan: one campaign, one ledger of hours
+release: data/release/v0.3           # as configs/run_plan.yaml (DD 12.30); bump both keys together
+release_manifest: "{release}/manifest.json"
+
+api:
+  assumed_tokens_per_call: 500       # copied from configs/run_plan.yaml; no line of this plan is API-served
+  park_threshold: 0.95
+
+item_files:
+  # ---- the two public sources (verbatim from configs/run_plan.yaml): the only files a line here may read whole
+  noilai_dev:
+    path: "{release}/noilai_dev.jsonl"
+    sha256: f0052e688d43407c5ee6e116b3bca195d35a7cb6281da7be7573d1f00bd03cc7
+    description: "public dev split (CC BY 4.0); prompt development, smoke tests and the pilot"
+    canary_required: false
+  xcopa_vi_test:
+    path: data/external/xcopa_test_vi.jsonl
+    sha256: 24cb28827066abb00a2f4004d86c447c4a30a9edb17938b26b61fb2385f94170   # data/HASHES.json
+    description: "XCOPA Vietnamese test, 500 items, CC BY 4.0; the E3 re-encoding arms"
+    canary_required: false
+    kind: xcopa
+  # ---- the Gate 1 pilot files (verbatim from configs/run_plan.yaml: same derive blocks, same seeds, same hashes)
+  pilot_t1_200:
+    path: "{release}/pilot_t1_200.jsonl"
+    sha256: 4d44c98958c4a724b45493e60cced56e7049bb6173b297980e215676ddb02e87
+    description: "Gate 1 pilot (DD 8.5): 200 dev items, 50 per T1 variant; its go/no-go criterion lives in docs/PREREGISTRATION.md section 10"
+    canary_required: false
+    derive: {source: noilai_dev, seed: 20261009, tasks: [T1], per_cell: {T1: 50}}
+    expected_counts: {n_items: 200}
+  pilot_xcopa_200:
+    path: data/external/pilot_xcopa_200.jsonl
+    sha256: 6a61990e5d87a0456a81916b68301734a037181e13d5ccb64d47d0c4011e7677
+    description: "Gate 1 pilot (DD 8.5): 200 XCOPA-vi test items, seeded"
+    canary_required: false
+    kind: xcopa
+    derive: {source: xcopa_vi_test, seed: 20261010, n: 200}
+    expected_counts: {n_items: 200}
+  # ---- derived, seeded dev sub-samples of this plan (DD 4.5 rules): written by `--materialize`, never drawn at run time
+  pilot_t1t3_dev:
+    path: "{release}/pilot_t1t3_dev.jsonl"
+    sha256: null                     # record the hash once materialized from the frozen dev split; the gate then refuses any other file
+    description: "exploratory floor pilot: 400 dev items, 50 per T1 variant cell and 50 per T3 variant cell (T3 counted in items, drawn as 25 yes/no pairs per cell; DD 5.3); never a paper table"
+    canary_required: false
+    derive: {source: noilai_dev, seed: 20261012, tasks: [T1, T3], per_cell: {T1: 50, T3: 50}}
+    expected_counts: {n_items: 400, per_cell: 50}
+  throughput_t1_300:
+    path: "{release}/throughput_t1_300.jsonl"
+    sha256: null                     # as above
+    description: "throughput measurement set: 300 dev items, 75 per T1 variant cell, one prompt shape per item so that tokens/s and items per GPU-hour are comparable across backend/precision classes (DD 8.5, item 30)"
+    canary_required: false
+    derive: {source: noilai_dev, seed: 20261013, tasks: [T1], per_cell: {T1: 75}}
+    expected_counts: {n_items: 300, per_cell: 75}
+
+model_sets:
+  pilot: [gemma-3-1b-it, qwen3.5-2b, phogpt-4b-chat]      # verbatim from configs/run_plan.yaml
+  # the five smallest panel models (configs/models.yaml params_b): the floor pilot asks whether they clear the floor at all
+  floor: [gemma-3-1b-it, qwen3.5-0.8b, qwen3.5-2b, gemma-4-e2b, gemma-sea-lion-v4.5-e2b-it]
+  # one model per backend/precision class of the T4 panel, so that every class gets a measured tokens/s (DD 8.5, item 30):
+  #   gemma-3-1b-it          fp32 vLLM on one T4 (Gemma 3 never runs in fp16; DD 7.2)
+  #   qwen3.5-2b             fp16 vLLM on one T4
+  #   phogpt-4b-chat         HF transformers (MPT is not runnable on vLLM 0.30; DD 7.2 / 12.25)
+  #   llama-3.1-8b-instruct  4-bit (AWQ) vLLM on one T4
+  #   gemma-3-4b-it          fp32 vLLM, tensor parallel over 2xT4
+  throughput_classes: [gemma-3-1b-it, qwen3.5-2b, phogpt-4b-chat, llama-3.1-8b-instruct, gemma-3-4b-it]
+
+# --------------------------------------------------------------------------- experiments
+experiments:
+  pilot: "week-2 go/no-go: three open models on 200 items per idea (plan 2.6, Gate 1 on 18 Oct 2026; criterion in docs/PREREGISTRATION.md section 10)"
+  pilot_exploratory: "exploratory, dev split only, never a paper table: the smallest panel models on T1 (exact match) and T3 (forced choice, t3_pair_lp) before Gate 1; informs model and prompt choices, decides nothing that is pre-registered"
+  throughput: "exploratory, dev split only: prefill/decode tokens per second and items per GPU-hour per backend/precision class under batched inference, the measurements every GPU estimate of configs/run_plan.yaml is re-priced from (DD 8.5, item 30)"
+
+runs:
+
+  - id: floor_pilot_dev
+    experiment: pilot_exploratory
+    exploratory: true            # every line of this plan: exploratory, never a paper table
+    dev_only: true               # every line of this plan: the public dev split (or XCOPA), never the test split or the core
+    purpose: "EXPLORATORY, dev split only, never a paper table: do the five smallest panel models clear the floor at all? 50 dev items per T1 variant cell scored by exact match (T1 strict) AND 50 per T3 variant cell (25 yes/no pairs) scored by forced choice, the paired log-probability t3_pair_lp: does the model rate the correct form above its near-miss twin under the shared T1 context (DD 5.3; reported apart from generated T3, never compared with it). Informs the choice of models and prompts before Gate 1 and decides nothing that is pre-registered (the pilot criterion stays PREREGISTRATION section 10)"
+    platform: kaggle
+    hardware: t4
+    models: {set: floor}
+    items: pilot_t1t3_dev        # seeded dev-derived file (seed 20261012); the test split stays untouched
+    tasks: [T1, T3]
+    variants: [V1, V2, V3, V4]
+    arms: [nfc]
+    paraphrases: [p0]
+    shots: 3
+    in_core_only: false
+    estimate: {unit: gpu_hours, low: 1, high: 3}   # five small models x 400 items x one arm; the T3 half needs prompt log-probabilities
+    counts_toward: exploratory
+    week: "Oct 8-18 (before Gate 1)"
+    note: "T3 forced choice needs the backend's prompt log-probabilities (run_eval.py records both T3 quantities, manifest logprobs_mode t3_yesno+t3_pair; scripts/score_run.py reports the forced choice and the pair comparison as separate columns, DD 5.3 item 63); a model whose engine returns none is reported on T1 only and named"
+
+  - id: throughput_dev
+    experiment: throughput
+    exploratory: true
+    dev_only: true
+    purpose: "EXPLORATORY, dev split only, never a paper table: measure prefill and decode tokens per second and items per GPU-hour for one model of every backend/precision class (fp32 vLLM, fp16 vLLM, HF transformers, 4-bit, 2xT4) under batched inference on 300 T1 dev items, so that every GPU estimate of configs/run_plan.yaml can be re-priced from measurements instead of the plan's assumed rates (DD 8.5, item 30)"
+    platform: kaggle
+    hardware: mixed              # each model on its own configured hardware (t4 or 2xt4); a t4 session skips gemma-3-4b-it
+    models: {set: throughput_classes}
+    items: throughput_t1_300     # seeded dev-derived file (seed 20261013)
+    tasks: [T1]
+    variants: [V1, V2, V3, V4]
+    arms: [nfc]
+    paraphrases: [p0]
+    shots: 3
+    in_core_only: false
+    estimate: {unit: gpu_hours, low: 1, high: 2}   # 300 items x 5 models; the 8B AWQ and the 2xT4 4B dominate [UNCERTAIN: unmeasured, which is the point of the line]
+    counts_toward: exploratory
+    week: "Oct 8-18 (before Gate 1: the re-pricing must precede the panel freeze)"
+    note: "the measurements are the wall hours the driver logs per model (items per GPU-hour = rows of outputs.jsonl / hours, DD 8.5) and the manifest's outcome.prefill_tok_s / decode_tok_s [UNCERTAIN: verify] noilai/eval/run.py writes these two fields as null placeholders today; until the eval owner fills them, derive tokens/s from the per-row n_prompt_tokens / n_output_tokens and the wall time"
+
+  # ---- the Gate 1 pilots, verbatim from configs/run_plan.yaml (same files, same seeds, same flags), so that the
+  # pilot can be launched from either plan; `exploratory` / `dev_only` mark THIS FILE's status, the go/no-go
+  # criterion stays docs/PREREGISTRATION.md section 10 whichever plan launches them
+  - id: pilot_t1_200
+    experiment: pilot
+    exploratory: true
+    dev_only: true
+    purpose: "Gate 1 evidence on T1: 50 dev items per variant, nfc vs nfd (DD 8.5: two pilot lines, one criterion in PREREGISTRATION section 10)"
+    platform: kaggle
+    hardware: t4
+    models: {set: pilot}
+    items: pilot_t1_200          # seeded dev-derived file; the test split stays untouched until the panel is fixed
+    tasks: [T1]
+    variants: [V1, V2, V3, V4]
+    arms: [nfc, nfd]
+    paraphrases: [p0]
+    shots: 3
+    in_core_only: false
+    estimate: {unit: gpu_hours, low: 1, high: 2}
+    counts_toward: pilots_and_smoke
+    week: "Oct 12-18"
+
+  - id: pilot_xcopa_200
+    experiment: pilot
+    exploratory: true
+    dev_only: true
+    purpose: "Gate 1 evidence on XCOPA: 200 seeded XCOPA-vi items, nfc vs nfd, scored by log-likelihood"
+    platform: kaggle
+    hardware: t4
+    models: {set: pilot}
+    items: pilot_xcopa_200
+    tasks: [XCOPA]
+    variants: []
+    arms: [nfc, nfd]
+    paraphrases: [p0]
+    shots: 0
+    in_core_only: false
+    estimate: {unit: gpu_hours, low: 1, high: 1}
+    counts_toward: pilots_and_smoke
+    week: "Oct 12-18"
+
+# --------------------------------------------------------------------------- compute lines
+# `pilots_and_smoke` is the pre-registered line (configs/run_plan.yaml); `exploratory` is this file's own line and
+# is NOT part of the 70-150 GPU-hour subtotal. tests/test_exploratory_plan.py checks that every run fits its line.
+plan_lines:
+  pilots_and_smoke:      {where: "Kaggle T4",        unit: gpu_hours, low: 5, high: 5, cash_usd: 0, note: "the pre-registered line; the two pilots count toward it from whichever plan launches them"}
+  exploratory:           {where: "Kaggle T4, 2xT4",  unit: gpu_hours, low: 2, high: 5, cash_usd: 0, note: "not pre-registered; outside the 70-150 GPU-h subtotal of configs/run_plan.yaml, drawn from the same ~30 GPU-h/week Kaggle quota"}
