@@ -144,7 +144,9 @@ def render(manifest: dict, manifest_path: str, attested: tuple[int | None, int |
     lines.append(r"Base pairs & & \multicolumn{5}{l}{" + f"{int(manifest.get('n_base_pairs', 0)):,} drawn ({int(manifest.get('n_lexical_base_pairs', 0)):,} lexical, "
                  f"{int(manifest.get('n_base_pairs', 0)) - int(manifest.get('n_lexical_base_pairs', 0)):,} pseudo; fewer carry surviving items; split by pair; dev fraction "
                  f"{(manifest.get('generator_args') or {}).get('dev_frac', 0.2)})" + r"} \\")
-    lines.append(r"Validation $\alpha$ & & \multicolumn{5}{l}{\placeholder{$\alpha$ = TODO, 95\% CI TODO; 1,000 items, 200 triple-judged}} \\")
+    # validation design as amended on 1 October 2026 (DESIGN_DECISIONS 10.1 marker; docs/gate1/VALIDATION_PROTOCOL.md)
+    lines.append(r"Validation $\alpha$ & & \multicolumn{5}{l}{\placeholder{$\alpha$ = TODO, 95\% CI TODO, over the 408-row sheet "
+                 r"(30 sampled items + 4 planted controls per cell; two validators each, 60 by all three); sample-only $\alpha$ = TODO}} \\")
     lines.append(r"\bottomrule")
     lines.append(r"\end{tabular}")
     smoke_note = (r" \placeholder{" + SMOKE_MARK + r": these counts come from a reduced build "
