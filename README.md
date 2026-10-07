@@ -27,6 +27,7 @@ noilai/
   stats/      clustered bootstrap, McNemar + Holm families, mixed models (E2), effect decomposition, power, agreement, tables
   probe/      hidden-state extraction at syllable positions, layer-wise probes with control tasks, patching; steering code
               stays but steering is future work (DD 9.4 / 12.36)
+  validation.py  the validation packet's sampling, planted controls, calibration, adjudication and scoring (docs/gate1/)
   eval/       prompts.py (YAML templates -> chat messages, demos, arms, prompt hash), backends.py (hf | vllm |
               openai_compat | gemini | llama_cpp + echo/scripted test backends), extract.py (the "Đáp án:" line),
               score.py (T1/T2/T3 scoring, error taxonomy, scores.jsonl), xcopa.py (E3 on XCOPA vi), run.py (a run:
@@ -41,29 +42,64 @@ scripts/
   build_attested.py       data/attested_seed.tsv -> the release file attested.jsonl
   audit_items.py          annotate an item file with per-syllable tokenization covariates for one tokenizer
   check_tokenizer_consistency.py  a model's HF tokenizer vs the SentencePiece model file used offline
-  make_validation_forms.py  sample the native-validation set and the human-baseline forms; score returned sheets
+  make_validation_forms.py  the native-validation packet (Parts A-E per validator, docs/gate1/), the human-baseline forms with the
+                          models' exact prompt; score returned sheets (agreement, adjudication, weighted generator precision) and
+                          the Google Forms returns (import-responses, score-baseline -> experiments/human/); `make ingest-sheets`
+  validation_sizing.py    simulation that sized the validation sample (data/audit/validation_sizing.json)
+  pin_panel.py            the panel pin kit: hub revision hashes, licences, gating, tokenizer and chat-template SHA-256 ->
+                          experiments/panel_pins.json; `--apply --from` writes the hashes into configs/models.yaml's `revision`
+                          lines (--partial / --force / --dry-run); the CPU chunks pin their own models in the clone
+  kaggle_cpu_jobs.py      CPU-only Kaggle driver for the hub jobs: tokenizer audits, per-item covariates, the whole-panel pin
+  check_run.py            one run end to end: item gate, deterministic rescoring, stats.json, results_hashes.json (--verify)
+  standin_smoke.py        CPU smoke of the whole harness with a random-weight stand-in and the real Gemma 3 tokenizer
   sample_items.py         seeded sub-samples of a release (DD 4.5): noilai_main.jsonl (4,200, 350 per cell) and noilai_c2.jsonl
   kaggle_run_plan.py      configs/run_plan.yaml -> run_eval.py commands; derives the seeded core subsets (--materialize), gates every
                           run on its item file, runs the commands under the session guards, logs hours, keeps the API request+token ledger
   kaggle_verify_items.py  item-file gate: SHA-256 against run_plan.yaml, the BIG-bench header record, canary on every row, row/cell counts
   kaggle_dataset.py       stage data/runs and push a versioned private Kaggle dataset (kaggle CLI, import guarded)
   kaggle_build_notebooks.py  generates notebooks/*.ipynb from one source; --check refuses hand-edited notebooks
+  plan_chunks.py          the run plan cut into Kaggle sessions in the reverse of the pre-registered cut order:
+                          configs/compute_chunks.yaml + notebooks/chunks/*.ipynb + the tables of docs/COMPUTE_PLAN.md (--check)
+  cpu_bench.py            CPU cost of a Gemma-3-1B-sized model (random weights) for the CPU pilot estimates
+  corpus_count_kit.sh     the C2 placement count on Wikipedia + CC-100 vi (streamed; DD 6.3, BLOCKED.md)
   colab_setup.py          Drive mount, token-safe clone (GIT_ASKPASS), project dir, pinned pip, environment record, secrets
   compute_log.py          GPU-hours CSV for checklist C1 (append / totals / show)
+  ledger.py               experiments/ledger.csv: one row per planned unit keyed to its compute chunk (init / ingest / show / reprice)
+  progress.py             the meter block of STATUS.md from the ledger: per chunk, next chunk per queue, frontier, Kaggle hours
+  interim_analysis.py     INTERIM analysis on completed units only (cluster-bootstrap CIs per cell) -> experiments/interim/
+  freeze_scoring_rule.py  hash over the scoring code; --record writes it into experiments/gates.yaml (the author's command), --check
 configs/
   models.yaml   the 21-model panel + bf16-reference and thinking variants: ids, revision, hardware, dtype, quantization, limits, risks
   run_plan.yaml the run matrix (pilot, smoke, E1 + explicit-input main result + ablations, E3, reasoning, bf16 drift, E4) with the
                 plan's compute estimates; `release:` names the release version once, every item path derives from it
-notebooks/      kaggle_eval_t4, kaggle_eval_tpu, colab_probe_gemma3, api_runs  (generated; see below)
+  run_plan_exploratory.yaml  the DEV-ONLY exploratory plan (floor pilot on the smallest models, throughput measurement for the
+                DD 8.5 re-pricing, the two Gate 1 pilots verbatim); run through `kaggle_run_plan.py --plan` / the notebooks'
+                `PLAN_PATH`; unscheduled alternatives outside the chunk order; never a paper table, never the test split or
+                the core, never merged into run_plan.yaml
+  compute_chunks.yaml  generated by scripts/plan_chunks.py: one Kaggle session per chunk, ordered by tier (docs/COMPUTE_PLAN.md)
+  env_pins.txt  the run-environment pins (pip constraints; tests/test_pin_panel.py keeps them equal to pyproject and the notebooks)
+notebooks/      kaggle_eval_t4, kaggle_eval_tpu, colab_probe_gemma3, api_runs, kaggle_cpu_pilot (generated; see below);
+                chunks/ one preset copy of the T4 / TPU / CPU notebook per compute chunk (generated by plan_chunks.py)
 prompts/        noilai.yaml (Vietnamese templates p0–p2 and the ablation variants), demos.yaml (few-shot demonstrations built
                 from syllables outside the test set), xcopa.yaml (the COPA framing); every string awaits a [NATIVE-CHECK]
 data/           HASHES.json (resource hashes), attested_seed.tsv, audit/ (committed), external/ and runs/ (ignored), release/;
                 validation/ and human/ hold validator and human-baseline material (forms, returned sheets): git-ignored,
                 never in the bundle a notebook clones, never sent anywhere (DD 11.2)
-docs/           PLAN_2026-09-30.md (founding plan), DATA_FORMAT.md (item, output, score schemas), DESIGN_DECISIONS.md (binding)
+experiments/    ledger.csv (one row per planned unit, keyed to its compute chunk; scripts/ledger.py), gates.yaml (the
+                pre-registration gate the run driver enforces; every value null until the author records it), quota.yaml
+                (Kaggle quota assumptions until verified), panel_pins.json (the whole-panel pin from a Kaggle CPU session;
+                absent until it has run), aggregates/ (per run: summary.json, stats.json, results_hashes.json and a manifest
+                excerpt, never item-level rows), human/ (human_baseline_report.json: aggregates only), interim/ (INTERIM
+                analyses); the first ingest creates the three directories
+docs/           PLAN_2026-09-30.md (founding plan), DATA_FORMAT.md (item, output, score schemas), DESIGN_DECISIONS.md (binding),
+                COMPUTE_PLAN.md (the chunk plan; its tables are generated by plan_chunks.py), gate1/ (the Gate 1 packet
+                protocols and the author's decision memo)
 paper/          ACL 2027 LaTeX sources
 tests/          pytest (test_vi, test_gen, test_audit, test_stats, test_constants, test_probe, test_eval, test_scripts,
-                test_release, test_e2, test_paper, test_cloud)
+                test_release, test_e2, test_paper, test_cloud, test_validation, test_forced_choice, test_exploratory_plan,
+                test_ledger, test_pin_panel, test_gates, test_interim_analysis)
+RUNBOOK.md, STATUS.md, BLOCKED.md, CLAUDE.md   the experiments workstream: click steps per chunk, the meter and the session
+                log, the deadline-ordered blocker list, the session protocol
 ```
 
 ## Quick start
@@ -134,14 +170,16 @@ on it by construction.
 Compute is $0: Kaggle's free 2×T4 (~30 GPU-h/week, 12-h sessions) and TPU v5e-8 (~20 TPU-h/week,
 9-h sessions), free Colab for the probes, and the Gemini and Groq free tiers for the four API
 models. The plan budgets 70–150 GPU-hours and 10–20 TPU-hours for everything including a 100%
-rerun buffer (`configs/run_plan.yaml`, `plan_lines`).
+rerun buffer (`configs/run_plan.yaml`, `plan_lines`). The plan is cut into 31 resumable Kaggle sessions, the
+**compute chunks** (`configs/compute_chunks.yaml`, `docs/COMPUTE_PLAN.md`): one notebook per chunk, launched in
+chunk order (`STATUS.md` "Next chunk per queue", `RUNBOOK.md`); the chunks are the run units the ledger tracks.
 
 1. **Panel and settings**: `configs/models.yaml`. One entry per (model, serving configuration):
    `hf_id`, `revision` (null until the panel freeze; DD 7.1: `run_eval.py` refuses an unpinned local
    backend without `--smoke`, and the run driver skips an unpinned self-hosted model on every
    non-smoke line unless `--allow-unpinned-revision`), family, group, tokenizer
    type, backend, dtype, quantization, hardware (`t4`, `2xt4`, `tpu` with tensor parallel 8, `l4`
-   as the Modal bf16 fallback, `api`), `max_model_len` (1,024 per DD 7.3), `chat_template_kwargs`
+   as the Modal bf16 fallback, `api`), `max_model_len` (2,048: DD 7.3's 1,024 is too small for the whole-prompt NFD arm, whose Gemma 3 prompts reach 1,131 tokens; `docs/DEVIATIONS.md`), `chat_template_kwargs`
    (`enable_thinking: false` for the Qwen families in the main runs), the DD 7.3 engine defaults
    (`gpu_memory_utilization 0.85`, `engine_kwargs`: TRITON_ATTN, zero multimodal limits, prefix
    caching, 64 seqs; the TPU entries drop the attention backend), provider `base_url` and the
@@ -230,6 +268,16 @@ rerun buffer (`configs/run_plan.yaml`, `plan_lines`).
      `GEMINI_RPD_OVERRIDE` / `GEMINI_TPD_OVERRIDE` are applied to the in-memory config and recorded
      in the ledger, and a provider with no cap and no override is refused unless
      `ALLOW_UNCAPPED_API` (no notebook rewrites `configs/`).
+   * `kaggle_cpu_pilot.ipynb`: the CPU route (Accelerator None, the HF backend in float32): the smoke line and
+     the two Gate 1 pilot lines on one small model per session, with the EXPLORATORY T1 forced choice
+     (`docs/FORCED_CHOICE_EXPLORATORY.md`); a cell pins the session's models in the clone
+     (`pin_panel.py --names <MODELS> --apply --partial --out /kaggle/working/noilai_runs_out/panel_pins.json`)
+     and `check_run.py` hashes every run directory; its run directories carry the tag `__cpu`.
+   * `chunks/c01_cpu_t0.ipynb` ... `c31_tpu_t5.ipynb`: one copy of the CPU / T4 / TPU notebook per compute chunk
+     with its parameters cell preset (`JOBS`, `RUN_ID` / `RUN_IDS`, `MODELS`, `RUN_LABEL`, `VERIFY_ITEM_KEYS`),
+     generated by `scripts/plan_chunks.py --write` together with `configs/compute_chunks.yaml` and the tables of
+     `docs/COMPUTE_PLAN.md` (`--check` refuses drift). Only the account-holder settings of the parameters cell
+     are edited on Kaggle (`RUNBOOK.md` section 1).
    Every cell is plain Python (no magics, no `input()`); the first code cell is the only one to
    edit. Kaggle Secrets to define: `GITHUB_TOKEN` (only without a bundle), `HF_TOKEN`,
    `KAGGLE_USERNAME`, `KAGGLE_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY`.
@@ -238,6 +286,17 @@ rerun buffer (`configs/run_plan.yaml`, `plan_lines`).
    the plan's `compute_log` key and awaits the author's confirmation). The driver writes one row
    per executed model run with the session's device count; the notebooks add a session-overhead
    row; merge the copy that comes back from Kaggle into the repository's file.
+6. **Bookkeeping** (the session protocol is `CLAUDE.md`): `scripts/ledger.py init` builds
+   `experiments/ledger.csv`, one row per planned unit keyed to its chunk; `ledger.py ingest --runs data/runs`
+   reads the finished run directories (tag-aware: `<run>__<model>[__<tag>]`), applies the item-file hash gate,
+   copies the aggregates into `experiments/aggregates/` and reports every directory that matches no unit;
+   `make ingest-sheets` scores the returned validation and human-baseline sheets (`scripts/make_validation_forms.py
+   score` / `score-baseline`; aggregates in `experiments/human/`, item-level rows stay under the git-ignored
+   `data/`); `scripts/progress.py` rewrites the meter block of `STATUS.md` (per chunk, next chunk per queue,
+   the analysis frontier, Kaggle hours this quota week); `scripts/interim_analysis.py` analyses completed units
+   only; `experiments/gates.yaml` holds the pre-registration gate that `kaggle_run_plan.py` enforces; the pinned
+   panel comes from `scripts/kaggle_cpu_jobs.py pin` on a Kaggle CPU session and `scripts/pin_panel.py --apply
+   --from experiments/panel_pins.json` at home. `RUNBOOK.md` has the click steps for all of it.
 
 Reproducibility: every run directory holds `outputs.jsonl`, `scores.jsonl` and a `manifest.json`
 with model id and revision, backend and version, dtype, quantization, engine flags, seed, prompt
@@ -346,6 +405,18 @@ per the ARR policy on generative assistance.
   pins vLLM 0.30.0 and llama-cpp-python 0.3.35; the Makefile builds v0.3 with the sampled files and
   refuses the superseded 20 × 40 baseline forms; `data/validation/` and `data/human/` are ignored.
   Still no model run.
+* **2026-10-07 (integration of the 1 and 7 October branches)** — The Gate 1 validation packet (Parts A–E
+  per validator, planted controls, calibration, adjudication; `noilai/validation.py`, `docs/gate1/`), the
+  human-baseline forms with the models' exact prompt and their scorer (`import-responses`, `score-baseline`),
+  the zero-budget compute plan cut into 31 resumable Kaggle chunks (`scripts/plan_chunks.py` →
+  `configs/compute_chunks.yaml`, `notebooks/chunks/`, `docs/COMPUTE_PLAN.md`) with the CPU pilot notebook
+  and chunk narrowing in the driver, the EXPLORATORY T1 forced choice (`docs/FORCED_CHOICE_EXPLORATORY.md`),
+  `check_run.py`, the run-environment pins (`configs/env_pins.txt`), `max_model_len` 2,048; the experiments
+  bookkeeping (`experiments/ledger.csv` keyed to the chunks, `scripts/progress.py`, `experiments/gates.yaml`
+  enforced by the driver, `scripts/interim_analysis.py`, the pin kit `scripts/pin_panel.py` →
+  `experiments/panel_pins.json` with `scripts/kaggle_cpu_jobs.py`, `RUNBOOK.md`, `STATUS.md`, `BLOCKED.md`,
+  `CLAUDE.md`), the dev-only `configs/run_plan_exploratory.yaml` and `PLAN_PATH` in every notebook, and the
+  reviewed paper draft (`paper/claims.md`). Still no model run.
 
 ## Running from a private repository
 

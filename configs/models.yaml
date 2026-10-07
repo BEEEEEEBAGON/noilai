@@ -36,7 +36,7 @@
 #   * every provider block carries `terms.trains_on_inputs` as a BOOLEAN: the run driver refuses a
 #     canary-bearing (test-split) item file for a provider whose tier trains on inputs, and the eval
 #     harness refuses any core item unless the value is exactly false (DESIGN_DECISIONS 11.2 / 12.41).
-# Engine defaults follow DESIGN_DECISIONS 7.3 (vLLM 0.30.0 on Kaggle 2xT4): max_model_len 1024,
+# Engine defaults follow DESIGN_DECISIONS 7.3 (vLLM 0.30.0 on Kaggle 2xT4): max_model_len 2048 (DD 7.3 said 1024; DEVIATIONS),
 # gpu_memory_utilization 0.85, TRITON_ATTN, zero multimodal limits, prefix caching, 64 seqs.
 
 version: 1
@@ -44,7 +44,9 @@ date: 2026-09-30
 plan: docs/PLAN_2026-09-30.md
 
 defaults:
-  max_model_len: 1024          # DESIGN_DECISIONS 7.3: ~500 prompt tokens (3 demonstrations) + <= 64 output tokens under NFC; [UNCERTAIN: verify] that the NFD prompts (~1.6x the tokens on Gemma 3) stay under 1024 - 64, else raise per entry and record it
+  max_model_len: 2048          # DESIGN_DECISIONS 7.3 said 1024 (~500 prompt tokens + <= 64 output under NFC); measured on 1 Oct 2026 with the real
+                               # Gemma 3 tokenizer: whole-prompt NFD prompts reach 1,131 tokens (T3 p2), above 1024 - 64 for every T2/T3 and
+                               # ~24% of T1 NFD prompts -> 2048 (docs/DEVIATIONS.md row "DESIGN_DECISIONS 7.3 (max_model_len)"; RL-2026-10-01-05)
   max_new_tokens: 64
   temperature: 0.0             # greedy decoding everywhere (plan 2.5)
   seed: 20261203               # the run (backend) seed; public, distinct from the withheld build seed (DESIGN_DECISIONS 4.6)
@@ -218,7 +220,7 @@ models:
     never_float16: true
     quantization: null
     hardware: t4
-    max_model_len: 1024
+    max_model_len: 2048
     chat_template_kwargs: {}
     verify: []
     notes:
@@ -242,7 +244,7 @@ models:
     never_float16: true
     quantization: null
     hardware: 2xt4          # ~17 GB of fp32 weights: tensor parallel over both T4s
-    max_model_len: 1024
+    max_model_len: 2048
     chat_template_kwargs: {}
     verify: []
     notes:
@@ -265,7 +267,7 @@ models:
     never_float16: true
     quantization: null
     hardware: tpu
-    max_model_len: 1024
+    max_model_len: 2048
     engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}   # vLLM-TPU: no attention_backend override [UNCERTAIN: verify] flag names on the TPU build
     chat_template_kwargs: {}
     verify: []
@@ -289,7 +291,7 @@ models:
     dtype: float16
     quantization: null
     hardware: t4
-    max_model_len: 1024
+    max_model_len: 2048
     chat_template_kwargs: {enable_thinking: false}
     verify:
       - "[UNCERTAIN: verify] repository id and whether an -Instruct suffix exists"
@@ -313,7 +315,7 @@ models:
     dtype: float16
     quantization: null
     hardware: t4
-    max_model_len: 1024
+    max_model_len: 2048
     chat_template_kwargs: {enable_thinking: false}
     verify:
       - "[UNCERTAIN: verify] repository id"
@@ -336,7 +338,7 @@ models:
     dtype: float16
     quantization: null
     hardware: t4
-    max_model_len: 1024
+    max_model_len: 2048
     chat_template_kwargs: {enable_thinking: false}
     verify:
       - "[UNCERTAIN: verify] repository id"
@@ -358,7 +360,7 @@ models:
     dtype: float16
     quantization: {method: awq, bits: 4, checkpoint: null}   # [UNCERTAIN: verify] pick a released AWQ/GPTQ repo or quantize once and cache it as a Kaggle dataset
     hardware: t4
-    max_model_len: 1024
+    max_model_len: 2048
     chat_template_kwargs: {enable_thinking: false}
     verify:
       - "[UNCERTAIN: verify] repository id (https://huggingface.co/Qwen/Qwen3.5-9B in the plan)"
@@ -382,7 +384,7 @@ models:
     dtype: float16
     quantization: {method: qat_int4, bits: 4, checkpoint: null}   # [UNCERTAIN: verify] the QAT int4 weights the dev.to report used
     hardware: t4
-    max_model_len: 1024
+    max_model_len: 2048
     chat_template_kwargs: {}
     verify:
       - "[UNCERTAIN: verify] repository id and the 4-bit QAT checkpoint"
@@ -406,7 +408,7 @@ models:
     dtype: float16
     quantization: {method: qat_int4, bits: 4, checkpoint: null}   # [UNCERTAIN: verify]
     hardware: t4
-    max_model_len: 1024
+    max_model_len: 2048
     chat_template_kwargs: {}
     verify:
       - "[UNCERTAIN: verify] repository id and the 4-bit checkpoint"
@@ -428,7 +430,7 @@ models:
     dtype: float16
     quantization: {method: awq_or_int8, bits: 4, checkpoint: null}   # [UNCERTAIN: verify] 4- or 8-bit across both GPUs (plan 3)
     hardware: 2xt4
-    max_model_len: 1024
+    max_model_len: 2048
     chat_template_kwargs: {}
     verify:
       - "[UNCERTAIN: verify] repository id and a 4/8-bit checkpoint that fits 2 x 16 GB with KV cache"
@@ -452,7 +454,7 @@ models:
     dtype: float16
     quantization: {method: qat_int4, bits: 4, checkpoint: null}   # [UNCERTAIN: verify]
     hardware: t4
-    max_model_len: 1024
+    max_model_len: 2048
     chat_template_kwargs: {}
     verify:
       - "[UNCERTAIN: verify] repository id"
@@ -476,7 +478,7 @@ models:
     dtype: float16
     quantization: {method: bitsandbytes_nf4, bits: 4, checkpoint: null}   # quantize at load; vLLM supports bitsandbytes on the T4 (plan 3)
     hardware: t4
-    max_model_len: 1024
+    max_model_len: 2048
     chat_template_kwargs: {}
     verify:
       - "[UNCERTAIN: verify] bitsandbytes 4-bit load under the pinned vLLM; AWQ repo as the alternative"
@@ -499,7 +501,7 @@ models:
     dtype: float16
     quantization: null
     hardware: t4
-    max_model_len: 1024
+    max_model_len: 2048
     trust_remote_code: true      # MPT architecture with custom modelling code (a pinned transformers 4.x venv if the remote code fails under 5.x)
     chat_template_kwargs: {}
     prompt_format: "### Câu hỏi: {prompt}\n### Trả lời:"   # PhoGPT's raw prompt (DD 7.2); no chat template. [NATIVE-CHECK] not needed: the model card's own markers
@@ -526,7 +528,7 @@ models:
     dtype: float16
     quantization: {method: bitsandbytes_nf4, bits: 4, checkpoint: null}
     hardware: t4
-    max_model_len: 1024
+    max_model_len: 2048
     chat_template_kwargs: {}
     verify:
       - "[UNCERTAIN: verify] gated access granted; 4-bit load path"
@@ -549,7 +551,7 @@ models:
     dtype: float16
     quantization: {method: awq, bits: 4, checkpoint: hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4}   # [UNCERTAIN: verify] still available
     hardware: t4
-    max_model_len: 1024
+    max_model_len: 2048
     chat_template_kwargs: {}
     verify:
       - "[UNCERTAIN: verify] the AWQ checkpoint id"
@@ -572,7 +574,7 @@ models:
     dtype: bfloat16
     quantization: null
     hardware: tpu
-    max_model_len: 1024
+    max_model_len: 2048
     engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}   # vLLM-TPU: no attention_backend override [UNCERTAIN: verify] flag names on the TPU build
     chat_template_kwargs: {enable_thinking: false}
     verify:
@@ -599,7 +601,7 @@ models:
     dtype: bfloat16
     quantization: null
     hardware: tpu
-    max_model_len: 1024
+    max_model_len: 2048
     engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}   # vLLM-TPU: no attention_backend override [UNCERTAIN: verify] flag names on the TPU build
     chat_template_kwargs: {enable_thinking: false}
     verify:
@@ -711,20 +713,20 @@ models:
   # Same weights as the panel entry named in `reference_of`, served unquantized in bf16 on the
   # TPU for the ~200-item drift check (plan 2.5: "about 200 items per model are re-run in bf16").
   # Modal L4 (bf16-capable) is the fallback if the TPU route fails (plan 3).
-  - {name: gemma-3-1b-it--bf16, reference_of: gemma-3-1b-it, hf_id: google/gemma-3-1b-it, hf_id_status: known, revision: null, gated: true, family: gemma3, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, never_float16: true, quantization: null, hardware: tpu, max_model_len: 1024, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: [], notes: ["bf16 reference for the fp32 T4 run"]}
-  - {name: gemma-3-4b-it--bf16, reference_of: gemma-3-4b-it, hf_id: google/gemma-3-4b-it, hf_id_status: known, revision: null, gated: true, family: gemma3, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, never_float16: true, quantization: null, hardware: tpu, max_model_len: 1024, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: [], notes: ["bf16 reference for the fp32 2xT4 run"]}
-  - {name: qwen3.5-0.8b--bf16, reference_of: qwen3.5-0.8b, hf_id: Qwen/Qwen3.5-0.8B, hf_id_status: uncertain, revision: null, gated: false, family: qwen3.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 1024, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {enable_thinking: false}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
-  - {name: qwen3.5-2b--bf16, reference_of: qwen3.5-2b, hf_id: Qwen/Qwen3.5-2B, hf_id_status: uncertain, revision: null, gated: false, family: qwen3.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 1024, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {enable_thinking: false}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
-  - {name: qwen3.5-4b--bf16, reference_of: qwen3.5-4b, hf_id: Qwen/Qwen3.5-4B, hf_id_status: uncertain, revision: null, gated: false, family: qwen3.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 1024, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {enable_thinking: false}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
-  - {name: qwen3.5-9b--bf16, reference_of: qwen3.5-9b, hf_id: Qwen/Qwen3.5-9B, hf_id_status: uncertain, revision: null, gated: false, family: qwen3.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 1024, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {enable_thinking: false}, verify: ["[UNCERTAIN: verify] as reference"], notes: ["unquantized bf16 reference for the 4-bit T4 run"]}
-  - {name: gemma-4-e2b--bf16, reference_of: gemma-4-e2b, hf_id: google/gemma-4-e2b-it, hf_id_status: uncertain, revision: null, gated: true, family: gemma4, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 1024, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] as reference"], notes: ["unquantized bf16 reference for the 4-bit T4 run"]}
-  - {name: gemma-4-e4b--bf16, reference_of: gemma-4-e4b, hf_id: google/gemma-4-e4b-it, hf_id_status: uncertain, revision: null, gated: true, family: gemma4, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 1024, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
-  - {name: gemma-4-12b--bf16, reference_of: gemma-4-12b, hf_id: google/gemma-4-12b-it, hf_id_status: uncertain, revision: null, gated: true, family: gemma4, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 1024, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
-  - {name: gemma-sea-lion-v4.5-e2b-it--bf16, reference_of: gemma-sea-lion-v4.5-e2b-it, hf_id: aisingapore/Gemma-SEA-LION-v4.5-E2B-IT, hf_id_status: uncertain, revision: null, gated: false, family: sea-lion-v4.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 1024, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
-  - {name: sailor2-8b-chat--bf16, reference_of: sailor2-8b-chat, hf_id: sail/Sailor2-8B-Chat, hf_id_status: known, revision: null, gated: false, family: sailor2, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 1024, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: [], notes: []}
-  - {name: phogpt-4b-chat--bf16, reference_of: phogpt-4b-chat, hf_id: vinai/PhoGPT-4B-Chat, hf_id_status: known, revision: null, gated: false, family: phogpt, group: bf16_reference, tokenizer_type: "as reference", backend: hf, fallback_backend: llama_cpp, dtype: bfloat16, quantization: null, hardware: l4, max_model_len: 1024, trust_remote_code: true, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] Modal L4 route (card on file); MPT is not runnable on vLLM 0.30, so the TPU route does not exist for this model"], notes: ["bf16 reference through HF transformers on the Modal L4 (plan 3: bf16 reruns if the TPU route fails); DD 7.2 / 12.25"]}
-  - {name: vistral-7b-chat--bf16, reference_of: vistral-7b-chat, hf_id: Viet-Mistral/Vistral-7B-Chat, hf_id_status: known, revision: null, gated: true, family: vistral, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 1024, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: [], notes: []}
-  - {name: llama-3.1-8b-instruct--bf16, reference_of: llama-3.1-8b-instruct, hf_id: meta-llama/Llama-3.1-8B-Instruct, hf_id_status: known, revision: null, gated: true, family: llama3.1, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 1024, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: [], notes: ["unquantized bf16 reference for the AWQ T4 run"]}
+  - {name: gemma-3-1b-it--bf16, reference_of: gemma-3-1b-it, hf_id: google/gemma-3-1b-it, hf_id_status: known, revision: null, gated: true, family: gemma3, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, never_float16: true, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: [], notes: ["bf16 reference for the fp32 T4 run"]}
+  - {name: gemma-3-4b-it--bf16, reference_of: gemma-3-4b-it, hf_id: google/gemma-3-4b-it, hf_id_status: known, revision: null, gated: true, family: gemma3, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, never_float16: true, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: [], notes: ["bf16 reference for the fp32 2xT4 run"]}
+  - {name: qwen3.5-0.8b--bf16, reference_of: qwen3.5-0.8b, hf_id: Qwen/Qwen3.5-0.8B, hf_id_status: uncertain, revision: null, gated: false, family: qwen3.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {enable_thinking: false}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
+  - {name: qwen3.5-2b--bf16, reference_of: qwen3.5-2b, hf_id: Qwen/Qwen3.5-2B, hf_id_status: uncertain, revision: null, gated: false, family: qwen3.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {enable_thinking: false}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
+  - {name: qwen3.5-4b--bf16, reference_of: qwen3.5-4b, hf_id: Qwen/Qwen3.5-4B, hf_id_status: uncertain, revision: null, gated: false, family: qwen3.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {enable_thinking: false}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
+  - {name: qwen3.5-9b--bf16, reference_of: qwen3.5-9b, hf_id: Qwen/Qwen3.5-9B, hf_id_status: uncertain, revision: null, gated: false, family: qwen3.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {enable_thinking: false}, verify: ["[UNCERTAIN: verify] as reference"], notes: ["unquantized bf16 reference for the 4-bit T4 run"]}
+  - {name: gemma-4-e2b--bf16, reference_of: gemma-4-e2b, hf_id: google/gemma-4-e2b-it, hf_id_status: uncertain, revision: null, gated: true, family: gemma4, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] as reference"], notes: ["unquantized bf16 reference for the 4-bit T4 run"]}
+  - {name: gemma-4-e4b--bf16, reference_of: gemma-4-e4b, hf_id: google/gemma-4-e4b-it, hf_id_status: uncertain, revision: null, gated: true, family: gemma4, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
+  - {name: gemma-4-12b--bf16, reference_of: gemma-4-12b, hf_id: google/gemma-4-12b-it, hf_id_status: uncertain, revision: null, gated: true, family: gemma4, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
+  - {name: gemma-sea-lion-v4.5-e2b-it--bf16, reference_of: gemma-sea-lion-v4.5-e2b-it, hf_id: aisingapore/Gemma-SEA-LION-v4.5-E2B-IT, hf_id_status: uncertain, revision: null, gated: false, family: sea-lion-v4.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
+  - {name: sailor2-8b-chat--bf16, reference_of: sailor2-8b-chat, hf_id: sail/Sailor2-8B-Chat, hf_id_status: known, revision: null, gated: false, family: sailor2, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: [], notes: []}
+  - {name: phogpt-4b-chat--bf16, reference_of: phogpt-4b-chat, hf_id: vinai/PhoGPT-4B-Chat, hf_id_status: known, revision: null, gated: false, family: phogpt, group: bf16_reference, tokenizer_type: "as reference", backend: hf, fallback_backend: llama_cpp, dtype: bfloat16, quantization: null, hardware: l4, max_model_len: 2048, trust_remote_code: true, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] Modal L4 route (card on file); MPT is not runnable on vLLM 0.30, so the TPU route does not exist for this model"], notes: ["bf16 reference through HF transformers on the Modal L4 (plan 3: bf16 reruns if the TPU route fails); DD 7.2 / 12.25"]}
+  - {name: vistral-7b-chat--bf16, reference_of: vistral-7b-chat, hf_id: Viet-Mistral/Vistral-7B-Chat, hf_id_status: known, revision: null, gated: true, family: vistral, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: [], notes: []}
+  - {name: llama-3.1-8b-instruct--bf16, reference_of: llama-3.1-8b-instruct, hf_id: meta-llama/Llama-3.1-8B-Instruct, hf_id_status: known, revision: null, gated: true, family: llama3.1, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: [], notes: ["unquantized bf16 reference for the AWQ T4 run"]}
 
   # ------------------------------------------------------------------ reasoning sub-study variants
   # Thinking ON, longer context for the reasoning tokens; 500 items (plan 2.5: "a budgeted

@@ -29,7 +29,7 @@ import kaggle_dataset as KD
 import kaggle_run_plan as KRP
 import kaggle_verify_items as KVI
 
-NOTEBOOK_NAMES = ("kaggle_eval_t4", "kaggle_eval_tpu", "colab_probe_gemma3", "api_runs")
+NOTEBOOK_NAMES = ("kaggle_eval_t4", "kaggle_eval_tpu", "colab_probe_gemma3", "api_runs", "kaggle_cpu_pilot")
 NOTEBOOKS = {n: ROOT / "notebooks" / f"{n}.ipynb" for n in NOTEBOOK_NAMES}
 # literal secret shapes: the task's three plus the GitHub (classic and fine-grained), Groq and Kaggle key shapes
 SECRET_PATTERNS = {
@@ -380,7 +380,7 @@ def test_hardware_is_consistent_with_dtype_and_gemma3_is_never_fp16(models_cfg):
             assert m["hardware"] == "api" and m["dtype"] is None and m["quantization"] is None, m["name"]
         else:
             assert isinstance(m["hf_id"], str) and "/" in m["hf_id"], m["name"]
-            assert m["max_model_len"] and m["max_model_len"] >= 1024, m["name"]       # DD 7.3: 1024
+            assert m["max_model_len"] and m["max_model_len"] >= 2048, m["name"]       # DD 7.3 as amended 1 Oct 2026 (NFD prompts reach 1,131 tokens)
             assert "revision" in m, (m["name"], "DD 7.1: every self-hosted entry carries `revision` (null until the freeze)")
         entry = B.get_model_entry(models_cfg, m["name"])
         if m["hardware"] == "tpu":
@@ -401,7 +401,7 @@ def test_hardware_is_consistent_with_dtype_and_gemma3_is_never_fp16(models_cfg):
     _check(models_cfg["by_name"]["gemma-3-1b-it"], hw)      # and the real entry passes
     # DD 7.3 engine defaults
     d = models_cfg["defaults"]
-    assert d["max_model_len"] == 1024 and d["gpu_memory_utilization"] == 0.85
+    assert d["max_model_len"] == 2048 and d["gpu_memory_utilization"] == 0.85    # 1024 before docs/DEVIATIONS.md "DESIGN_DECISIONS 7.3 (max_model_len)"
     assert d["engine_kwargs"] == {"attention_backend": "TRITON_ATTN", "limit_mm_per_prompt": {"image": 0, "audio": 0},
                                   "enable_prefix_caching": True, "max_num_seqs": 64}
     # PhoGPT is not runnable on vLLM 0.30 (DD 7.2 / 12.25)
@@ -1575,7 +1575,168 @@ def test_makefile_builds_the_plans_release_and_refuses_the_superseded_baseline_d
     baseline = mk[mk.index("baseline:"):mk.index("lint:")]
     assert "--per-form 40" not in baseline, "the superseded 20 x 40 design is gone (DD 10.2 / 12.20)"
     assert "--items $(RELEASE)/noilai_main.jsonl" in baseline and "--n-forms 20 --per-form 30" in baseline, "DD 10.2: 20 x 30 from the main sample"
-    assert "d['distinct_items'] == 246" in baseline and "d['min_appearances'] == 2" in baseline and "d['max_appearances'] == 20" in baseline
+    for want in ("'forms': 20", "'per_form': 30", "'anchors': 6", "'distinct_items': 246", "'min_appearances': 2",
+                 "'max_appearances': 20", "'anchors_seen_by': 20", "'others': [2]", "'rater_graph_connected': True"):
+        assert want in baseline, want                                      # all nine design values are checked by the target
+    assert "--exclude-flags data/audit/validator_flags.json" in baseline   # DD 11.5: validator-flagged items never reach a form
     assert "exit 1" in baseline and "rm -f data/human/baseline_form_*.csv" in baseline and "HUMAN_BASELINE_FORM.md" in baseline, \
         "forms that are not the 246-item design are deleted, never left to be sent (item 66)"
     assert "--seed 20261102" in baseline           # the public sampling seed of docs/HUMAN_BASELINE_FORM.md, never the build seed
+
+
+def test_normalizing_tokenizers_skip_the_nfd_and_pc_arms_as_zero_by_construction(tmp_path, monkeypatch, plan, models_cfg):
+    """DD 6.2: a tokenizer whose census says `normalizes` for an arm does not run it (0 by construction); a model
+    without a census file skips nothing; a pass-through census (the committed Gemma 3 audit) skips nothing."""
+    import json as _json
+
+    import kaggle_run_plan as KRP
+
+    from noilai.eval import run as RUN
+    e3 = next(r for r in plan["runs"] if r["id"] == "E3_noilai")
+    monkeypatch.setattr(RUN, "AUDIT_DIR", tmp_path)
+    (tmp_path / "qwen3.5.json").write_text(_json.dumps({"normalization_census": {"verdict_nfd": "normalizes", "verdict_pc": "normalizes"}}))
+    q = models_cfg["by_name"]["qwen3.5-2b"]
+    skipped = KRP.census_skipped_arms(e3, q)
+    assert set(skipped) == {"nfd", "pc"} and all("0 by construction" in v for v in skipped.values())
+    cmd = KRP.build_command(e3, "qwen3.5-2b", plan, models_cfg)
+    arms = cmd[cmd.index("--arms") + 1: cmd.index("--resume")]
+    assert "nfd" not in arms and "pc" not in arms and "strip_tones" in arms and "nfc" in arms
+    assert KRP.census_skipped_arms(e3, models_cfg["by_name"]["llama-3.1-8b-instruct"]) == {}      # not censused: nothing skipped
+    monkeypatch.setattr(RUN, "AUDIT_DIR", ROOT / "data" / "audit")
+    assert KRP.census_skipped_arms(e3, models_cfg["by_name"]["gemma-3-1b-it"]) == {}              # passes through
+
+
+def test_a_chunk_may_only_narrow_its_line_and_writes_its_own_run_directory(plan):
+    """docs/COMPUTE_PLAN.md: a compute chunk narrows a run line (e.g. paraphrases p0+p1 now, p2 later, the DD 8.5 cut
+    before any model) and gets its own run directory so that every manifest describes exactly its rows."""
+    import kaggle_run_plan as KRP
+    e1 = KRP.find_run(plan, "E1_main")
+    n = KRP.narrow_run(e1, {"paraphrases": ["p0", "p1"]}, "p0p1")
+    assert n["paraphrases"] == ["p0", "p1"] and KRP.run_dir(plan, n, "gemma-3-4b-it").endswith("E1_main__gemma-3-4b-it__p0p1")
+    assert KRP.run_dir(plan, e1, "gemma-3-4b-it").endswith("E1_main__gemma-3-4b-it")
+    with pytest.raises(ValueError, match="widens"):
+        KRP.narrow_run(KRP.find_run(plan, "E1_explicit_input"), {"paraphrases": ["p0", "p1"]})
+    with pytest.raises(ValueError, match="only narrow"):
+        KRP.narrow_run(e1, {"items": "noilai_test"})
+    assert KRP.narrow_run(e1, None) is e1
+    whole = KRP.narrow_run(e1, None, "cpu")                          # a tag alone: the whole line in its own directory
+    assert whole["paraphrases"] == e1["paraphrases"] and KRP.run_dir(plan, whole, "m").endswith("__m__cpu")
+
+
+# ----------------------------------------------------------------------------- compute chunks (docs/COMPUTE_PLAN.md)
+import plan_chunks as PC
+
+
+@pytest.fixture(scope="module")
+def chunk_spec():
+    return PC.build_chunks()
+
+
+def test_compute_chunks_notebooks_and_plan_block_match_the_generator(chunk_spec):
+    assert PC.check(chunk_spec) == []
+
+
+def test_chunk_order_is_the_reverse_of_the_pre_registered_cut_order(chunk_spec, plan, models_cfg):
+    dd = (ROOT / "docs" / "DESIGN_DECISIONS.md").read_text(encoding="utf-8")
+    assert "tokenizer-redundant models first — Gemma 3 12B, Qwen3.5-0.8B, Gemma 4 12B — then the second model of any family" in dd
+    assert PC.REDUNDANT == ("gemma-3-12b-it", "qwen3.5-0.8b", "gemma-4-12b")
+    assert "paraphrases drop to two for the TPU/2×T4 models before any model is cut" in dd
+    tiers = [c["tier"] for c in chunk_spec["chunks"]]
+    assert tiers == sorted(tiers) and [c["order"] for c in chunk_spec["chunks"]] == list(range(1, len(tiers) + 1))
+    leads = set(chunk_spec["rules"]["first_of_family"].values())
+    for c in chunk_spec["chunks"]:
+        for j in c["jobs"]:
+            for m in j["models"]:
+                base = models_cfg["by_name"][m].get("reference_of") or m
+                if base in PC.REDUNDANT:
+                    assert c["tier"] in (0, 4, 5), (c["id"], m)
+                if base in leads and c["tier"] in (3, 4):
+                    raise AssertionError(f"lead model {m} scheduled in cut tier {c['tier']} ({c['id']})")
+            if j["tag"] == "p2":
+                assert c["tier"] == 5 and j["overrides"] == {"paraphrases": ["p2"]}
+                assert all(models_cfg["by_name"][m]["hardware"] in ("2xt4", "tpu") for m in j["models"])
+
+
+def test_tier_zero_reads_only_dev_files_and_later_tiers_wait_for_stage_two(chunk_spec, plan):
+    for c in chunk_spec["chunks"]:
+        canary = [k for k in c["item_keys"] if plan["item_files"][k].get("canary_required")]
+        if c["tier"] == 0:
+            assert not canary, (c["id"], canary)
+            assert all(j["run"] in PC.PRE_LINES for j in c["jobs"])
+        else:
+            assert "stage-2" in c["window"], c["id"]
+
+
+def test_chunks_cover_every_gpu_and_tpu_job_of_the_plan_exactly_once(chunk_spec, plan, models_cfg):
+    seen: dict[tuple, list[str]] = {}
+    for c in chunk_spec["chunks"]:
+        if c["tier"] == 0:
+            continue
+        for j in c["jobs"]:
+            run = KRP.find_run(plan, j["run"])
+            paras = (j["overrides"] or {}).get("paraphrases", run["paraphrases"])
+            for m in j["models"]:
+                seen.setdefault((j["run"], m), []).extend(paras)
+    expected = {}
+    for rid in PC.MAIN_LINES + PC.OUTSIDE_LINES:
+        run = KRP.find_run(plan, rid)
+        for m in PC.booked_models(run, plan, models_cfg):
+            if models_cfg["by_name"][m]["hardware"] in PC.HW_QUEUE:
+                expected[(rid, m)] = sorted(run["paraphrases"])
+    assert {k: sorted(v) for k, v in seen.items()} == expected
+    assert [(u["run"], u["model"]) for u in chunk_spec["unscheduled"]] == [("bf16_drift_200", "phogpt-4b-chat--bf16")]
+    tpu_line = set(KRP.expand_models(KRP.find_run(plan, "tpu_main"), plan, models_cfg))
+    assert not any(r == "E1_main" and m in tpu_line for r, m in seen), "tpu_main books the TPU trio's E1 runs"
+
+
+def test_each_chunk_fits_one_session_and_only_narrows_its_lines(chunk_spec, plan, models_cfg):
+    dirs = set()
+    for c in chunk_spec["chunks"]:
+        assert c["hours"]["high"] <= PC.SESSION_CAP_H[c["queue"]], c["id"]
+        assert c["hours"]["low"] <= c["hours"]["high"]
+        for j in c["jobs"]:
+            run = KRP.narrow_run(KRP.find_run(plan, j["run"]), j["overrides"], j["tag"])   # raises on a widening override
+            for m in j["models"]:
+                d = KRP.run_dir(plan, run, m)
+                assert d not in dirs or (c["queue"] == "cpu" and j["run"] == "smoke_20"), d   # the CPU pilot re-enters c01's smoke (--resume)
+                dirs.add(d)
+                if j["overrides"]:
+                    cmd = KRP.build_command(run, m, plan, models_cfg)
+                    assert cmd[cmd.index("--paraphrases") + 1:cmd.index("--shots")] == j["overrides"]["paraphrases"]
+                    assert cmd[cmd.index("--run-id") + 1].endswith(f"__{j['tag']}")
+
+
+def test_first_models_of_the_families_meet_the_minimum_viable_panel(chunk_spec, models_cfg):
+    leads = chunk_spec["rules"]["first_of_family"]
+    open_leads = [m for m in leads.values() if models_cfg["by_name"][m]["hardware"] != "api"]
+    assert len(open_leads) >= 8 and len(set(leads)) >= 4             # DD 7.1: >= 8 open models over >= 4 families
+    assert {"gemma-3-1b-it", "qwen3.5-2b", "phogpt-4b-chat"} <= set(leads.values())   # the pilot models lead their families
+    assert not set(PC.REDUNDANT) & set(leads.values())
+
+
+def test_chunk_notebooks_preset_exactly_the_chunk_jobs(chunk_spec):
+    for c in chunk_spec["chunks"]:
+        nb = nbformat.read(str(ROOT / c["notebook"]), as_version=4)
+        nbformat.validate(nb)
+        assert nb.metadata["noilai"]["chunk"] == c["id"]
+        param = next(cell for cell in nb.cells if cell.cell_type == "code" and "# ---- parameters" in cell.source)
+        ns: dict = {}
+        exec(compile(param.source, c["id"], "exec"), ns)  # noqa: S102 -- the generated parameters cell runs on its own
+        assert ns["RUN_LABEL"] == c["id"]
+        if c["queue"] == "cpu":
+            assert ns["RUN_IDS"] == [j["run"] for j in c["jobs"]] and ns["MODELS"] == c["jobs"][0]["models"]
+        else:
+            assert ns["JOBS"] == c["jobs"] and ns["MODELS"] == []
+            assert set(c["item_keys"]) <= set(ns["VERIFY_ITEM_KEYS"])
+            run_cell = next(cell for cell in nb.cells if KBN.RUN_TAG in cell.metadata.get("tags", []) and "JOBS" in cell.source)
+            assert 'line_overrides=job.get("overrides"), chunk_tag=job.get("tag")' in run_cell.source
+
+
+def test_cpu_chunk_estimates_derive_from_the_benchmark(chunk_spec):
+    b = json.loads(PC.BENCH.read_text())
+    est = PC.cpu_estimates(b)
+    dec = (b["generate_bs1_520p_24new_s"] - b["prefill_520_s"]) / 24
+    assert est["smoke_20"] == pytest.approx(40 * (b["prefill_520_s"] + 64 * dec) / 3600)
+    cpu = [c for c in chunk_spec["chunks"] if c["queue"] == "cpu"]
+    assert [c["jobs"][0]["models"] for c in cpu] == [["gemma-3-1b-it"], ["gemma-3-1b-it"], ["qwen3.5-2b"], ["phogpt-4b-chat"]]
+    assert all(c["quota_hours"]["x1"] == [0, 0] for c in cpu)

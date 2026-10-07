@@ -1,0 +1,14 @@
+# Kaggle free-tier quota assumptions used by scripts/progress.py (STATUS.md "Kaggle hours this week") and by
+# scripts/ledger.py (the weight of a CPU session hour in the quota meter).
+# Every figure here is an ASSUMPTION until the author reads the real numbers on the Kaggle quota page
+# (Settings -> "Your GPU/TPU quota"); configs/run_plan.yaml `quota` carries the same dated figures.
+gpu_hours_per_week: 30          # [UNCERTAIN: verify on the account's quota page]
+tpu_hours_per_week: 20          # [UNCERTAIN: verify]
+week_resets_on: saturday        # Kaggle's weekly quota resets on Saturday 00:00 UTC [UNCERTAIN: verify on the quota page]
+week_reset_hour_utc: 0
+# Semantics of the CPU flag (scripts/ledger.py cpu_quota_weight, scripts/progress.py): null = not yet verified and
+# false both give CPU units (the c01-c04 chunks, est_unit cpu_hours) weight 0 in the quota meter, with their hours
+# shown on a line of their own; true gives them weight 1 (a CPU session hour costs one GPU quota hour). After
+# changing it, re-run `python scripts/ledger.py init --force` (est_cost is computed at init; statuses carry over).
+# The x1 / x2 reading of a 2xT4 session hour (memo N8) is NOT a setting here: the meter prints both.
+cpu_sessions_count_against_gpu_quota: null   # null = not yet verified; the user asked for this to be checked

@@ -142,7 +142,7 @@ def onsets_table(now: str) -> str:
     for sp, canon in ONSET_SPELLINGS.items():
         surfaces.setdefault(canon, []).append(sp)
     lines = [_hdr("onsets", now)]
-    lines.append(r"\begin{table}[t]\centering\small")
+    lines.append(r"\begin{table*}[t]\centering\small")
     lines.append(r"\begin{tabular}{@{}lll@{}}")
     lines.append(r"\toprule")
     lines.append(r"Onset & Written & Engine examples \\")
@@ -153,7 +153,7 @@ def onsets_table(now: str) -> str:
             continue
         written = ", ".join(sorted(surfaces.get(o, [o]), key=len))
         if o == "c":
-            ex = f"{_ex('c', False, 'a')} / {_ex('c', False, 'e')} / {_ex('c', True, 'a')} (c before a, k before e \\^{{e}} i, q before the glide)"
+            ex = f"{_ex('c', False, 'a')} / {_ex('c', False, 'e')} / {_ex('c', True, 'a')} (c before a, k before e \\^{{e}} i y, q before the glide)"
         elif o == "g":
             ex = f"{_ex('g', False, 'a')} / {_ex('g', False, 'e')} (gh before e \\^{{e}} i)"
         elif o == "ng":
@@ -166,11 +166,11 @@ def onsets_table(now: str) -> str:
     lines.append(r"\bottomrule")
     lines.append(r"\end{tabular}")
     lines.append(r"\caption{Surface spelling of the canonical onsets. The k/gh/ngh spellings are triggered by the first "
-                 r"\emph{written} letter after the onset (e, \^{e}, i), so a glide switches them off (\texttt{ngoe}, "
+                 r"\emph{written} letter after the onset (e, \^{e}, i, y), so a glide switches them off (\texttt{ngoe}, "
                  r"\texttt{nguy}); every example is produced by \texttt{noilai.vi.syllable.spell}, and the examples of "
                  r"the plain rows are attested syllables of the release inventory.}")
     lines.append(r"\label{tab:onsets}")
-    lines.append(r"\end{table}")
+    lines.append(r"\end{table*}")
     return "\n".join(lines) + "\n"
 
 
@@ -219,7 +219,7 @@ def spelling_table(now: str) -> str:
     ]
     lines = [_hdr("spelling", now)]
     lines.append(r"\begin{table*}[t]\centering\small")
-    lines.append(r"\begin{tabular}{@{}lp{0.42\textwidth}p{0.36\textwidth}@{}}")
+    lines.append(r"\begin{tabular}{@{}lp{0.40\textwidth}p{0.34\textwidth}@{}}")   # 0.42/0.36 overflowed by 17pt
     lines.append(r"\toprule")
     lines.append(r"Rule & Statement & Engine examples \\")
     lines.append(r"\midrule")
@@ -307,7 +307,7 @@ def variants_table(now: str) -> str:
     all_variants = getattr(V, "ALL_VARIANTS", V.VARIANTS)
     generated = set(V.VARIANTS)
     lines = [_hdr("variants", now)]
-    lines.append(r"\begin{table}[t]\centering\small")
+    lines.append(r"\begin{table*}[t]\centering\small")
     lines.append(r"\begin{tabular}{@{}lllll@{}}")
     lines.append(r"\toprule")
     lines.append(r"Variant & Swapped & Kept in place & Engine example & Status \\")
@@ -332,9 +332,10 @@ def variants_table(now: str) -> str:
                  r"the two positions. Each is an involution; reading an output in the other order maps \var{1} to \var{6}, "
                  r"\var{2} to \var{3} and \var{4} to \var{5}, so \var{5} and \var{6} add no new unordered pair and are not "
                  r"generated as \task{T1} cells. Examples \var{1}--\var{5} are attested folk forms that the engine reproduces "
-                 r"exactly; \var{6} has none.}")
+                 r"exactly; the \var{6} example is the \var{1} pair read in the other order, and the seed's two attested \var{6} rows "
+                 r"(\vi{thay đổi} $\rightarrow$ \vi{đảy thôi}, \vi{trái gió} $\rightarrow$ \vi{giái tró}) are reproduced exactly as well.}")
     lines.append(r"\label{tab:variants}")
-    lines.append(r"\end{table}")
+    lines.append(r"\end{table*}")
     return "\n".join(lines) + "\n"
 
 
