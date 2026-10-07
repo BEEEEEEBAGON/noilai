@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Interim analysis on COMPLETED units only: per-cell accuracy with base-pair cluster-bootstrap CIs.
 
     python scripts/interim_analysis.py                                  # experiments/ledger.csv + data/runs -> experiments/interim/
