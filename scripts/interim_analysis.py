@@ -188,6 +188,8 @@ def attach_clusters(rows: list[dict], manifest: dict) -> str | None:
     except FileNotFoundError as e:
         raise Unscorable(f"{len(missing)} score rows carry no {CLUSTER_KEY} and the item file is not "
                          f"resolvable: {e}") from e
+    except (OSError, ValueError) as e:                   # an unreadable or non-jsonl item file (JSONDecodeError is a ValueError)
+        raise Unscorable(f"{len(missing)} score rows carry no {CLUSTER_KEY} and the item file cannot be read: {e}") from e
     by_id = {it["item_id"]: it for it in items}
     unresolved = 0
     for r in missing:
@@ -234,6 +236,9 @@ def analyse_run(ref: RunRef, n_boot: int, seed: int, rescore: bool) -> tuple[dic
     data = manifest.get("data") or {}
     run_id = identity.get("run_id") or manifest.get("run_id") or ref.run_dir.name
     model = identity.get("model_key") or (manifest.get("model") or {}).get("name") or "?"
+    if manifest.get("status") == STATUS_THINKING:        # DESIGN_DECISIONS 7.3: thinking text in a main run MUST be 0
+        raise Unscorable(f"manifest status {STATUS_THINKING!r} ({manifest.get('n_thinking_chars_total')} thinking "
+                         "characters in a main run): reasoning sub-study material, never an interim main-table row")
     rows, scored_now = load_scores(ref.run_dir, rescore)
     note = attach_clusters(rows, manifest)
     if ref.arms is not None:
@@ -251,7 +256,7 @@ def analyse_run(ref: RunRef, n_boot: int, seed: int, rescore: bool) -> tuple[dic
            "hash_verified": ref.hash_verified, "manifest_status": manifest.get("status"),
            "item_file": info.get("path") or data.get("item_file"),
            "item_file_sha256": info.get("sha256") or data.get("item_file_sha256"),
-           "arms": sorted({r.get("arm") or "nfc" for r in rows}),
+           "manifest_arms": data.get("arms"), "arms": sorted({r.get("arm") or "nfc" for r in rows}),
            "prompt_ids": sorted({str(r.get("prompt_id")) for r in rows}),
            "n_rows": len(rows), "n_items": len(item_ids), "n_base_pairs": len(base_pairs),
            "scored_now": scored_now, "cluster_note": note}

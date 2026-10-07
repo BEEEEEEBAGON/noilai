@@ -220,6 +220,21 @@ def test_a_missing_ledger_falls_back_to_the_runs_directory_and_empty_runs_still_
     assert r.returncode == 2 and "YYYY-MM-DD" in r.stderr
 
 
+def test_a_thinking_present_main_run_is_unscorable_even_when_already_scored(runs, tmp_path):
+    """DESIGN_DECISIONS 7.3: thinking text in a main run MUST be 0; a `finished_thinking_present` run is reported,
+    never analysed as an interim main-table row, whether or not somebody scored it with --allow-thinking."""
+    runs2 = tmp_path / "runs"
+    runs2.mkdir()
+    _copy_run(runs / "interim_test", runs2 / "thinking", run_id="thinking", status="finished_thinking_present")
+    out = tmp_path / "interim"
+    r = _driver("--runs", str(runs2), "--out", str(out), "--date", DATE, "--quiet")
+    assert r.returncode == 0, r.stderr
+    rep = json.loads((out / f"{DATE}_interim.json").read_text(encoding="utf-8"))
+    assert rep["runs"] == [] and rep["cells"] == [] and rep["skipped"] == []
+    assert len(rep["unscorable"]) == 1 and "finished_thinking_present" in rep["unscorable"][0]["reason"]
+    assert "n = 0 items, 0 base pairs, 0 models" in (out / f"{DATE}_interim.md").read_text(encoding="utf-8")
+
+
 def test_refuses_to_write_under_paper(runs):
     target = ROOT / "paper" / "interim_must_not_exist"
     r = _driver("--runs", str(runs), "--out", str(target), "--date", DATE)
