@@ -130,7 +130,7 @@ runs:
     estimate: {unit: gpu_hours, low: 1, high: 3}   # five small models x 400 items x one arm; the T3 half needs prompt log-probabilities
     counts_toward: exploratory
     week: "Oct 8-18 (before Gate 1)"
-    note: "T3 forced choice needs the backend's prompt log-probabilities (run_eval.py records both T3 quantities, manifest logprobs_mode t3_yesno+t3_pair; scripts/score_run.py reports the forced choice and the pair comparison as separate columns, DD 5.3 item 63); a model whose engine returns none is reported on T1 only and named"
+    note: "T3 forced choice needs the backend's prompt log-probabilities: run_eval.py records both T3 quantities by default (no flag; --no-logprobs opts out; manifest sampling.logprobs_mode t3_yesno+t3_pair+xcopa_choice) and scripts/score_run.py reports them as separate columns, never compared with generated T3 (forced_choice_correct for t3_yesno_lp; paired_correct / paired_correct_norm and the cell's paired_accuracy for t3_pair_lp; DD 5.3 item 63); a model whose engine returns none is reported on T1 only and named"
 
   - id: throughput_dev
     experiment: throughput
@@ -150,7 +150,7 @@ runs:
     estimate: {unit: gpu_hours, low: 1, high: 2}   # 300 items x 5 models; the 8B AWQ and the 2xT4 4B dominate [UNCERTAIN: unmeasured, which is the point of the line]
     counts_toward: exploratory
     week: "Oct 8-18 (before Gate 1: the re-pricing must precede the panel freeze)"
-    note: "the measurements are the wall hours the driver logs per model (items per GPU-hour = rows of outputs.jsonl / hours, DD 8.5) and the manifest's outcome.prefill_tok_s / decode_tok_s [UNCERTAIN: verify] noilai/eval/run.py writes these two fields as null placeholders today; until the eval owner fills them, derive tokens/s from the per-row n_prompt_tokens / n_output_tokens and the wall time"
+    note: "the measurements are the wall hours the driver logs per model (items per GPU-hour = rows of outputs.jsonl / hours, DD 8.5) and the manifest's outcome.prefill_tok_s / decode_tok_s (noilai/eval/run.py writes these two fields as null placeholders today, verified 2026-10-07); until the eval owner fills them, derive tokens/s from the per-row n_prompt_tokens / n_output_tokens and the wall time"
 
   # ---- the Gate 1 pilots, verbatim from configs/run_plan.yaml (same files, same seeds, same flags), so that the
   # pilot can be launched from either plan; `exploratory` / `dev_only` mark THIS FILE's status, the go/no-go
