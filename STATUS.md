@@ -1,0 +1,135 @@
+# STATUS — experiments and validation workstreams
+
+Hand-maintained sections first; the meter block at the end is written by `scripts/progress.py` and
+must never be edited by hand.
+
+## Session log (newest first)
+
+- **2026-10-07 (session 1, no Kaggle access).** Built the bookkeeping: `experiments/ledger.csv`
+  (428 units: 404 compute units from `configs/run_plan.yaml` and `configs/run_plan_exploratory.yaml`, 24 human-lane units; cut-order ranks per DD 7.1/8.8; cost
+  model documented in `scripts/ledger.py`), `scripts/progress.py` (meter → this file),
+  `experiments/gates.yaml`, `experiments/quota.yaml`, `CLAUDE.md`, `BLOCKED.md`, `RUNBOOK.md`,
+  `configs/run_plan_exploratory.yaml` (dev-only floor-risk pilot and throughput test),
+  `scripts/pin_panel.py`, `scripts/kaggle_cpu_jobs.py`, `scripts/interim_analysis.py`,
+  `scripts/ingest_sheets.py`, the pre-registration gate in `scripts/kaggle_run_plan.py`. Exercised
+  the pipeline end to end on a local NON-frozen smoke build (seed 20261007, outside `data/release/`):
+  `run_eval.py --backend echo --smoke --limit 20` → `score_run.py` → `ledger.py ingest` → the meter.
+  No GPU unit has run: the frozen item files, Kaggle and Hugging Face are unreachable from this
+  machine (BLOCKED.md 1–3). Every builder's output went through an independent verifier; the
+  verifiers' fixes (pin resolver error handling, interim-analysis unscorable rules, plan notes) are
+  committed. CI green on the branch head. Item-level human-baseline rows (`baseline_scores.jsonl`) go
+  to the git-ignored `data/human/scored/`; `experiments/human/` keeps summaries with the file's SHA-256.
+
+## Prerequisites (DD 7.1, 4.6)
+
+| prerequisite | state |
+|---|---|
+| pinned panel manifest (`configs/models.yaml` revisions) | **missing**: all null; resolver written (`scripts/pin_panel.py`), needs Kaggle CPU + hub access |
+| passing ~20-item end-to-end run | echo backend: **passes** locally on the smoke build (20/20 rows, scored, ingested); a real model smoke (`smoke_20`) needs Kaggle GPU |
+| frozen item files present and passing the hash gate | **missing** here (private Kaggle dataset); the gate code (`scripts/kaggle_verify_items.py`, `ledger.py ingest`) is in place and tested against a mismatching file |
+
+## Gates recorded (copied from `experiments/gates.yaml` by the meter below)
+
+Pre-registration link/date: not recorded. `qu` convention: not decided. `i/y` emission: not decided.
+Gemini route: not decided. Scoring rule freeze: not recorded. → every confirmatory unit is **gated**.
+
+## Running now and expected finish
+
+Nothing is running. Nothing can be launched from this machine until BLOCKED.md items 1–2 are cleared;
+the first units to launch, in cut order, are `smoke_20` on `gemma-3-1b-it`, then the Gate 1 pilots
+`pilot_t1_200` and `pilot_xcopa_200` (3 models, ~3 GPU-h), then the dev-only `floor_pilot_dev` and
+`throughput_dev` lines of `configs/run_plan_exploratory.yaml`.
+
+## Questions for the author (batched, 2026-10-07)
+
+1. **Kaggle access.** Allow `www.kaggle.com`, `huggingface.co` and `cdn-lfs.huggingface.co` in this cloud
+   environment's network settings and put a Kaggle API token in `KAGGLE_API_TOKEN` (or
+   `~/.kaggle/access_token`)? Then the assistant launches, polls and downloads notebooks itself.
+   Otherwise every GPU session goes through `RUNBOOK.md` by hand.
+2. **Private datasets.** The slug of the dataset holding the frozen `data/release/v0.3/` tree (the
+   notebooks assume `noilai-release`), and whether `noilai-runs` exists yet.
+3. **Quota.** The real weekly GPU and TPU hours and the reset day on the account's quota page, and whether
+   CPU sessions count against the GPU quota (`experiments/quota.yaml` holds assumptions).
+4. **Stage-1 registration.** Which commit of THIS repository is the stage-1 freeze (the manifest's
+   `f94f655` is the original repository's hash; `docs/MIGRATION.md` maps it to `62f63ae`), when it is
+   committed, and the link to record (`experiments/gates.yaml`).
+5. **`qu` and `i/y`.** The decisions of DD 13.3 and 13.5 (both change items, prompts or gold); until they
+   are in `experiments/gates.yaml` no confirmatory run starts.
+6. **Gemini.** Paid key with data-use opt-out, development-derived set, or drop (DD 13.18); the API lane
+   waits for it.
+7. **Accounts.** `ACCOUNT_HOLDER_ROLE` for the manifests (role only) and who holds the Kaggle, Hugging Face
+   and Groq accounts under their age clauses (DD 11.2).
+8. **Groq cap scope.** Per model or per organization (the console shows it); it decides whether the two
+   gpt-oss models take about 9 or 18 days of the free tier.
+9. **People.** Are the three validators and about twenty respondents recruited, and from when; which
+   attested collections are being sourced for the 100-row H6 floor.
+10. **Exploratory pilot data.** If the frozen dev split stays unavailable to the assistant, may the dev-only
+    floor-risk and throughput lines run on the Kaggle side from the private dataset, with the assistant
+    ingesting aggregates only? (The Gate 1 pilot itself must use the frozen `pilot_t1_200` derivation.)
+
+<!-- progress:begin -->
+_Generated by `scripts/progress.py` on 2026-10-07 15:44Z from `experiments/ledger.csv` (404 compute units, 24 human units). Weights: 1 GPU-h = 1 TPU-h = 1 L4-h = 1.0; 1,000 API calls = 0.25; human person-hours on their own lines. A unit counts only when `done` and hash-verified._
+
+### Meter
+
+| scope | done / planned (cost units) | share |
+|---|---|---|
+| **Overall (compute)** | 0.0 / 104.6 | **  0.0%** |
+| confirmatory units only | 0.0 / 95.6 |   0.0% |
+| section: Results | 0.0 / 54.0 |   0.0% |
+| section: Counterfactuals | 0.0 / 31.6 |   0.0% |
+| section: Tone | 0.0 / 10.0 |   0.0% |
+| section: Prerequisite | 0.0 / 5.5 |   0.0% |
+| section: Exploratory | 0.0 / 3.5 |   0.0% |
+| experiment: E1 | 0.0 / 32.1 |   0.0% |
+| experiment: E1_ablation | 0.0 / 6.0 |   0.0% |
+| experiment: E3 | 0.0 / 31.6 |   0.0% |
+| experiment: E4 | 0.0 / 10.0 |   0.0% |
+| experiment: bf16_drift | 0.0 / 5.0 |   0.0% |
+| experiment: pilot | 0.0 / 2.5 |   0.0% |
+| experiment: pilot_exploratory | 0.0 / 2.0 |   0.0% |
+| experiment: reasoning | 0.0 / 10.9 |   0.0% |
+| experiment: smoke | 0.0 / 3.0 |   0.0% |
+| experiment: throughput | 0.0 / 1.5 |   0.0% |
+| human validation (person-h) | 0.0 / 24.0 |   0.0% |
+| human baseline (person-h) | 0.0 / 8.4 |   0.0% |
+| attested expansion (person-h) | 0.0 / 12.0 |   0.0% |
+
+Status counts (compute units): {"planned": 404}
+
+### Pre-registered analyses computable on the completed units
+
+| analysis | computable now | n | primary |
+|---|---|---|---|
+| Table 2 (E1 estimation per done model) | no | 0 models |  |
+| Explicit-input gap, DD 12.17 main result | no | 0 models paired | yes |
+| H1 nested LR test (E2), PREREG 8.4 | no | 0 models / 0 families (needs >= 8 over >= 4 incl. a non-Gemma pass-through family; item audits data/audit/items_*.jsonl) | yes |
+| H3 pooled crossover (E3), PREREG 8.5 | no | 0 pass-through models / 0 families (pooled CI reliable from 5 families) | yes |
+| H3b tone-isolation DiD | no | 0 models |  |
+| H4 placement (C2 set) | no | 0 models |  |
+| H5 probes and patching (E4) | no | 0 models |  |
+| H6 attested vs matched (needs the 100-row floor) | no | 0 models; floor NOT met |  |
+| Human-baseline comparison (mean-human band) | no | 0/20 forms |  |
+
+### Priority frontier (cut-order walk to the 55-60% band)
+
+Units inside the band when done in cut order: 238 (first: `smoke_20__gemma-3-1b-it__nfc`, last: `E3_xcopa__gemma-4-e4b__nfd`).
+Share at which each analysis first becomes computable: Table 2 (E1 estimation per done model) at 10%, H1 nested LR test (E2), PREREG 8.4 at 18%, Explicit-input gap, DD 12.17 main result at 33%, H4 placement (C2 set) at 55%, H3 pooled crossover (E3), PREREG 8.5 at 57%, H3b tone-isolation DiD at 57%, H5 probes and patching (E4) at 68%
+Analyses computable at the band: Table 2 (E1 estimation per done model), Explicit-input gap, DD 12.17 main result, H1 nested LR test (E2), PREREG 8.4, H3 pooled crossover (E3), PREREG 8.5, H3b tone-isolation DiD, H4 placement (C2 set).
+All three primary analyses are computable at the band.
+
+### Kaggle hours this quota week
+
+Week starting 2026-10-03 00:00Z (reset day per `experiments/quota.yaml`, unverified): GPU 0.0 used, 30.0 left of 30 assumed; TPU 0.0 used, 20.0 left of 20 assumed. Source: `data/compute_log.csv` (absent = nothing logged).
+
+### Gates (`experiments/gates.yaml`)
+
+- pre-registration: url `None`, date `None`, stage-1 `None`, stage-2 `None`
+- qu convention `None`; i/y emission `None`; Gemini route `None`; scoring rule frozen at `None`
+- confirmatory runs: **gated** (missing: registration_url, registration_date, qu_convention, iy_emission)
+- API runs: **gated** (Gemini route undecided)
+
+### Running now
+
+Nothing is running (no unit is launched, running or partial).
+<!-- progress:end -->

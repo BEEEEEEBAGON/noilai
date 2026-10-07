@@ -53,3 +53,13 @@ bundle:
 	git bundle create dist/noilai-main.bundle main
 	git rev-parse main > dist/noilai-main.bundle.commit
 	@echo "bundle at dist/noilai-main.bundle for commit $$(cat dist/noilai-main.bundle.commit)"
+
+# Returned human sheets (CLAUDE.md step 2): validation sheets under data/validation/returned/ and human-baseline
+# sheets under data/human/returned/ (both git-ignored, DESIGN_DECISIONS 11.2) are checked, scored by the models'
+# scorer and summarized into experiments/human/ (no names or e-mails); exclusions per PREREGISTRATION section 5
+# item 7 and DESIGN_DECISIONS 10.2. Nothing is written when no sheet has come back.
+.PHONY: ingest-sheets
+ingest-sheets:
+	$(PY) scripts/ingest_sheets.py --items $(RELEASE)/noilai_test.jsonl $(RELEASE)/noilai_dev.jsonl \
+	  --human-items data/human/human_items.json \
+	  --validation-returned 'data/validation/returned/*.csv' --baseline-returned 'data/human/returned/*.csv'
