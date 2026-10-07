@@ -5,7 +5,7 @@ RELEASE ?= data/release/v0.3
 # SEED has NO default: the build seed is private (DESIGN_DECISIONS 4.6, item 51) and lives in $(RELEASE)/manifest_private.json;
 # run `make data SEED=<from the private release manifest>`. The sampling seeds below are public: they select from the built test split.
 
-.PHONY: test resources data attested audit validation validation-score baseline lint
+.PHONY: test resources data attested audit validation validation-score baseline baseline-score ingest-sheets lint
 
 test:
 	$(PY) -m pytest -q
@@ -29,10 +29,6 @@ VALIDATORS ?= A B C
 validation:
 	$(PY) scripts/make_validation_forms.py packet --release $(RELEASE) --out data/validation --validators $(VALIDATORS)
 
-validation-score:
-	$(PY) scripts/make_validation_forms.py score --dir data/validation --returned 'data/validation/returned/*' \
-	  --flags-out data/audit/validator_flags.json
-
 # Human-baseline forms, DESIGN_DECISIONS 10.2: 20 forms x 30 items from the open-model main sample (6 anchors on every form,
 # 240 items each on exactly two forms = 246 distinct items). The coverage printout of the builder is checked against that
 # design; forms that do not meet it are deleted and the target fails (item 66; the design is docs/HUMAN_BASELINE_FORM.md section 1).
@@ -54,12 +50,20 @@ bundle:
 	git rev-parse main > dist/noilai-main.bundle.commit
 	@echo "bundle at dist/noilai-main.bundle for commit $$(cat dist/noilai-main.bundle.commit)"
 
-# Returned human sheets (CLAUDE.md step 2): validation sheets under data/validation/returned/ and human-baseline
-# sheets under data/human/returned/ (both git-ignored, DESIGN_DECISIONS 11.2) are checked, scored by the models'
-# scorer and summarized into experiments/human/ (no names or e-mails); exclusions per PREREGISTRATION section 5
-# item 7 and DESIGN_DECISIONS 10.2. Nothing is written when no sheet has come back.
-.PHONY: ingest-sheets
-ingest-sheets:
-	$(PY) scripts/ingest_sheets.py --items $(RELEASE)/noilai_test.jsonl $(RELEASE)/noilai_dev.jsonl \
-	  --human-items data/human/human_items.json \
-	  --validation-returned 'data/validation/returned/*.csv' --baseline-returned 'data/human/returned/*.csv'
+# Returned human sheets (CLAUDE.md step 2): ONE entry point. `make ingest-sheets` scores the returned validation sheets
+# (data/validation/returned/, Parts A-E of the 1 October packet -> data/validation/report/validation_report.json, whose
+# `validators_returned` the ledger reads, and data/audit/validator_flags.json: commit it) and the returned human-baseline
+# forms (data/human/returned/baseline_form_*.csv written by `make_validation_forms.py import-responses` -> the item-level
+# data/human/report/human_scores.jsonl, git-ignored, and the aggregates experiments/human/human_baseline_report.json, whose
+# `forms_included` the ledger reads; exclusions per PREREGISTRATION section 5 item 7 + the WAS_VALIDATOR amendment, the
+# two-way bootstrap of PREREGISTRATION 8.11). Both scorers write nothing when no sheet has come back. The two targets
+# below are the halves ingest-sheets delegates to, not separate entry points.
+validation-score:
+	$(PY) scripts/make_validation_forms.py score --dir data/validation --returned 'data/validation/returned/*' \
+	  --flags-out data/audit/validator_flags.json
+
+baseline-score:
+	$(PY) scripts/make_validation_forms.py score-baseline --items $(RELEASE)/noilai_main.jsonl --dir data/human \
+	  --returned 'data/human/returned/baseline_form_*.csv' --out experiments/human
+
+ingest-sheets: validation-score baseline-score

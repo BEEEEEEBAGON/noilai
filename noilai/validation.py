@@ -142,7 +142,7 @@ def stratum_key(it: dict) -> tuple[str, str, str]:
 def _largest_remainder(sizes: dict, n: int) -> dict:
     total = sum(sizes.values())
     if total == 0:
-        return {k: 0 for k in sizes}
+        return dict.fromkeys(sizes, 0)
     raw = {k: n * v / total for k, v in sizes.items()}
     alloc = {k: min(sizes[k], math.floor(r)) for k, r in raw.items()}
     left = n - sum(alloc.values())
@@ -932,3 +932,99 @@ def score_calibration(returned_rows: list[dict], calib: list[dict]) -> dict:
                             "explanation_en": c["explanation_en"]})
     return {"matches": {j: {"agree": a, "answered": n} for j, (a, n) in res.items()}, "to_discuss": discuss,
             "passes": res["correct"][1] > 0 and res["correct"][0] >= math.ceil(C.VALIDATION_CALIBRATION_PASS * res["correct"][1])}
+
+
+# --------------------------------------------------------------------------- human-baseline aggregates (PREREG 8.11)
+# Ported from the 7 October sheet ingester: the pre-registered comparator and its interval. A judgment is one
+# (person, item, correct) triple; the person is a respondent (one form, one person), the item a release item.
+def two_way_bootstrap(correct: Sequence[bool], persons: Sequence[str], items: Sequence[str], n_boot: int, seed: int = 0,
+                      level: float = 0.95, stat: str = "mean") -> dict:
+    """Mean-human accuracy (stat 'mean': the mean over items of the item's mean judgment, PREREGISTRATION 8.11) or
+    the any-human ceiling (stat 'any': the share of items some rater got right), with a two-way (person, item)
+    cluster bootstrap: persons and items are resampled with replacement independently, a judgment's weight is its
+    person's draw count and an item's weight its own draw count; percentile interval; fixed seed."""
+    import numpy as np
+
+    c = np.asarray(list(correct), dtype=float)
+    _, p_inv = np.unique(np.asarray([str(p) for p in persons], dtype=object), return_inverse=True)
+    _, i_inv = np.unique(np.asarray([str(i) for i in items], dtype=object), return_inverse=True)
+    n_p = int(p_inv.max()) + 1 if len(p_inv) else 0
+    n_i = int(i_inv.max()) + 1 if len(i_inv) else 0
+
+    def statistic(wp, wi) -> float:
+        w = wp[p_inv]
+        num = np.bincount(i_inv, weights=w * c, minlength=n_i)
+        den = np.bincount(i_inv, weights=w, minlength=n_i)
+        ok = den > 0
+        if not ok.any() or wi[ok].sum() == 0:
+            return float("nan")
+        vals = (num[ok] / den[ok]) if stat == "mean" else (num[ok] > 0).astype(float)
+        return float(np.average(vals, weights=wi[ok]))
+
+    if not n_p or not n_i:
+        return {"estimate": None, "lo": None, "hi": None, "n_items": n_i, "n_persons": n_p, "n_judgments": len(c),
+                "n_boot": n_boot, "level": level, "method": f"two_way_person_item_bootstrap_{stat}"}
+    est = statistic(np.ones(n_p), np.ones(n_i))
+    rng = np.random.default_rng(seed)
+    boots = np.empty(n_boot)
+    for b in range(n_boot):
+        wp = np.bincount(rng.integers(0, n_p, size=n_p), minlength=n_p)
+        wi = np.bincount(rng.integers(0, n_i, size=n_i), minlength=n_i)
+        boots[b] = statistic(wp, wi)
+    a = (1 - level) / 2
+    lo, hi = (np.nanquantile(boots, [a, 1 - a]) if n_boot else (float("nan"), float("nan")))
+    return {"estimate": est, "lo": float(lo), "hi": float(hi), "n_items": n_i, "n_persons": n_p, "n_judgments": len(c),
+            "n_boot": n_boot, "level": level, "method": f"two_way_person_item_bootstrap_{stat}"}
+
+
+BASELINE_CORRECTNESS = ("strict", "lenient", "tolerant")   # DESIGN_DECISIONS 10.2 item 32: all three reported
+
+
+def baseline_accuracy_cell(rows: list[dict], n_boot: int, seed: int = 0) -> dict:
+    """mean_human and any_human for the three correctness columns over scored rows `{respondent, item_id, strict,
+    lenient, tolerant}` (one row per kept respondent x item)."""
+    persons = [r["respondent"] for r in rows]
+    items = [r["item_id"] for r in rows]
+    cell = {"n_judgments": len(rows), "n_items": len(set(items)), "n_persons": len(set(persons))}
+    for key in BASELINE_CORRECTNESS:
+        vals = [bool(r[key]) for r in rows]
+        cell[key] = {"mean_human": two_way_bootstrap(vals, persons, items, n_boot, seed),
+                     "any_human": two_way_bootstrap(vals, persons, items, n_boot, seed, stat="any")}
+    return cell
+
+
+def baseline_agreement(rows: list[dict], n_boot: int, seed: int = 0) -> dict:
+    """PREREGISTRATION 8.11: nominal alpha between the raters over the double-judged items (exactly two raters) on
+    strict correctness (item-bootstrap CI, raw agreement, AC1) and on the produced answer (canonical text, blank =
+    ''; point estimate, the label set is large); the same on correctness over every item with two or more raters
+    (the anchors included)."""
+    from noilai.stats.agreement import (
+        alpha_bootstrap_ci,
+        gwet_ac1,
+        krippendorff_alpha_nominal,
+        percent_agreement,
+    )
+
+    per_item = Counter(r["item_id"] for r in rows)
+    double = [r for r in rows if per_item[r["item_id"]] == 2]
+    multi = [r for r in rows if per_item[r["item_id"]] >= 2]
+
+    def on_correct(sub: list[dict]) -> dict | None:
+        rs = [(r["item_id"], r["respondent"], "right" if r["strict"] else "wrong") for r in sub]
+        if not rs:
+            return None
+        est, lo, hi = alpha_bootstrap_ci(rs, n_boot=n_boot, seed=seed)
+        return {"alpha": est, "alpha_ci": [lo, hi], "percent_agreement": percent_agreement(rs), "ac1": gwet_ac1(rs),
+                "n_items": len({r[0] for r in rs}), "n_ratings": len(rs)}
+
+    def on_answer(sub: list[dict]) -> dict | None:
+        rs = [(r["item_id"], r["respondent"], canonical_text(r["answer"]) if r.get("answer") else "") for r in sub]
+        if not rs:
+            return None
+        return {"alpha": krippendorff_alpha_nominal(rs), "percent_agreement": percent_agreement(rs),
+                "n_items": len({r[0] for r in rs}), "n_ratings": len(rs)}
+
+    return {"scope": "double_judged = items with exactly two raters (DESIGN_DECISIONS 10.2: the 240 double-judged items); "
+                     "all_multi = every item with two or more raters (the anchors included)",
+            "double_judged": {"correct_strict": on_correct(double), "answer": on_answer(double)},
+            "all_multi": {"correct_strict": on_correct(multi)}}

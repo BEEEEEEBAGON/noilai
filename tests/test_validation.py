@@ -215,9 +215,9 @@ def test_google_form_script_and_response_import(tmp_path):
     p.write_text("\n".join(json.dumps(x, ensure_ascii=False) for x in items), encoding="utf-8")
     out = tmp_path / "human"
     run = [sys.executable, "scripts/make_validation_forms.py"]
-    subprocess.run(run + ["baseline", "--items", str(p), "--out", str(out), "--n-forms", "4", "--per-form", "24", "--no-model-prompt"],
+    subprocess.run([*run, "baseline", "--items", str(p), "--out", str(out), "--n-forms", "4", "--per-form", "24", "--no-model-prompt"],
                    cwd=root, check=True, capture_output=True, text=True)
-    subprocess.run(run + ["google-form", "--dir", str(out)], cwd=root, check=True, capture_output=True, text=True)
+    subprocess.run([*run, "google-form", "--dir", str(out)], cwd=root, check=True, capture_output=True, text=True)
     js = (out / "build_forms.gs").read_text(encoding="utf-8")
     assert "setCollectEmail(false)" in js and "requireSelectExactly" in js
     # what a respondent sees without the PDF and after submitting; links logged one by one; a partial rebuild
@@ -236,7 +236,7 @@ def test_google_form_script_and_response_import(tmp_path):
         w.writerow(["Timestamp", "Nhóm tuổi"] + [f"{r['position']}. {r['question_short']}" for r in rows])
         w.writerow(["t", "18–29"] + [f"ans{r['position']}" for r in rows])
         w.writerow(["t2", "50 trở lên"] + ["second" for _r in rows])            # a second submission on one form
-    res = subprocess.run(run + ["import-responses", "--dir", str(out)], cwd=root, check=True, capture_output=True, text=True)
+    res = subprocess.run([*run, "import-responses", "--dir", str(out)], cwd=root, check=True, capture_output=True, text=True)
     assert json.loads(res.stdout.strip().splitlines()[-1])["extra_submissions_dropped"] == {"2": 1}
     assert not (out / "returned" / "baseline_form_02_r2.csv").exists()
     with open(out / "returned" / "baseline_form_02_r1.csv", encoding="utf-8") as fh:
@@ -318,7 +318,7 @@ def test_second_calibration_set_uses_new_inputs_and_is_scored(tmp_path):
     first = VA.build_calibration()
     (tmp_path / "A_calibration_key.json").write_text(json.dumps(first, ensure_ascii=False), encoding="utf-8")
     run = [sys.executable, "scripts/make_validation_forms.py"]
-    r = subprocess.run(run + ["calibration2", "--dir", str(tmp_path), "--validators", "B"], cwd=root, check=True,
+    r = subprocess.run([*run, "calibration2", "--dir", str(tmp_path), "--validators", "B"], cwd=root, check=True,
                        capture_output=True, text=True)
     info = json.loads(r.stdout.strip().splitlines()[-1])
     second = json.loads((tmp_path / "A2_calibration_key.json").read_text(encoding="utf-8"))
@@ -335,7 +335,33 @@ def test_second_calibration_set_uses_new_inputs_and_is_scored(tmp_path):
         w.writeheader()
         for x in sheet:
             w.writerow({**x, **{j: {"yes": "Có", "no": "Không"}[key[x["row_id"]][j]] for j in ("correct", "spelling", "offensive")}})
-    subprocess.run(run + ["score", "--dir", str(tmp_path), "--returned", str(ret / "*")], cwd=root, check=True,
+    subprocess.run([*run, "score", "--dir", str(tmp_path), "--returned", str(ret / "*")], cwd=root, check=True,
                    capture_output=True, text=True)
     rep = json.loads((tmp_path / "report" / "validation_report.json").read_text(encoding="utf-8"))
     assert rep["calibration_round2"]["B"]["passes"] and not rep["calibration_round2"]["B"]["to_discuss"]
+
+
+def test_two_way_bootstrap_resamples_persons_and_items():
+    """PREREG 8.11: mean-human = the mean over items of the item mean; a person who is always right and one always
+    wrong give 0.5 with replicates at 0, 0.5 and 1 (the person dimension is resampled, not only the items); any-human
+    is the ceiling; unequal raters per item: the item means are averaged, so 20 raters on one item weigh as much as
+    two on another; an empty cell gives no estimate rather than an error."""
+    persons = ["A"] * 10 + ["B"] * 10
+    items = [f"i{k}" for k in range(10)] * 2
+    correct = [True] * 10 + [False] * 10
+    ci = VA.two_way_bootstrap(correct, persons, items, n_boot=400, seed=1)
+    assert ci["estimate"] == 0.5 and ci["lo"] == 0.0 and ci["hi"] == 1.0 and ci["n_persons"] == 2 and ci["n_items"] == 10
+    assert ci["method"] == "two_way_person_item_bootstrap_mean" and ci["n_judgments"] == 20
+    any_ = VA.two_way_bootstrap(correct, persons, items, n_boot=50, seed=1, stat="any")
+    assert any_["estimate"] == 1.0 and any_["method"].endswith("_any")
+    ci2 = VA.two_way_bootstrap([True] * 20 + [False, False], [f"p{k}" for k in range(20)] + ["p0", "p1"],
+                               ["anchor"] * 20 + ["x", "x"], n_boot=20, seed=0)
+    assert ci2["estimate"] == 0.5
+    assert VA.two_way_bootstrap([], [], [], n_boot=10)["estimate"] is None
+    rows = [{"respondent": p, "item_id": i, "strict": c, "lenient": c, "tolerant": True, "answer": "x" if c else ""}
+            for p, i, c in zip(persons, items, correct)]
+    cell = VA.baseline_accuracy_cell(rows, n_boot=20)
+    assert cell["n_judgments"] == 20 and cell["strict"]["mean_human"]["estimate"] == 0.5 and cell["tolerant"]["mean_human"]["estimate"] == 1.0
+    ag = VA.baseline_agreement(rows, n_boot=20)
+    assert ag["double_judged"]["correct_strict"]["n_items"] == 10 and ag["double_judged"]["correct_strict"]["percent_agreement"] == 0.0
+    assert ag["double_judged"]["answer"]["n_ratings"] == 20 and ag["all_multi"]["correct_strict"]["n_ratings"] == 20

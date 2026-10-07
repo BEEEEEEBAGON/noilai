@@ -15,15 +15,24 @@ docs/DEVIATIONS.md). Sizes come from noilai.constants (chosen with scripts/valid
     python scripts/make_validation_forms.py score --dir data/validation --returned 'data/validation/returned/*'
 
     # human baseline (DESIGN_DECISIONS 10.2): 20 forms x 30 items with the models' exact p0 prompt, + check item,
-    # + the 10-item natural-competence block; then score returned forms with the models' scorer
+    # + the 10-item natural-competence block + the two closing rows; the Google Forms are built by the Apps Script
     python scripts/make_validation_forms.py baseline --items data/release/v0.3/noilai_main.jsonl --out data/human \
         --attested data/release/v0.3/attested.jsonl
+    python scripts/make_validation_forms.py google-form --dir data/human --contact-email <address>
+
+    # after the window: the Google Forms response CSVs -> returned/ (first submission per form; e-mails redacted),
+    # then the models' scorer, the PREREG 5.7 exclusions and the PREREG 8.11 aggregates (two-way bootstrap, any-human
+    # ceiling, strict / lenient / tolerant, alpha between the raters, region split). `make ingest-sheets` runs both
+    # scorers (validation `score` and `score-baseline`) over whatever has come back.
+    python scripts/make_validation_forms.py import-responses --dir data/human
     python scripts/make_validation_forms.py score-baseline --items data/release/v0.3/noilai_main.jsonl --dir data/human \
-        --returned 'data/human/returned/*.csv'
+        --returned 'data/human/returned/baseline_form_*.csv' --out experiments/human
 
 Validators are letters; nothing identifying is stored; data/validation/ and data/human/ are git-ignored and never
-leave the author's machine except as the sheets sent to the validators (DESIGN_DECISIONS 11.2). Seeds are PUBLIC
-sampling seeds, never the withheld build seed (DESIGN_DECISIONS 4.6).
+leave the author's machine except as the sheets sent to the validators (DESIGN_DECISIONS 11.2). Item-level rows
+(human_scores.jsonl, the returned sheets, the reports under data/validation/report/) stay in the git-ignored data/
+tree; only aggregates, with the item-level file's SHA-256, go to experiments/human/ (CLAUDE.md), never anything
+under paper/. Seeds are PUBLIC sampling seeds, never the withheld build seed (DESIGN_DECISIONS 4.6).
 """
 from __future__ import annotations
 
@@ -33,6 +42,7 @@ import datetime as _dt
 import glob
 import json
 import random
+import re
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -43,7 +53,19 @@ sys.path.insert(0, str(ROOT))
 from noilai import constants as C
 from noilai import validation as VA
 from noilai.eval import run as RN
+from noilai.eval.score import score_outputs
 from noilai.gen.generate import load_items
+from noilai.vi.reencode import canonical_text
+
+PAPER_DIR = ROOT / "paper"                                  # CLAUDE.md: this workstream never writes under paper/
+HUMAN_AGGREGATES_DIR = ROOT / "experiments" / "human"       # CLAUDE.md: scored-sheet summaries, no names or e-mails
+EMAIL = re.compile(r"[^\s@,;<>()]+@[^\s@,;<>()]+\.[A-Za-z]{2,}")
+REDACTED = "[redacted]"
+REGION_HEADER = re.compile(r"\bregion\b|\bvùng\b|\bmiền\b", re.IGNORECASE)
+# coarse region bands of docs/DATA_STATEMENT.md; "ngoài Việt Nam" is tested before "nam", which it contains
+REGION_BANDS = (("ngoài", "ngoài Việt Nam"), ("ngoai", "ngoài Việt Nam"), ("abroad", "ngoài Việt Nam"),
+                ("outside", "ngoài Việt Nam"), ("bắc", "Bắc"), ("bac", "Bắc"), ("north", "Bắc"), ("trung", "Trung"),
+                ("central", "Trung"), ("nam", "Nam"), ("south", "Nam"))
 
 PACKET_SEED = 20261018               # public sampling seed of the validation packet (Gate 1, 18 October 2026)
 BASELINE_SEED = 20261102            # public sampling seed (docs/HUMAN_BASELINE_FORM.md); never the build seed (design 4.6)
@@ -273,7 +295,7 @@ def cmd_adjudication_sheet(args) -> int:
         if a["rule"] != "needs_author" or args.to in a["judgments"]:
             continue
         r = dict(sheet_src[a["row_id"]])
-        for j in VA.JUDGMENTS_B + ("dialect", "comment"):
+        for j in (*VA.JUDGMENTS_B, "dialect", "comment"):
             r[j] = ""
         rows_b[a["row_id"]] = r
     path = d / f"B_adjudicate_{args.to}.csv"
@@ -318,12 +340,18 @@ def cmd_calibration2(args) -> int:
 def cmd_score(args) -> int:
     d = Path(args.dir)
     returned = _read_returned(args.returned)
+    if not returned:
+        print("score: no returned validation sheet matches; nothing scored, nothing written")
+        return 0
     regions = {}
     if (d / "validators.json").exists():
         regions = {k: v.get("region") for k, v in json.loads((d / "validators.json").read_text(encoding="utf-8")).items()}
     rep_dir = d / "report"
     rep_dir.mkdir(parents=True, exist_ok=True)
-    report: dict = {"created_utc": _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "regions": regions}
+    report: dict = {"created_utc": _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "regions": regions,
+                    # for the ledger (experiments/ledger.csv, validation__<V>): who has returned what, by sheet
+                    "validators_returned": sorted({v for by_v in returned.values() for v in by_v}),
+                    "rows_returned": {sheet: {v: len(rows) for v, rows in sorted(by_v.items())} for sheet, by_v in sorted(returned.items())}}
     # Part A
     if (d / "A_calibration_key.json").exists() and "A_calibration" in returned:
         calib = json.loads((d / "A_calibration_key.json").read_text(encoding="utf-8"))
@@ -608,67 +636,236 @@ def cmd_baseline(args) -> int:
     return 0
 
 
-def cmd_score_baseline(args) -> int:
-    """Score returned baseline forms with the models' scorer (DESIGN_DECISIONS 10.2; PREREG 8.11 and the exclusions
-    of PREREG 5.7). A returned CSV keeps the form's columns; `answer` filled; a closing row with item_id `TOOLS`
-    and the `WAS_VALIDATOR` row record the closing questions (yes to either excludes the form)."""
-    from noilai.eval.score import score_outputs
-    from noilai.vi.reencode import canonical_text
-    items = {it["item_id"]: it for it in load_items(Path(args.items))}
-    man = json.loads((Path(args.dir) / "baseline_manifest.json").read_text(encoding="utf-8"))
-    nat_key = {r["item_id"]: r["expected"] for r in man.get("natural_block", [])}
-    per_form, excluded, scored = {}, {}, []
-    for p in sorted({q for pat in args.returned for q in glob.glob(pat)}):
-        with open(p, encoding="utf-8") as fh:
-            rows = list(csv.DictReader(fh))
-        form = Path(p).stem
-        main = [r for r in rows if r.get("block", "main") == "main" and r["item_id"] in items]
-        answered = sum(bool((r.get("answer") or "").strip()) for r in main)
-        check = next((r for r in rows if r["item_id"] == CHECK_ITEM["item_id"]), None)
-        tools = next((r for r in rows if r["item_id"] == "TOOLS"), None)
-        was_validator = next((r for r in rows if r["item_id"] == "WAS_VALIDATOR"), None)
-        reason = None
-        if answered < args.min_answered:
-            reason = f"answered {answered} < {args.min_answered}"
-        elif check is not None and canonical_text(check.get("answer") or "") != canonical_text(CHECK_ITEM["expected"]):
-            reason = "failed instruction check"
-        elif tools is not None and VA.norm_label(tools.get("answer")) == "yes":
-            reason = "reported using a dictionary, search engine or AI assistant"
-        elif was_validator is not None and VA.norm_label(was_validator.get("answer")) == "yes":
-            reason = "respondent was a validator (validators never take the baseline form)"
-        if reason:
-            excluded[form] = reason
+def _form_and_response(path: Path, rows: list[dict]) -> tuple[str, int]:
+    """('07', 1) from returned/baseline_form_07_r1.csv (import-responses), ('07', 1) from baseline_form_07.csv, else the
+    rows' `form` column; the response number tells a second submission on the same form apart."""
+    m = re.search(r"form[ _-]*(\d+)(?:_r(\d+))?", path.stem, re.IGNORECASE)
+    if m:
+        return f"{int(m.group(1)):02d}", int(m.group(2) or 1)
+    col = next((r.get("form") for r in rows if r.get("form")), None)
+    return (f"{int(col):02d}" if col and str(col).isdigit() else (col or path.stem)), 1
+
+
+def _yesno(value) -> str | None:
+    """yes / no / unsure / None for a closing row; free text is None (a Google Form offers Có / Không only)."""
+    try:
+        return VA.norm_label(value)
+    except ValueError:
+        return None
+
+
+def _redact(text: str, counter: Counter) -> str:
+    """An e-mail typed into an answer cell never reaches a report (CLAUDE.md: no e-mail under experiments/human/)."""
+    if text and EMAIL.search(text):
+        counter["emails_redacted"] += 1
+        return REDACTED
+    return text
+
+
+def _region_band(text: str | None) -> str | None:
+    """The coarse band of the demographics answer (docs/HUMAN_BASELINE_FORM.md section 2: Bắc / Trung / Nam / Ngoài
+    Việt Nam); 'ngoài' is tested before 'nam', which it contains."""
+    t = (text or "").strip().lower()
+    for key, band in REGION_BANDS:
+        if key in t:
+            return band
+    return None
+
+
+def _read_demographics(path: Path) -> dict[tuple[str, int], str | None]:
+    """{(form, response): region band} from returned/demographics.csv (written by import-responses; coarse bands only)."""
+    if not path.exists():
+        return {}
+    with open(path, encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    out = {}
+    for r in rows:
+        try:
+            form, resp = f"{int(r['form']):02d}", int(r.get("response") or 1)
+        except (KeyError, ValueError):
             continue
-        outs = [{"item_id": r["item_id"], "task": items[r["item_id"]]["task"], "arm": "base", "prompt_id": f"human-{form}",
-                 "raw": r.get("answer") or "", "answer": (r.get("answer") or "").strip() or None, "extraction_method": "human"}
-                for r in main]
-        rows_scored = score_outputs([items[o["item_id"]] for o in outs], outs)
-        for r in rows_scored:
-            r["form"] = form
-        scored += rows_scored
-        nat = [r for r in rows if r.get("block") == "natural"]
-        nat_ok = sum(canonical_text(r.get("answer") or "") is not None and
-                     set((canonical_text(r.get("answer") or "") or "").split()) == set((canonical_text(nat_key.get(r["item_id"], "")) or "").split())
-                     for r in nat)
-        per_form[form] = {"n_main": len(main), "answered": answered, "natural_correct": nat_ok, "natural_n": len(nat)}
-    by_item = defaultdict(list)
+        region_col = next((c for c in r if c and REGION_HEADER.search(c)), None)
+        out[(form, resp)] = _region_band(r.get(region_col)) if region_col else None
+    return out
+
+
+def _load_returned_form(path: Path, items: dict[str, dict], min_answered: int, problems: Counter) -> dict:
+    """One returned form (the form's own columns, `answer` filled): the main-block answers, the check and closing
+    rows, the natural block, and the PREREG 5.7 reasons that exclude it (every reason that applies is listed)."""
+    with open(path, encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    form, resp = _form_and_response(path, rows)
+    for r in rows:
+        r["answer"] = _redact((r.get("answer") or "").strip(), problems)
+    main = [r for r in rows if r.get("block", "main") == "main" and r.get("item_id") in items]
+    unknown = sorted({r["item_id"] for r in rows if r.get("block", "main") == "main" and r.get("item_id") not in items})
+    answered = sum(bool(r["answer"]) for r in main)
+    check = next((r for r in rows if r.get("item_id") == CHECK_ITEM["item_id"]), None)
+    tools = next((r for r in rows if r.get("item_id") == "TOOLS"), None)
+    was_validator = next((r for r in rows if r.get("item_id") == "WAS_VALIDATOR"), None)
+    reasons = []
+    if answered < min_answered:
+        reasons.append("too_few_answers")
+    check_state = "missing"
+    if check is not None:                                   # HBP section 5 rule 2: not "đã đọc" after normalization fails
+        check_state = "passed" if canonical_text(check["answer"]) == canonical_text(CHECK_ITEM["expected"]) else "failed"
+        if check_state == "failed":
+            reasons.append("failed_instruction_check")
+    tools_label = _yesno(tools["answer"]) if tools is not None else None
+    if tools is not None and tools["answer"] and tools_label is None:
+        problems["closing_answer_unparsed"] += 1
+    if tools_label == "yes":
+        reasons.append("tool_use")
+    validator_label = _yesno(was_validator["answer"]) if was_validator is not None else None
+    if was_validator is not None and was_validator["answer"] and validator_label is None:
+        problems["closing_answer_unparsed"] += 1
+    if validator_label == "yes":
+        reasons.append("was_validator")
+    return {"file": path.name, "form": form, "response": resp, "respondent": f"{form}-r{resp}", "rows": rows, "main": main,
+            "n_main": len(main), "answered": answered, "unknown_item_ids": unknown, "check": check_state,
+            "tool_use": tools_label or ("unreported" if tools is None else "unparsed"),
+            "was_validator": validator_label or ("unreported" if was_validator is None else "unparsed"),
+            "natural": [r for r in rows if r.get("block") == "natural"], "reasons": reasons}
+
+
+def _natural_score(nat_rows: list[dict], nat_key: dict[str, str]) -> int:
+    """An answer counts when its two syllables are the attested original's, in either order (DD 10.2)."""
+    ok = 0
+    for r in nat_rows:
+        ans = canonical_text(r["answer"]) if r["answer"] else None
+        exp = canonical_text(nat_key.get(r["item_id"], "")) if nat_key.get(r["item_id"]) else None
+        ok += bool(ans) and bool(exp) and set(ans.split()) == set(exp.split())
+    return ok
+
+
+def _score_form(fm: dict, items: dict[str, dict], region: str | None) -> list[dict]:
+    """The models' scorer on the form's main rows (docs/HUMAN_BASELINE_FORM.md section 4: the documented output shape;
+    a blank answer is unparseable, hence wrong); strict / lenient / tolerant per row (DD 10.2 item 32)."""
+    outs = [{"item_id": r["item_id"], "task": items[r["item_id"]]["task"], "arm": "base",
+             "prompt_id": f"human-form-{fm['form']}", "raw": r["answer"], "answer": r["answer"] or None,
+             "extraction_method": "human"} for r in fm["main"]]
+    if not outs:
+        return []
+    scored = score_outputs([items[o["item_id"]] for o in outs], outs)
     for r in scored:
-        by_item[r["item_id"]].append(bool(r.get("correct")))
-    item_acc = {k: sum(v) / len(v) for k, v in by_item.items()}
-    by_task = defaultdict(list)
-    for k, acc in item_acc.items():
-        by_task[items[k]["task"]].append(acc)
-    out = Path(args.dir) / "report"
+        strict, lenient = bool(r.get("correct")), bool(r.get("correct_lenient"))
+        r.update(form=fm["form"], response=fm["response"], respondent=fm["respondent"], region=region, strict=strict,
+                 lenient=lenient, tolerant=lenient or r.get("error_class") in ("doublet", "homophone"))
+    return scored
+
+
+def cmd_score_baseline(args) -> int:
+    """Score returned baseline forms with the models' scorer and compute the pre-registered aggregates (DESIGN_DECISIONS
+    10.2; PREREG 8.11; the exclusions of PREREG 5.7 plus the 1 October WAS_VALIDATOR amendment). Reads the forms
+    `import-responses` wrote (the form's own columns, `answer` filled; `baseline_form_<nn>_r<k>.csv`), joins the
+    region band from returned/demographics.csv, writes the item-level rows to <dir>/report/human_scores.jsonl
+    (git-ignored) and the aggregates, with that file's SHA-256, to <out>/human_baseline_report.json."""
+    paths = sorted({Path(q) for pat in args.returned for q in glob.glob(pat)})
+    if not paths:
+        print("score-baseline: no returned form matches; nothing scored, nothing written")
+        return 0
+    d, out = Path(args.dir), Path(args.out)
+    if PAPER_DIR in out.resolve().parents or out.resolve() == PAPER_DIR:
+        raise SystemExit(f"refusing to write under paper/ ({out}); CLAUDE.md: this workstream never edits paper/")
+    items = {it["item_id"]: it for it in load_items(Path(args.items))}
+    man_path = d / "baseline_manifest.json"
+    man = json.loads(man_path.read_text(encoding="utf-8")) if man_path.exists() else {}
+    if not man:
+        print(f"WARNING: {man_path} not found: the natural block is not scored", file=sys.stderr)
+    nat_key = {r["item_id"]: r["expected"] for r in man.get("natural_block", [])}
+    design_path = d / "human_items.json"
+    design_ids = set(json.loads(design_path.read_text(encoding="utf-8"))) if design_path.exists() else None
+    regions = _read_demographics(d / "returned" / "demographics.csv")
+    problems: Counter = Counter()
+    forms = [_load_returned_form(p, items, args.min_answered, problems) for p in paths]
+    kept, excluded, claimed = [], [], set()
+    for fm in forms:                                          # sorted: r1 before r2; a form is claimed by its first included response
+        reasons = list(fm["reasons"])
+        if fm["form"] in claimed:
+            reasons.insert(0, "duplicate_form_response")
+        if reasons:
+            excluded.append({"file": fm["file"], "form": fm["form"], "response": fm["response"], "reasons": reasons,
+                             "n_answered": fm["answered"], "n_main": fm["n_main"]})
+        else:
+            kept.append(fm)
+            claimed.add(fm["form"])
+    scored: list[dict] = []
+    per_form = {}
+    for fm in kept:
+        rows = _score_form(fm, items, regions.get((fm["form"], fm["response"])))
+        scored += rows
+        per_form[fm["form"]] = {"file": fm["file"], "response": fm["response"], "n_main": fm["n_main"], "answered": fm["answered"],
+                                "natural_correct": _natural_score(fm["natural"], nat_key), "natural_n": len(fm["natural"]),
+                                "unknown_item_ids": fm["unknown_item_ids"]}
+    rep_dir = d / "report"
+    rep_dir.mkdir(parents=True, exist_ok=True)
+    item_level = rep_dir / "human_scores.jsonl"
+    with open(item_level, "w", encoding="utf-8") as f:
+        f.writelines(json.dumps(r, ensure_ascii=False, default=str) + "\n" for r in scored)
+    per_item = Counter(r["item_id"] for r in scored)
+    tally = {"instruction_check": dict(Counter(fm["check"] for fm in forms)),
+             "tool_use": dict(Counter(fm["tool_use"] for fm in forms)),
+             "was_validator": dict(Counter(fm["was_validator"] for fm in forms))}
+    rep: dict = {
+        "design": "DESIGN_DECISIONS 10.2 / PREREGISTRATION 8.11: mean-human accuracy (mean over items of the item's mean "
+                  "judgment) with a two-way (person, item) bootstrap CI; any-human is a ceiling reported separately; "
+                  "strict, lenient and doublet/homophone-tolerant all reported (item 32); no superhuman claim",
+        "created_utc": _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "scored_by": "scripts/make_validation_forms.py score-baseline (noilai.eval.score.score_outputs, the models' scorer)",
+        "items_file": str(args.items), "n_boot": args.n_boot, "seed": args.seed, "min_answered": args.min_answered,
+        "forms_returned": len(forms), "forms_scored": len(per_form), "forms_included": sorted(per_form),
+        "forms_excluded": {e["file"]: e["reasons"][0] for e in excluded},
+        "exclusions": {"n": len(excluded), "by_reason": dict(sorted(Counter(r for e in excluded for r in e["reasons"]).items())),
+                       "rule": "PREREGISTRATION section 5 item 7 (too_few_answers, failed_instruction_check, tool_use) + the "
+                               "1 October 2026 amendment (was_validator, docs/DEVIATIONS.md) + duplicate_form_response (a form "
+                               "is claimed by its first included response); every reason that applies is listed, "
+                               "`forms_excluded` gives the first", "respondents": excluded},
+        "instruction_check": tally["instruction_check"], "tool_use": tally["tool_use"], "was_validator": tally["was_validator"],
+        "problems": dict(problems),
+        "per_form": per_form,
+        "natural_block": {"n_items": len(nat_key), "mean_correct": (sum(p["natural_correct"] for p in per_form.values()) / len(per_form)
+                                                                    if per_form and nat_key else None)},
+        "items": {"n_items": len(per_item), "n_judgments": len(scored),
+                  "raters_per_item": {str(k): v for k, v in sorted(Counter(per_item.values()).items())},
+                  "n_double_judged": sum(1 for v in per_item.values() if v == 2),
+                  "n_single_rated": sum(1 for v in per_item.values() if v == 1),
+                  "not_in_human_design": sorted(i for i in per_item if design_ids is not None and i not in design_ids),
+                  "design_items_unanswered": (len(design_ids - set(per_item)) if design_ids is not None else None)},
+        "accuracy": {}, "agreement": None, "error_classes": {}, "by_region": {},
+        "item_level": {"path": str(item_level), "n_rows": len(scored), "sha256": RN.sha256_file(item_level),
+                       "note": "git-ignored (data/human/); never copied under experiments/ or paper/"},
+    }
+    if scored:
+        acc = {"overall": VA.baseline_accuracy_cell(scored, args.n_boot, args.seed), "by_task": {}, "by_task_variant": {},
+               "by_output_lexicality": {}}
+        for task in sorted({r["task"] for r in scored}):
+            sub = [r for r in scored if r["task"] == task]
+            acc["by_task"][task] = VA.baseline_accuracy_cell(sub, args.n_boot, args.seed)
+            for v in sorted({r["variant"] for r in sub}):
+                acc["by_task_variant"][f"{task}-{v}"] = VA.baseline_accuracy_cell([r for r in sub if r["variant"] == v], args.n_boot, args.seed)
+            rep["error_classes"][task] = dict(sorted(Counter(r["error_class"] for r in sub).items()))
+        for lex in sorted({str(r.get("output_lexical")) for r in scored}):
+            acc["by_output_lexicality"][lex] = VA.baseline_accuracy_cell([r for r in scored if str(r.get("output_lexical")) == lex],
+                                                                         args.n_boot, args.seed)
+        rep["accuracy"] = acc
+        rep["agreement"] = VA.baseline_agreement(scored, args.n_boot, args.seed)
+        for region in sorted({r["region"] or "unreported" for r in scored}):
+            sub = [r for r in scored if (r["region"] or "unreported") == region]
+            rep["by_region"][region] = {"n_respondents": len({r["respondent"] for r in sub}), "n_judgments": len(sub),
+                                        "strict": sum(r["strict"] for r in sub) / len(sub)}
+        # the strict mean per task as a point estimate (the shape docs/gate1/HUMAN_BASELINE_PROTOCOL.md section 6.1 names)
+        rep["mean_human_by_task"] = {t: c["strict"]["mean_human"]["estimate"] for t, c in acc["by_task"].items()}
     out.mkdir(parents=True, exist_ok=True)
-    with open(out / "human_scores.jsonl", "w", encoding="utf-8") as f:
-        for r in scored:
-            f.write(json.dumps(r, ensure_ascii=False, default=str) + "\n")
-    rep = {"forms_scored": len(per_form), "forms_excluded": excluded, "per_form": per_form,
-           "mean_human_by_task": {t: sum(v) / len(v) for t, v in sorted(by_task.items())},
-           "n_items_scored": len(item_acc),
-           "note": "point estimates only; the two-way (person, item) bootstrap of PREREG 8.11 runs in the analysis step"}
-    (out / "human_baseline_report.json").write_text(json.dumps(rep, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(json.dumps(rep, ensure_ascii=False))
+    (out / "human_baseline_report.json").write_text(json.dumps(rep, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+    overall = rep["accuracy"].get("overall", {}).get("strict", {}).get("mean_human") if scored else None
+    print(f"score-baseline: {len(forms)} returned form(s), {len(kept)} scored, {len(excluded)} excluded "
+          f"{rep['exclusions']['by_reason']}, {len(scored)} scored rows -> {item_level} (item-level, git-ignored); "
+          f"aggregates -> {out / 'human_baseline_report.json'}")
+    if overall and overall["estimate"] is not None:
+        print(f"mean-human strict accuracy {overall['estimate']:.3f} [{overall['lo']:.3f}, {overall['hi']:.3f}] "
+              f"({overall['n_items']} items, {overall['n_persons']} persons, two-way bootstrap B={overall['n_boot']})")
+    print(json.dumps({"forms_scored": rep["forms_scored"], "forms_included": rep["forms_included"],
+                      "forms_excluded": rep["forms_excluded"], "n_rows": len(scored)}, ensure_ascii=False))
     return 0
 
 
@@ -786,6 +983,7 @@ def cmd_import_responses(args) -> int:
     demo_rows = []
     extra: dict[int, int] = {}
     n = 0
+    redacted = 0
     for path in sorted((d / "responses").glob("responses_form_*.csv")):
         nn = int(path.stem.rsplit("_", 1)[1])
         with open(d / f"baseline_form_{nn:02d}.csv", encoding="utf-8") as fh:
@@ -803,6 +1001,9 @@ def cmd_import_responses(args) -> int:
                 if head.isdigit() and int(head) in by_pos:
                     r = dict(by_pos[int(head)])
                     r["answer"] = val or ""
+                    if EMAIL.search(r["answer"]):             # an e-mail typed into an answer cell never reaches returned/
+                        r["answer"] = REDACTED
+                        redacted += 1
                     out_rows.append(r)
             out_rows.sort(key=lambda r: int(r["position"]))
             _write_csv(ret / f"baseline_form_{nn:02d}_r{k}.csv", list(form_rows[0].keys()), out_rows)
@@ -811,7 +1012,8 @@ def cmd_import_responses(args) -> int:
     _write_csv(ret / "demographics.csv", ["form", "response", *[t for t, _c, _r in DEMOGRAPHICS_VI]], demo_rows)
     if extra:
         print(f"WARNING: later submissions dropped (first one kept) on forms {extra}: check who else had the link", file=sys.stderr)
-    print(json.dumps({"responses": n, "extra_submissions_dropped": extra, "written_to": str(ret)}, ensure_ascii=False))
+    print(json.dumps({"responses": n, "extra_submissions_dropped": extra, "emails_redacted": redacted, "written_to": str(ret)},
+                     ensure_ascii=False))
     return 0
 
 
@@ -866,11 +1068,16 @@ def main(argv=None) -> int:
     b.add_argument("--attested-verified", default=None,
                    help="attested_verified.tsv from `score`: the natural block uses native-verified rows only")
     b.set_defaults(func=cmd_baseline)
-    sb = sub.add_parser("score-baseline")
-    sb.add_argument("--items", required=True)
-    sb.add_argument("--dir", required=True)
-    sb.add_argument("--returned", nargs="+", required=True)
-    sb.add_argument("--min-answered", type=int, default=15)
+    sb = sub.add_parser("score-baseline", help="score returned baseline forms; PREREG 5.7 exclusions, PREREG 8.11 aggregates")
+    sb.add_argument("--items", required=True, help="the item file the forms were built from (noilai_main.jsonl)")
+    sb.add_argument("--dir", required=True, help="data/human: baseline_manifest.json, human_items.json, returned/demographics.csv")
+    sb.add_argument("--returned", nargs="+", required=True, help="glob(s) of returned forms (returned/baseline_form_*.csv)")
+    sb.add_argument("--out", default=str(HUMAN_AGGREGATES_DIR),
+                    help="where human_baseline_report.json (aggregates only; the ledger reads it) goes")
+    sb.add_argument("--min-answered", type=int, default=C.HUMAN_BASELINE_ITEMS_PER_PERSON // 2,
+                    help="PREREG 5.7: fewer main-block answers excludes the form (15 of 30)")
+    sb.add_argument("--n-boot", type=int, default=C.BOOTSTRAP_B, help="replicates of the two-way (person, item) bootstrap")
+    sb.add_argument("--seed", type=int, default=0, help="seed of the bootstrap (a public analysis seed, never the build seed)")
     sb.set_defaults(func=cmd_score_baseline)
     g = sub.add_parser("google-form", help="Apps Script that builds the baseline Google Forms in the author's account")
     g.add_argument("--dir", required=True)
