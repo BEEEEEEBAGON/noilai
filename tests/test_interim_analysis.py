@@ -250,9 +250,11 @@ def test_cell_ci_recovers_clusters_from_the_item_file_and_uses_the_base_pair_boo
     assert cell["n_rows"] == 80 and cell["n_items"] == 80 and cell["n_base_pairs"] == 10 and cell["stratified"]
     assert cell["lo"] < cell["estimate"] < cell["hi"] and cell["method"] == "wilson_deff" and cell["small_cell"]
     assert cell["deff"] > 1.0 and 0 <= cell["unparseable_rate"] <= 1
-    # 40 base pairs of two rows each, correctness varying BETWEEN base pairs: the percentile bootstrap (fewer than
-    # BCA_MIN_CLUSTERS base pairs) with a non-degenerate interval inside (0, 1)
-    forty = [dict(r, item_id=f"{r['item_id']}-{j}", correct=i % 2 == 0) for i, r in enumerate(rows) for j in range(2)]
+    # 40 synthetic base pairs of two rows each (the smoke rows' own base pairs repeat across tasks, so the ids are
+    # assigned here), correctness varying BETWEEN base pairs: the percentile bootstrap (fewer than BCA_MIN_CLUSTERS
+    # base pairs) with a non-degenerate interval inside (0, 1)
+    forty = [dict(r, item_id=f"{r['item_id']}-{j}", base_pair_id=f"bp-{i}", correct=i % 2 == 0)
+             for i, r in enumerate(rows) for j in range(2)]
     cell = IA.cell_ci(forty, n_boot=N_BOOT, seed=0)
     assert cell["n_base_pairs"] == 40 and cell["estimate"] == 0.5 and cell["method"] == "percentile" and cell["stratified"]
     assert 0.0 < cell["lo"] < 0.5 < cell["hi"] < 1.0 and cell["n_boot"] == N_BOOT and not cell["small_cell"]
