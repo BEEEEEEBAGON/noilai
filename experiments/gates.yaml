@@ -1,0 +1,60 @@
+# experiments/gates.yaml -- the pre-registration gate of the experiments workstream.
+#
+# Read by scripts/kaggle_run_plan.py (gate_status / confirmatory_block_reason) before every command it
+# launches, by scripts/progress.py (the "Gates" block of STATUS.md) and by scripts/freeze_scoring_rule.py
+# (--record / --check). The rule (CLAUDE.md "Binding documents and gates"; DESIGN_DECISIONS 8.8 and 13;
+# PREREGISTRATION header): no confirmatory run -- any line whose item file carries the canary (a
+# test-split or core file, DD 4.6) and any line that is neither smoke, pilot nor exploratory -- starts
+# until the registration link and date and the author's `qu` and `i/y` decisions are recorded below;
+# an API-served model also waits for the Gemini decision; the scoring rule is frozen (commit recorded)
+# before anyone looks at a confirmatory result. A null below means "not yet recorded", and every null
+# in a gate keeps that gate closed. Only the author fills this file (DD 13: "only the author can
+# decide"); the assistant never guesses a value. The driver ignores the gate only when this file is
+# absent (tests use temporary project roots).
+#
+# Caution: `scripts/freeze_scoring_rule.py --record` rewrites this file with yaml.safe_dump, which drops
+# these comments; keep a copy of the header, or re-add it, when that happens.
+
+preregistration:
+  # DD 8.8 / PREREGISTRATION header: the two registration commits, each the `git rev-parse HEAD` of the
+  # commit that adds the stage (stage 1: generator freeze + v0.3 rebuild; stage 2: hypotheses and analysis
+  # plan, no later than Gate 2, 8 November 2026, before any test-split run). Recorded for the record;
+  # the driver gates on the URL and the date below, which exist only once the registration is public.
+  stage1_commit: null
+  stage2_commit: null
+  # the public link of the registration (the frozen docs/PREREGISTRATION.md: a tagged commit URL, OSF or
+  # similar) and its date (YYYY-MM-DD). Both null -> every confirmatory run waits.
+  registration_url: null
+  registration_date: null
+
+decisions:
+  # DD 13.3: whether qu- inputs enter as a stratum and under which analysis (after the 20-pair native check).
+  # The value is the author's ruling in a few words; `decided_on` is its date. Changes items, prompts and
+  # gold answers, so no confirmatory run starts before it is recorded.
+  qu_convention:
+    value: null
+    decided_on: null
+    affects: "items, prompts, gold answers (DD 13.3)"
+  # DD 13.5 (R5c): confirm the `y`-preference with the validators, or revert to the MOET `i` and record
+  # why. Changes gold answers, so no confirmatory run starts before it is recorded.
+  iy_emission:
+    value: null
+    decided_on: null
+    affects: "gold answers (DD 13.5)"
+  # DD 13.18 / 11.2 (red-team item 33): how Gemini is run. One of `allowed`: paid_key_opt_out (a paid
+  # key whose data-use opt-out is verified and recorded in configs/models.yaml
+  # providers.gemini.terms.paid_key_data_use_opt_out), dev_derived_set (the dev-derived API set
+  # noilai_api_dev, DD 4.5, reported separately and never in Table 2) or drop (no Gemini). Every
+  # API-served model (backend gemini or openai_compat) waits on a confirmatory line until it is recorded.
+  gemini_route:
+    value: null
+    decided_on: null
+    allowed: [paid_key_opt_out, dev_derived_set, drop]
+
+scoring_rule_freeze:
+  # written by `python scripts/freeze_scoring_rule.py --record` (DD 5.1-5.5): the commit, the SHA-256 over
+  # the scoring code and prompt files it lists, and the date. `--check` (run by the ingest step before a
+  # confirmatory unit is scored) exits 1 when the working tree's scoring code differs from files_sha256.
+  commit: null
+  files_sha256: null
+  frozen_on: null

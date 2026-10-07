@@ -38,6 +38,15 @@ commit hash, a Kaggle Models slug + version or a GGUF SHA-256 is skipped on ever
 line ("skipped: revision not pinned"), mirroring run_eval.py's own refusal, unless
 `allow_unpinned_revision`; dry runs still print the command.
 
+Pre-registration gate (CLAUDE.md "Binding documents and gates"; DESIGN_DECISIONS 8.8, 13.3, 13.5,
+13.18): when <project_root>/experiments/gates.yaml exists, a confirmatory (run, model) -- the item
+file carries `canary_required` (a test-split or core file), or the experiment is none of smoke,
+pilot, pilot_exploratory, throughput and the line is not flagged `exploratory` -- is skipped
+("skipped: gate: ...") until the registration link and date and the `qu` and `i/y` decisions are
+recorded in that file; an API entry also waits for the Gemini route (`gate_status`,
+`confirmatory_block_reason`). A project root without the file is never gated; dry runs print the
+command and the gate reason.
+
 Item files. `{release}` in a plan path is the plan's `release` directory. A file with a
 `derive` block is a seeded sub-sample of another item file (per task x variant cell counts,
 T3 as yes/no pairs, the core kept whole, vulgar rows excluded, balanced over source and output
@@ -238,6 +247,84 @@ def revision_pinned(entry: dict) -> bool:
         return True
     rev = entry.get("revision")
     return isinstance(rev, str) and any(p.fullmatch(rev.strip()) for p in REVISION_PATTERNS)
+
+
+# ------------------------------------------------------------------ pre-registration gate
+GATES_FILE = Path("experiments") / "gates.yaml"      # under the project root (CLAUDE.md "Binding documents and gates")
+# experiments whose lines are prerequisites (smoke, the Gate 1 pilots) or dev-only exploratory work and never
+# confirmatory (DD 8.8: pilots and smoke run around the stage-1 date; scripts/ledger.py keeps the same sets)
+UNGATED_EXPERIMENTS = frozenset({"smoke", "pilot", "pilot_exploratory", "throughput"})
+# what every confirmatory (run, model) waits for, as (path inside gates.yaml, label): the public registration
+# (DD 8.8 / PREREGISTRATION header) and the two author decisions that change items, prompts or gold answers
+# (DD 13.3 the qu convention, DD 13.5 the i/y emission rule)
+CONFIRMATORY_REQUIREMENTS = ((("preregistration", "registration_url"), "pre-registration link"),
+                             (("preregistration", "registration_date"), "pre-registration date"),
+                             (("decisions", "qu_convention", "value"), "qu convention (DD 13.3)"),
+                             (("decisions", "iy_emission", "value"), "i/y emission rule (DD 13.5)"))
+# what an API-served model waits for on top (DD 13.18 / 11.2, item 33: paid key with opt-out, dev-derived set or drop)
+API_REQUIREMENTS = ((("decisions", "gemini_route", "value"), "Gemini route (DD 13.18)"),)
+
+
+def gate_status(project_root: Path = ROOT) -> dict:
+    """The gates recorded in <project_root>/experiments/gates.yaml with `present` added: {"present": False}
+    when the file does not exist (such a project root is never gated), else {"present": True, **the file}."""
+    path = Path(project_root) / GATES_FILE
+    if not path.exists():
+        return {"present": False}
+    data = load_yaml(path) or {}
+    if not isinstance(data, dict):
+        raise TypeError(f"{path} must hold a mapping (preregistration, decisions, scoring_rule_freeze), "
+                        f"not {type(data).__name__}")
+    return {"present": True, **data}
+
+
+def gate_value(gates: dict, keys: Sequence[str]):
+    """The value at the nested path `keys` of a gates mapping (None when any level is missing)."""
+    cur = gates
+    for k in keys:
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(k)
+    return cur
+
+
+def _unrecorded(value) -> bool:
+    """A gate value is unrecorded when it is null or a blank string (scripts/progress.py reads it the same way)."""
+    return value is None or (isinstance(value, str) and not value.strip())
+
+
+def is_confirmatory(run: dict, item_spec: dict) -> bool:
+    """True for a line the gate holds: its item file carries the canary (a test-split or core file, DD 4.6),
+    or its experiment is none of UNGATED_EXPERIMENTS and the line is not flagged `exploratory`."""
+    if item_spec.get("canary_required"):
+        return True
+    return run.get("experiment") not in UNGATED_EXPERIMENTS and not run.get("exploratory")
+
+
+def confirmatory_block_reason(run: dict, entry: dict, item_spec: dict, gates: dict) -> str | None:
+    """Why the pre-registration gate holds this (run, model) back, or None when it may start.
+
+    `gates` is gate_status()'s result (or the file's mapping); {"present": False} never blocks. A
+    confirmatory line (is_confirmatory) waits for every CONFIRMATORY_REQUIREMENTS entry that is still
+    unrecorded; an API entry (backend gemini / openai_compat) also waits for the Gemini route, which
+    must be one of the file's `allowed` values once recorded.
+    """
+    if gates.get("present") is False or not is_confirmatory(run, item_spec):
+        return None
+    missing = [label for keys, label in CONFIRMATORY_REQUIREMENTS if _unrecorded(gate_value(gates, keys))]
+    if is_api(entry):
+        for keys, label in API_REQUIREMENTS:
+            value = gate_value(gates, keys)
+            allowed = gate_value(gates, (*keys[:-1], "allowed"))
+            if _unrecorded(value):
+                missing.append(label)
+            elif isinstance(allowed, list) and value not in allowed:
+                missing.append(f"{label}: {value!r} is not one of {allowed}")
+    if not missing:
+        return None
+    why = (f"item file {run.get('items')!r} carries the canary (a test-split or core file)" if item_spec.get("canary_required")
+           else f"experiment {run.get('experiment')!r} is confirmatory")
+    return f"{why}; waits for {', '.join(missing)} in {GATES_FILE}"
 
 
 def build_command(run: dict, model: str, plan: dict, models_cfg: dict, project_root: Path = ROOT,
@@ -712,14 +799,17 @@ def execute(run_id: str, models: Sequence[str] | None = None, platform: str = "k
 
     Statuses: 'dry-run', 'ok', 'failed (<rc>)', 'parked: ...' (an API day's cap reached; resume
     tomorrow), 'refused: ...' (a build_command guard: never_to_api, a training provider on a
-    test-split file, in_core_only missing, ...), 'skipped: ...' (budget spent, hardware not
-    runnable in this session, session budget reached, item file failed verification, revision
-    not pinned on a non-smoke line).
+    test-split file, in_core_only missing, ...), 'skipped: gate: ...' (the pre-registration gate
+    of experiments/gates.yaml holds a confirmatory line; `prereg_gate` carries the reason, on dry
+    runs too), 'skipped: ...' (budget spent, hardware not runnable in this session, session
+    budget reached, item file failed verification, revision not pinned on a non-smoke line).
     """
     plan = plan or load_plan()
     models_cfg = models_cfg or load_models()
     run = find_run(plan, run_id)
     names = list(models) if models else expand_models(run, plan, models_cfg)
+    item_spec = plan["item_files"].get(run.get("items"), {})     # a missing key is build_command's error to raise
+    gates = gate_status(project_root)                             # {"present": False} without experiments/gates.yaml
     log_path = Path(log_path) if log_path else Path(project_root) / plan.get("compute_log", "data/compute_log.csv")
     lpath = ledger_path(plan, project_root)
     ledger = ledger_load(lpath)
@@ -746,6 +836,15 @@ def execute(run_id: str, models: Sequence[str] | None = None, platform: str = "k
             continue
         res["cmd"] = cmd
         print(f"\n[plan ] {run_id} / {name}\n[cmd  ] {shlex.join(cmd)}")
+        if gates["present"]:                  # the pre-registration gate: a dry run prints the reason, a real run skips
+            reason = confirmatory_block_reason(run, entry, item_spec, gates)
+            if reason:
+                res["prereg_gate"] = reason
+                print(f"[gate ] {name}: {reason}")
+                if not dry_run:
+                    res["status"] = f"skipped: gate: {reason}"
+                    results.append(res)
+                    continue
         if not dry_run and not run.get("limit") and not allow_unpinned_revision and not revision_pinned(entry):
             res["status"] = (f"skipped: revision not pinned ({entry.get('revision')!r}); DESIGN_DECISIONS 7.1 requires a full "
                              f"commit hash, a Kaggle Models slug + version or a GGUF SHA-256 before a paper run "
