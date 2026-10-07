@@ -46,7 +46,8 @@ this workstream **never edit anything under `paper/`**.
 
 - `experiments/ledger.csv` (units, cut rank, cost, status, result hashes), `experiments/aggregates/`
   (per-run `summary.json` and manifest excerpts, never item-level rows), `experiments/interim/`
-  (interim analyses), `experiments/human/` (scored sheets, no names or e-mails), `experiments/quota.yaml`
+  (interim analyses), `experiments/human/` (scored-sheet summaries, no names or e-mails; the item-level
+  `baseline_scores.jsonl` goes to the git-ignored `data/human/scored/`), `experiments/quota.yaml`
   (quota assumptions until verified), `experiments/panel_pins.json` (resolved revisions).
 - Raw item-level outputs: the private Kaggle dataset `noilai-runs`, mirrored under the git-ignored
   `data/runs/` on the machine that ingests them.

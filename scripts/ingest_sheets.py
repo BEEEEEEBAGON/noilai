@@ -42,8 +42,8 @@ layouts are accepted and told apart by the header:
 Columns whose header names a person (e-mail, name, họ tên, phone, address) or whose values look like e-mail
 addresses are DROPPED on reading and only their headers are listed in the report; an e-mail typed into an
 answer cell is redacted before anything is written. Nothing here is ever written under paper/ and no
-timestamp, name or address reaches <out> (CLAUDE.md: experiments/human/ holds scored sheets, no names or
-e-mails).
+timestamp, name or address reaches <out> or <item-level-out> (CLAUDE.md: experiments/human/ holds scored-sheet
+summaries, no names or e-mails; item-level rows stay out of the repository).
 
 Exclusions (PREREGISTRATION section 5 item 7 / DESIGN_DECISIONS 10.2 / docs/HUMAN_BASELINE_FORM.md section 4,
 every count reported): `too_few_answers` (fewer than --min-answered of the form's items answered, 15 of 30 by
@@ -59,9 +59,11 @@ in the gold set, T3 Có/Không; a blank answer is unparseable, hence wrong). Thr
 (DESIGN_DECISIONS 10.2, item 32): `strict`, `lenient` (the gold syllables in the other order) and `tolerant`
 (lenient, plus the `doublet` and `homophone` bins the scorer keeps apart, 5.4 items 8-9).
 
-Outputs under <out> (experiments/human/ by default):
+Outputs. Item-level, under <item-level-out> (data/human/scored/ by default: git-ignored, like every other
+item-level output; the summary records the file's path, row count and SHA-256):
   baseline_scores.jsonl    one row per kept respondent x item: form, respondent, item_id, task, variant, answer
                            (as typed), extracted, strict, lenient, tolerant, error_class, region
+Aggregates, under <out> (experiments/human/ by default, committed):
   baseline_summary.json    mean-human accuracy (the mean over items of the item's mean judgment; PREREGISTRATION
                            8.11) with a two-way person x item bootstrap CI (persons and items resampled
                            independently, B = --n-boot, fixed seed), the any-human ceiling, overall / per task /
@@ -81,6 +83,7 @@ import contextlib
 import csv
 import datetime as dt
 import glob
+import hashlib
 import importlib
 import io
 import json
@@ -105,7 +108,8 @@ from noilai.vi.reencode import canonical_text
 
 MVF = importlib.import_module("make_validation_forms")      # imported after the path insert, as kaggle_cpu_jobs.py does
 
-OUT_DIR = ROOT / "experiments" / "human"                    # CLAUDE.md: scored sheets, no names or e-mails
+OUT_DIR = ROOT / "experiments" / "human"                    # CLAUDE.md: scored-sheet summaries, no names or e-mails
+ITEM_LEVEL_DIR = ROOT / "data" / "human" / "scored"          # git-ignored: item-level rows never enter the repository
 VALIDATION_DIR = ROOT / "data" / "validation"               # git-ignored (DD 11.2); cmd_score's own copy of its report
 PAPER_DIR = ROOT / "paper"                                  # CLAUDE.md: this workstream never writes under paper/
 JUDGMENTS = MVF.JUDGMENTS
@@ -693,7 +697,8 @@ def main(argv=None) -> int:
     ap.add_argument("--human-items", default=None, help="data/human/human_items.json: the 246 ids of the design (answers to other ids are flagged)")
     ap.add_argument("--validation-returned", nargs="*", default=[], help="glob(s) of returned validation sheets")
     ap.add_argument("--baseline-returned", nargs="*", default=[], help="glob(s) of returned baseline sheets")
-    ap.add_argument("--out", default=str(OUT_DIR))
+    ap.add_argument("--out", default=str(OUT_DIR), help="aggregates: baseline_summary.json, validation_report.json, ingest_report.json")
+    ap.add_argument("--item-level-out", default=str(ITEM_LEVEL_DIR), help="item-level baseline_scores.jsonl (git-ignored by default)")
     ap.add_argument("--validation-out", default=str(VALIDATION_DIR), help="where cmd_score writes its own report copy")
     ap.add_argument("--min-answered", type=int, default=MIN_ANSWERED, help=f"PREREGISTRATION 5.7: fewer answers excludes (default {MIN_ANSWERED})")
     ap.add_argument("--instruction-check-id", default=INSTRUCTION_CHECK_ID, help="item id / header key of the instruction-check item")
@@ -710,6 +715,7 @@ def main(argv=None) -> int:
     out, validation_out = Path(args.out), Path(args.validation_out)
     refuse_paper(out)
     refuse_paper(validation_out)
+    refuse_paper(Path(args.item_level_out))
     val_files, base_files = expand(args.validation_returned), expand(args.baseline_returned)
     if not val_files and not base_files:
         print("ingest_sheets: no returned sheet matches; nothing to ingest")
@@ -743,9 +749,14 @@ def main(argv=None) -> int:
         kept, excluded, tally = apply_exclusions(resps, args.min_answered, args.instruction_check_answer,
                                                  items_by_id.get(args.instruction_check_id))
         rows = score_respondents(kept, items_by_id)
-        with open(out / "baseline_scores.jsonl", "w", encoding="utf-8") as fh:
+        item_level = Path(args.item_level_out)
+        item_level.mkdir(parents=True, exist_ok=True)
+        scores_path = item_level / "baseline_scores.jsonl"
+        with open(scores_path, "w", encoding="utf-8") as fh:
             fh.writelines(json.dumps(r, ensure_ascii=False) + "\n" for r in rows)
         summary = summarize_baseline(rows, loaded, excluded, tally, len(resps), design_ids, args.n_boot, args.seed)
+        summary["item_level"] = {"path": str(scores_path), "n_rows": len(rows),
+                                 "sha256": hashlib.sha256(scores_path.read_bytes()).hexdigest()}
         (out / "baseline_summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=1), encoding="utf-8")
         report["baseline"] = [{k: v for k, v in f.items() if k != "respondents"} | {"n_respondents": len(f["respondents"])}
                               for f in loaded]
@@ -753,7 +764,7 @@ def main(argv=None) -> int:
         overall = summary["accuracy"].get("overall", {}).get("strict", {}).get("mean_human")
         print(f"baseline: {len(base_files)} sheet(s), {len(resps)} respondent(s), {len(kept)} kept, "
               f"{len(excluded)} excluded {summary['excluded']['by_reason']}, {len(rows)} scored rows -> "
-              f"{out / 'baseline_scores.jsonl'}")
+              f"{scores_path} (item-level, not committed); summary -> {out / 'baseline_summary.json'}")
         if overall:
             print(f"mean-human strict accuracy {overall['estimate']:.3f} [{overall['lo']:.3f}, {overall['hi']:.3f}] "
                   f"({overall['n_items']} items, {overall['n_persons']} persons, two-way bootstrap B={overall['n_boot']})")

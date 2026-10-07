@@ -127,8 +127,10 @@ def long_run(tmp_path_factory, item_file, six):
     out = tmp / "out"
     r = _run("--items", str(item_file), "--baseline-returned", str(ret / "*.csv"), "--out", str(out), "--validation-out",
              str(tmp / "val"), "--min-answered", "3", "--instruction-check-answer", "Có", "--n-boot", str(N_BOOT),
-             "--human-items", str(design))
-    rows = [json.loads(ln) for ln in (out / "baseline_scores.jsonl").read_text(encoding="utf-8").splitlines()]
+             "--human-items", str(design), "--item-level-out", str(tmp / "scored"))
+    assert not (out / "baseline_scores.jsonl").exists()                      # item-level rows never land in the committed dir
+    rows = [json.loads(ln) for ln in (tmp / "scored" / "baseline_scores.jsonl").read_text(encoding="utf-8").splitlines()]
+    _no_personal_data(tmp / "scored")
     summary = json.loads((out / "baseline_summary.json").read_text(encoding="utf-8"))
     report = json.loads((out / "ingest_report.json").read_text(encoding="utf-8"))
     return {"out": out, "stdout": r.stdout, "rows": rows, "summary": summary, "report": report}
@@ -213,8 +215,10 @@ def test_wide_google_forms_export(tmp_path, item_file, six):
                 extra_item_header="[T1-V1-999999] câu lạ")
     out = tmp_path / "out"
     r = _run("--items", str(item_file), "--baseline-returned", str(ret / "*.csv"), "--out", str(out), "--validation-out",
-             str(tmp_path / "val"), "--min-answered", "3", "--instruction-check-answer", "Có", "--n-boot", str(N_BOOT))
-    rows = [json.loads(ln) for ln in (out / "baseline_scores.jsonl").read_text(encoding="utf-8").splitlines()]
+             str(tmp_path / "val"), "--min-answered", "3", "--instruction-check-answer", "Có", "--n-boot", str(N_BOOT),
+             "--item-level-out", str(tmp_path / "scored"))
+    rows = [json.loads(ln) for ln in (tmp_path / "scored" / "baseline_scores.jsonl").read_text(encoding="utf-8").splitlines()]
+    _no_personal_data(tmp_path / "scored")
     s = json.loads((out / "baseline_summary.json").read_text(encoding="utf-8"))
     rep = json.loads((out / "ingest_report.json").read_text(encoding="utf-8"))
     _no_personal_data(out)
@@ -231,6 +235,7 @@ def test_wide_google_forms_export(tmp_path, item_file, six):
     assert "unknown_item_column" in r.stdout and rep["n_problems"]["error"] == 1
     # --fail-on-problems turns the flagged header into a non-zero exit
     bad = _run("--items", str(item_file), "--baseline-returned", str(ret / "baseline_form_07.csv"), "--out", str(tmp_path / "o2"),
+               "--item-level-out", str(tmp_path / "scored2"),
                "--validation-out", str(tmp_path / "v2"), "--min-answered", "3", "--n-boot", "10", "--fail-on-problems", check=False)
     assert bad.returncode == 1
 
@@ -253,8 +258,9 @@ def test_instruction_check_as_a_release_item_is_scored_by_the_scorer(tmp_path, i
         w.writerows([*body, (check["item_id"], "Có" if _gold(check) == "Không" else "Không"), ("tool_use", "no")])
     out = tmp_path / "out"
     _run("--items", str(item_file), "--baseline-returned", str(ret / "*.csv"), "--out", str(out), "--validation-out",
-         str(tmp_path / "val"), "--min-answered", "3", "--instruction-check-id", check["item_id"], "--n-boot", "10")
-    rows = [json.loads(ln) for ln in (out / "baseline_scores.jsonl").read_text(encoding="utf-8").splitlines()]
+         str(tmp_path / "val"), "--min-answered", "3", "--instruction-check-id", check["item_id"], "--n-boot", "10",
+         "--item-level-out", str(tmp_path / "scored"))
+    rows = [json.loads(ln) for ln in (tmp_path / "scored" / "baseline_scores.jsonl").read_text(encoding="utf-8").splitlines()]
     s = json.loads((out / "baseline_summary.json").read_text(encoding="utf-8"))
     assert {r["form"] for r in rows} == {"08"} and len(rows) == 5 and check["item_id"] not in {r["item_id"] for r in rows}
     assert s["instruction_check"] == {"passed": 1, "failed": 1}
