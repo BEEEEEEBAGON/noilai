@@ -51,3 +51,15 @@ this workstream **never edit anything under `paper/`**.
 - Raw item-level outputs: the private Kaggle dataset `noilai-runs`, mirrored under the git-ignored
   `data/runs/` on the machine that ingests them.
 - `RUNBOOK.md`: click steps for running on Kaggle by hand and for handing results back.
+
+## Lint and tests, as CI runs them
+
+CI (`.github/workflows/tests.yml`) installs the newest `ruff` (0.16.10 on 7 Oct 2026, whose default
+rule set includes C4, DTZ, ISC, FURB and RUF and excludes E402) and runs `python -m ruff check noilai
+scripts tests`, then `python -m pytest -q -p no:cacheprovider -o addopts=""`. When the local ruff is
+older, lint changed files with `ruff check --select ALL --ignore
+D,ANN,T201,PLR,S,CPY,E501,FBT,PTH,TRY,EM,PLW,C901,PLC,ERA,N,ARG,B,UP,SIM,RET,INP,PERF,FURB,PT,PGH,A,DTZ005,G,TD,FIX,BLE001 <files>`
+as well as with the default rules; import scripts in tests through `importlib.import_module` after the
+`sys.path` insert (clean under both rule sets). `tests/test_cloud.py::test_readme_statements_are_true_against_the_tree`
+requires every `tests/test_*.py` module to be named in the README's test list.
+
