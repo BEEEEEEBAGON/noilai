@@ -1,0 +1,8 @@
+# Kaggle free-tier quota assumptions used by scripts/progress.py (STATUS.md "Kaggle hours this week").
+# Every figure here is an ASSUMPTION until the author reads the real numbers on the Kaggle quota page
+# (Settings -> "Your GPU/TPU quota"); configs/run_plan.yaml `quota` carries the same dated figures.
+gpu_hours_per_week: 30          # [UNCERTAIN: verify on the account's quota page]
+tpu_hours_per_week: 20          # [UNCERTAIN: verify]
+week_resets_on: saturday        # Kaggle's weekly quota resets on Saturday 00:00 UTC [UNCERTAIN: verify on the quota page]
+week_reset_hour_utc: 0
+cpu_sessions_count_against_gpu_quota: null   # null = not yet verified; the user asked for this to be checked
