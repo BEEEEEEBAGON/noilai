@@ -6,6 +6,7 @@ NON-frozen local dev split (the smoke build; copied into a temporary release dir
 data/release/), and the generated notebooks are parsed, never executed. The pre-registered plan
 (configs/run_plan.yaml) is read only to check that the two Gate 1 pilot lines are verbatim copies.
 """
+import importlib
 import json
 import os
 import re
@@ -24,8 +25,8 @@ SCRIPTS = ROOT / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 sys.path.insert(0, str(ROOT))
 
-import kaggle_build_notebooks as KBN  # noqa: E402  (scripts/ is on sys.path only from here)
-import kaggle_run_plan as KRP  # noqa: E402
+KBN = importlib.import_module("kaggle_build_notebooks")   # scripts/kaggle_build_notebooks.py, imported after the path insert
+KRP = importlib.import_module("kaggle_run_plan")   # scripts/kaggle_run_plan.py, imported after the path insert
 
 EXPLORATORY = ROOT / "configs" / "run_plan_exploratory.yaml"
 PREREGISTERED = ROOT / "configs" / "run_plan.yaml"
@@ -244,10 +245,10 @@ def test_materialize_derives_the_two_dev_files_with_the_expected_cells(tmp_path)
     """`--materialize` with a tmp copy of the plan whose `release` points at a copy of the local dev split: the two
     new files get their per-cell counts, T3 stays in yes/no pairs, nothing vulgar, no canary, and the derivation is
     idempotent. The copy keeps the shared smoke build untouched and never writes under data/release/."""
+    import run_eval as RE
+
     from noilai.eval.run import RunOptions, select_items
     from noilai.gen.generate import load_items
-
-    import run_eval as RE
 
     src = _dev_source()
     release = tmp_path / "release"
@@ -347,19 +348,19 @@ def test_the_gate_cell_runs_against_the_exploratory_plan_without_the_network(tmp
     g = {"PLAN_PATH": str(EXPLORATORY), "ITEMS_DATASET_DIR": None, "VERIFY_ITEM_KEYS": None, "RUN_ID": "floor_pilot_dev",
          "SMOKE_RUN_IDS": [], "PROJECT": tmp_path, "subprocess": subprocess}
     monkeypatch.chdir(ROOT)
-    exec(compile(gate, "gate_cell", "exec"), g)
+    exec(compile(gate, "gate_cell", "exec"), g)  # noqa: S102  (a notebook cell under test)
     assert g["KEYS"] == ["pilot_t1t3_dev"] and g["PLAN"]["release"] == "data/release/v0.3"
     verify_calls = [c for c in calls if "scripts/kaggle_verify_items.py" in c]
     assert verify_calls == [[sys.executable, "scripts/kaggle_verify_items.py", "--plan", str(EXPLORATORY), "--key", "pilot_t1t3_dev", "--materialize"]]
     # two run ids: two keys, in order, no duplicates
     g2 = dict(g, RUN_ID="throughput_dev", SMOKE_RUN_IDS=["floor_pilot_dev"], KEYS=None)
     calls.clear()
-    exec(compile(gate, "gate_cell", "exec"), g2)
+    exec(compile(gate, "gate_cell", "exec"), g2)  # noqa: S102  (a notebook cell under test)
     assert g2["KEYS"] == ["throughput_t1_300", "pilot_t1t3_dev"]
     # an id that is not a line of the plan stops the cell with the plan's run ids in the message
     g3 = dict(g, RUN_ID="E1_main")
     with pytest.raises(KeyError, match="floor_pilot_dev"):
-        exec(compile(gate, "gate_cell", "exec"), g3)
+        exec(compile(gate, "gate_cell", "exec"), g3)  # noqa: S102  (a notebook cell under test)
 
 
 def test_the_pre_registered_plan_does_not_know_the_exploratory_one():
