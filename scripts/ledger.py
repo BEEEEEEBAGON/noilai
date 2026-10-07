@@ -187,13 +187,13 @@ def unit_rows_for_run(run: dict, plan: dict, models: dict, exploratory: bool, tp
         rows = []
         for name in run["models"]:
             share = E4_SPLIT.get(name, 1.0 / len(run["models"]))
-            rows.append(dict(unit_id=f"{rid}__{name}__{'+'.join(run['arms'])}", experiment=exp, run_id=rid, model=name,
-                             arm="+".join(run["arms"]), split="inventory", item_key="syllable_inventory",
-                             seed="syllable_seed=0;pair_seed=0", paraphrases="", section="Tone",
-                             kind="confirmatory", lane="kaggle_gpu", cut_rank=RUN_TIER[rid] * 100 + MODEL_RANK.get(name, 50),
-                             est_cost=round(mid * share * COST_PER_GPU_HOUR, 3), est_unit="gpu_hours",
-                             est_raw=round(mid * share, 3), status="planned", gate="prereg",
-                             hash_verified="n/a", notes="DD 8.8: reported regardless of outcome; noilai.probe, not run_eval"))
+            rows.append({"unit_id": f"{rid}__{name}__{'+'.join(run['arms'])}", "experiment": exp, "run_id": rid, "model": name,
+                         "arm": "+".join(run["arms"]), "split": "inventory", "item_key": "syllable_inventory",
+                         "seed": "syllable_seed=0;pair_seed=0", "paraphrases": "", "section": "Tone",
+                         "kind": "confirmatory", "lane": "kaggle_gpu", "cut_rank": RUN_TIER[rid] * 100 + MODEL_RANK.get(name, 50),
+                         "est_cost": round(mid * share * COST_PER_GPU_HOUR, 3), "est_unit": "gpu_hours",
+                         "est_raw": round(mid * share, 3), "status": "planned", "gate": "prereg",
+                         "hash_verified": "n/a", "notes": "DD 8.8: reported regardless of outcome; noilai.probe, not run_eval"})
         return rows
     if rid == "tpu_main":                        # alias of E1_main for the TPU trio (the plan says so)
         return []
@@ -255,24 +255,24 @@ def unit_rows_for_run(run: dict, plan: dict, models: dict, exploratory: bool, tp
             gate = "none"
             if kind == "confirmatory":
                 gate = "prereg+qu+iy" + ("+gemini" if lane == "api" else "")
-            rows.append(dict(unit_id=f"{rid}__{name}__{arm}", experiment=exp, run_id=rid, model=name, arm=arm,
-                             split=split_of(item_key, spec), item_key=item_key, seed=seed,
-                             paraphrases="|".join(run.get("paraphrases") or []), section=SECTION_OF_EXPERIMENT.get(exp, "Other"),
-                             kind=kind, lane=lane, cut_rank=rank, est_cost=cost, est_unit=est_unit, est_raw=est_raw,
-                             status="planned", gate=gate, hash_verified="n/a" if spec.get("sha256") is None else "no",
-                             notes="; ".join(notes)))
+            rows.append({"unit_id": f"{rid}__{name}__{arm}", "experiment": exp, "run_id": rid, "model": name, "arm": arm,
+                         "split": split_of(item_key, spec), "item_key": item_key, "seed": seed,
+                         "paraphrases": "|".join(run.get("paraphrases") or []), "section": SECTION_OF_EXPERIMENT.get(exp, "Other"),
+                         "kind": kind, "lane": lane, "cut_rank": rank, "est_cost": cost, "est_unit": est_unit, "est_raw": est_raw,
+                         "status": "planned", "gate": gate, "hash_verified": "n/a" if spec.get("sha256") is None else "no",
+                         "notes": "; ".join(notes)})
     return rows
 
 
 def human_rows() -> list[dict]:
     rows = []
     for uid, exp, note, hours in HUMAN_UNITS:
-        rows.append(dict(unit_id=uid, experiment=exp, run_id=uid.split("__")[0], model="", arm="", split="human",
-                         item_key="validation_sample" if exp == "human_validation" else ("noilai_main" if exp == "human_baseline" else "attested_seed"),
-                         seed="", paraphrases="", section="Human", kind="confirmatory", lane="human",
-                         cut_rank={"human_validation": 500, "human_baseline": 600, "data": 550}[exp],
-                         est_cost=hours, est_unit="person_hours", est_raw=hours, status="planned", gate="none",
-                         hash_verified="n/a", notes=note))
+        item_key = "validation_sample" if exp == "human_validation" else ("noilai_main" if exp == "human_baseline" else "attested_seed")
+        rows.append({"unit_id": uid, "experiment": exp, "run_id": uid.split("__")[0], "model": "", "arm": "", "split": "human",
+                     "item_key": item_key, "seed": "", "paraphrases": "", "section": "Human", "kind": "confirmatory", "lane": "human",
+                     "cut_rank": {"human_validation": 500, "human_baseline": 600, "data": 550}[exp],
+                     "est_cost": hours, "est_unit": "person_hours", "est_raw": hours, "status": "planned", "gate": "none",
+                     "hash_verified": "n/a", "notes": note})
     return rows
 
 
@@ -551,7 +551,7 @@ def cmd_reprice(args) -> int:
             arms = max(1, sum(1 for x in rows if x["run_id"] == r["run_id"] and x["model"] == r["model"]))
             r["est_raw"] = round(measured[key] / arms, 3)
             r["est_cost"] = round(float(r["est_raw"]) * (COST_PER_GPU_HOUR if r["est_unit"] == "gpu_hours" else COST_PER_TPU_HOUR), 4)
-            r["notes"] = (r["notes"] + "; " if r["notes"] else "") + f"repriced from measured {measured[key]:.2f} h on {dt.date.today().isoformat()}"
+            r["notes"] = (r["notes"] + "; " if r["notes"] else "") + f"repriced from measured {measured[key]:.2f} h on {dt.datetime.now(dt.timezone.utc).date().isoformat()}"
             n += 1
     write_ledger(rows, Path(args.ledger))
     print(json.dumps({"repriced_units": n, "measured_runs": len(measured)}))

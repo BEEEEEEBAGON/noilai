@@ -1,6 +1,7 @@
 """experiments/ledger.csv and scripts/progress.py: units, cost split, ingest and the meter."""
 from __future__ import annotations
 
+import importlib
 import json
 import subprocess
 import sys
@@ -11,8 +12,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-import ledger as L  # noqa: E402
-import progress as P  # noqa: E402
+L = importlib.import_module("ledger")        # scripts/ledger.py (imported after the path insert)
+P = importlib.import_module("progress")      # scripts/progress.py
 
 SMOKE_DEV = Path("/tmp/claude-0/-home-user-noilai/7ed5d88b-f91c-57ec-b5a3-07ddcf2f1a1c/scratchpad/smoke_build/v0.3-smoke/noilai_dev.jsonl")
 

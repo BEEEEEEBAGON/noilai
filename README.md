@@ -54,6 +54,9 @@ configs/
   models.yaml   the 21-model panel + bf16-reference and thinking variants: ids, revision, hardware, dtype, quantization, limits, risks
   run_plan.yaml the run matrix (pilot, smoke, E1 + explicit-input main result + ablations, E3, reasoning, bf16 drift, E4) with the
                 plan's compute estimates; `release:` names the release version once, every item path derives from it
+  run_plan_exploratory.yaml  the DEV-ONLY exploratory plan (floor pilot on the smallest models, throughput measurement for the
+                DD 8.5 re-pricing, the two Gate 1 pilots verbatim); run through `kaggle_run_plan.py --plan` / the notebooks'
+                `PLAN_PATH`; never a paper table, never the test split or the core, never merged into run_plan.yaml
 notebooks/      kaggle_eval_t4, kaggle_eval_tpu, colab_probe_gemma3, api_runs  (generated; see below)
 prompts/        noilai.yaml (Vietnamese templates p0–p2 and the ablation variants), demos.yaml (few-shot demonstrations built
                 from syllables outside the test set), xcopa.yaml (the COPA framing); every string awaits a [NATIVE-CHECK]
@@ -63,7 +66,7 @@ data/           HASHES.json (resource hashes), attested_seed.tsv, audit/ (commit
 docs/           PLAN_2026-09-30.md (founding plan), DATA_FORMAT.md (item, output, score schemas), DESIGN_DECISIONS.md (binding)
 paper/          ACL 2027 LaTeX sources
 tests/          pytest (test_vi, test_gen, test_audit, test_stats, test_constants, test_probe, test_eval, test_scripts,
-                test_release, test_e2, test_paper, test_cloud)
+                test_release, test_e2, test_paper, test_cloud, test_exploratory_plan, test_ledger, test_pin_panel)
 ```
 
 ## Quick start
