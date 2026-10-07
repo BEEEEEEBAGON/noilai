@@ -117,7 +117,7 @@ def frontier(rows: list[dict], rows_by_unit: dict[str, dict], attested_ok: bool,
         for name, info in comp.items():
             if info["computable"] and name not in first_computable:
                 first_computable[name] = round(cum / tot, 3)
-    at_band = {u for u in band_units}
+    at_band = set(band_units)
     comp_band = analyses_computable(at_band, rows_by_unit, attested_ok, human_done)
     return {"band_units": band_units, "analyses_at_band": {k: v["computable"] for k, v in comp_band.items()},
             "first_computable_at_share": first_computable,
@@ -174,7 +174,7 @@ def compute(ledger: Path = LEDGER, gates: Path = GATES, quota_path: Path = QUOTA
     for exp in sorted({r["experiment"] for r in compute_rows}):
         per_exp[exp] = share([r for r in compute_rows if r["experiment"] == exp])
     per_sec = {}
-    for sec in SECTIONS + ("Prerequisite", "Exploratory"):
+    for sec in (*SECTIONS, "Prerequisite", "Exploratory"):
         sub = [r for r in compute_rows if r["section"] == sec]
         if sub:
             per_sec[sec] = share(sub)

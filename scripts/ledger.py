@@ -334,8 +334,9 @@ def cmd_init(args) -> int:
             carried += 1
     write_ledger(rows, path)
     cost = sum(float(r["est_cost"]) for r in rows if r["lane"] != "human")
+    person_hours = sum(float(r["est_raw"]) for r in rows if r["lane"] == "human")
     print(json.dumps({"ledger": str(path), "units": len(rows), "carried_over": carried,
-                      "compute_cost_units": round(cost, 2), "human_person_hours": round(sum(float(r['est_raw']) for r in rows if r['lane'] == 'human'), 1)}))
+                      "compute_cost_units": round(cost, 2), "human_person_hours": round(person_hours, 1)}))
     return 0
 
 
@@ -363,7 +364,7 @@ def ingest_run_dir(run_dir: Path, rows_by_unit: dict[str, dict], plans: list[dic
     item_file = m.get("item_file") if isinstance(m.get("item_file"), dict) else {}
     observed_sha = data.get("item_file_sha256") or item_file.get("sha256")
     n_selected = item_file.get("n_selected") or data.get("n_items") or 0
-    rows_per_arm: dict[str, int] = {a: 0 for a in arms}
+    rows_per_arm: dict[str, int] = dict.fromkeys(arms, 0)
     outputs = run_dir / "outputs.jsonl"
     if outputs.exists():
         with open(outputs, encoding="utf-8") as f:
