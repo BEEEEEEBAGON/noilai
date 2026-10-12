@@ -444,14 +444,14 @@ def device_for(entry: dict) -> tuple[str, int]:
     return (dev or hw, 1 if n is None else n)
 
 
-def session_device(session_hardware: "str | CudaSession") -> tuple[str, int]:
+def session_device(session_hardware: str | CudaSession) -> tuple[str, int]:
     if isinstance(session_hardware, CudaSession):
         return (session_hardware.gpu_type, session_hardware.n_gpus)
     dev, n = HARDWARE_DEVICES.get(session_hardware, (session_hardware, 1))
     return (dev or session_hardware, 1 if n is None else n)
 
 
-def hardware_compatible(entry: dict, session_hardware: "str | CudaSession | None", models_cfg: dict | None = None) -> bool:
+def hardware_compatible(entry: dict, session_hardware: str | CudaSession | None, models_cfg: dict | None = None) -> bool:
     """Can a model configured for `entry['hardware']` run in a session on `session_hardware`?
 
     A Kaggle-style session name is matched by SESSION_COMPATIBLE; a CudaSession (a rented box) is

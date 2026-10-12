@@ -7,10 +7,10 @@ are exercised against configs/models.yaml and a stub run_eval.py in a temporary 
 import copy
 import json
 import sys
-import tomllib
 from pathlib import Path
 
 import pytest
+import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
