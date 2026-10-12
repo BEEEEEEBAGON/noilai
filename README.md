@@ -45,6 +45,8 @@ scripts/
   sample_items.py         seeded sub-samples of a release (DD 4.5): noilai_main.jsonl (4,200, 350 per cell) and noilai_c2.jsonl
   kaggle_run_plan.py      configs/run_plan.yaml -> run_eval.py commands; derives the seeded core subsets (--materialize), gates every
                           run on its item file, runs the commands under the session guards, logs hours, keeps the API request+token ledger
+  cuda_box.py             one command for a rented CUDA box (marketplace GPU, AWS): bootstrap the pinned engine, run the plan's
+                          self-hosted lines in cut order under a VRAM-based session guard, sync the outputs after every model
   kaggle_verify_items.py  item-file gate: SHA-256 against run_plan.yaml, the BIG-bench header record, canary on every row, row/cell counts
   kaggle_dataset.py       stage data/runs and push a versioned private Kaggle dataset (kaggle CLI, import guarded)
   kaggle_build_notebooks.py  generates notebooks/*.ipynb from one source; --check refuses hand-edited notebooks
@@ -63,7 +65,7 @@ data/           HASHES.json (resource hashes), attested_seed.tsv, audit/ (commit
 docs/           PLAN_2026-09-30.md (founding plan), DATA_FORMAT.md (item, output, score schemas), DESIGN_DECISIONS.md (binding)
 paper/          ACL 2027 LaTeX sources
 tests/          pytest (test_vi, test_gen, test_audit, test_stats, test_constants, test_probe, test_eval, test_scripts,
-                test_release, test_e2, test_paper, test_cloud)
+                test_release, test_e2, test_paper, test_cloud, test_cuda_box)
 ```
 
 ## Quick start
@@ -348,6 +350,23 @@ per the ARR policy on generative assistance.
   Still no model run.
 
 ## Running from a private repository
+
+**On a rented CUDA box** (a marketplace GPU or an AWS instance; the free-tier notebooks do not apply) clone
+the repository over SSH or from the bundle below, export `HF_TOKEN` for gated checkpoints, and run
+
+```bash
+python scripts/cuda_box.py --bootstrap --session auto --platform rented \
+    --sync-cmd "aws s3 sync data/runs s3://<bucket>/noilai/runs"        # or rclone, or a git push of data/runs
+```
+
+`--session auto` reads the card, its VRAM, the count and the bf16 capability from `nvidia-smi` (or pass
+`--session <gpu_type>:<vram_gb>[x<n_gpus>][:nobf16]`, e.g. `rtx3090:24`, `a100-80gb:80`); every self-hosted
+line of the plan then runs in cut order through `kaggle_run_plan.py`'s loop, a model is skipped when its
+estimated weight size does not fit (`cuda_fit`: parameters × bytes per parameter × 1.1 + 1 GB against 90% of
+the VRAM; bf16 entries need compute capability ≥ 8.0), the weights are sharded over the cards only when one
+card is too small, the compute log records the real card under `--platform` (`rented`, `aws`, `local`), and
+`--sync-cmd` runs after every executed model so a box that dies keeps what it finished. `--runs` and `--models`
+narrow the plan (the Gate 1 pilot: `--runs pilot_t1_200 pilot_xcopa_200`); `--dry-run` prints every command.
 
 The notebooks never clone over HTTPS while the repository is private: they read the code from a
 **git bundle in a private Kaggle dataset** (`BUNDLE_PATH`, the default in every parameters cell) and

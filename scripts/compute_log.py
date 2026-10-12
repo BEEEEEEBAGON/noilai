@@ -34,7 +34,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_LOG = ROOT / "data" / "compute_log.csv"
 COLUMNS = ("date", "platform", "gpu_type", "n_gpus", "hours", "run_id", "purpose")
-PLATFORMS = ("kaggle", "colab", "modal", "local", "api", "other")
+PLATFORMS = ("kaggle", "colab", "modal", "local", "api", "rented", "aws", "other")   # rented: a marketplace GPU box
 # device type -> accounting kind; anything unknown is counted as a GPU
 DEVICE_KINDS = {
     "t4": "gpu", "2xt4": "gpu", "p100": "gpu", "l4": "gpu", "a100": "gpu", "h100": "gpu",
