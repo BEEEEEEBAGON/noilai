@@ -1,0 +1,156 @@
+# configs/analysis.yaml -- the pre-registered analysis entry point's configuration
+# (python -m noilai.stats.analyze --config configs/analysis.yaml; PREREGISTRATION 8.13, DESIGN_DECISIONS 8.8).
+#
+# Every threshold here MIRRORS noilai/constants.py and is asserted against it at load time (alpha, the bootstrap
+# settings, the Table 3 Holm family, the arm aliases, the placement baseline): the constants module is the source,
+# this file only names which lines feed which table. The analysis code implements docs/PREREGISTRATION.md section 8
+# and docs/DESIGN_DECISIONS.md sections 1, 8 and 9; it never changes them. Nothing is ever written under paper/.
+
+version: 1
+
+paths:
+  runs_root: data/runs
+  ledger: experiments/ledger.csv
+  aggregates: experiments/aggregates
+  run_plan: configs/run_plan.yaml
+  models: configs/models.yaml
+  audit_dir: data/audit
+  human_report: experiments/human/human_baseline_report.json
+  human_items: data/human/human_items.json
+  gates: experiments/gates.yaml
+  freeze_check: scripts/freeze_scoring_rule.py        # run with --check only (the author's --record is never run here)
+  out_dir: experiments/analysis                       # never under paper/ (refused with exit 2)
+
+completed:
+  ledger_statuses: [done]
+  hash_verified_allowed: ["yes", "n/a"]               # `no` is skipped and reported (DESIGN_DECISIONS 4.6)
+  manifest_statuses: [finished]
+  thinking_status_allowed_for_lines: [reasoning_500, reasoning_500_tpu, reasoning_500_api]   # finished_thinking_present
+  kinds: [confirmatory]                               # a ledger unit of another kind never enters a paper table
+  exclude_splits: [dev]
+  exclude_smoke_manifests: true                       # options.notes.smoke / outcome.smoke; --include-smoke overrides (INTERIM only)
+  require_p0: true
+
+lines:
+  aliases: {tpu_main: E1_main}                        # the TPU trio's E1 directories pool under E1_main (ledger RUN_ALIAS)
+  pool_tags: [p0p1, p2]                               # a paraphrase split: one set of cells per (line, model)
+  separate_tags: [cpu]                                # the CPU engine unit stays a unit apart (COMPUTE_PLAN section 2)
+  table2: {lines: [E1_main, E1_api_core, E1_api_paraphrase], arm: nfc, primary_paraphrase: p0, range_over: [p0, p1, p2]}
+  api: [E1_api_core, E1_api_paraphrase, E3_api_core, reasoning_500_api]
+  explicit_input: {line: E1_explicit_input, baseline_line: E1_main, paraphrase: p0, restrict_to: in_core,
+                   condition: "vi-*-s3-explained-components"}
+  table3:
+    main: E3_noilai
+    xcopa: {line: E3_xcopa, outcome: logprob_correct, cluster: item_id}
+    c2: E3_c2_enriched
+    api: {line: E3_api_core, baseline_line: E1_api_core}
+    baseline_arm: nfc
+  h3: {pass_through_only: true, t1_variant: V3}
+  h4: {line: E3_c2_enriched, arm: placement_new, api_line: E3_api_core, api_baseline_line: E1_api_core}
+  attested: {line: E1_attested, control_line: E1_main, floor_unit: attested__expansion, floor: 100}
+  ablations: [E1_abl_zero_shot, E1_abl_name_only, E1_abl_english, E1_abl_spaced]
+  appendix: {reasoning: [reasoning_500, reasoning_500_tpu, reasoning_500_api], bf16: bf16_drift_200,
+             scope: E3_scope_item, engine: E3_engine_hf}
+  probes: E4_probe
+
+families:
+  # model -> TOKENIZER family (PREREGISTRATION 8.1 / DESIGN_DECISIONS 8.1: "Gemma SentencePiece x7 entries, Qwen BPE x6,
+  # Llama 3.1, PhoGPT, Vistral/Mistral, o200k, Gemini"). This is NOT configs/models.yaml `family` (eleven labels; the
+  # SEA-LION label covers two tokenizers). The author confirms every label before any pooled number is reported; the
+  # Sailor2 entry is placed with the Qwen BPE tokenizers it was fine-tuned from (the DD counts leave it unassigned).
+  by_model:
+    gemma-3-1b-it: gemma_sp
+    gemma-3-4b-it: gemma_sp
+    gemma-3-12b-it: gemma_sp
+    gemma-4-e2b: gemma_sp
+    gemma-4-e4b: gemma_sp
+    gemma-4-12b: gemma_sp
+    gemma-sea-lion-v4.5-e2b-it: gemma_sp
+    qwen3.5-0.8b: qwen_bpe
+    qwen3.5-2b: qwen_bpe
+    qwen3.5-4b: qwen_bpe
+    qwen3.5-9b: qwen_bpe
+    qwen3.8-27b: qwen_bpe
+    qwen-sea-lion-v4.5-27b-it: qwen_bpe
+    sailor2-8b-chat: qwen_bpe                         # author to confirm (DD 8.1 counts sum to 20 without it)
+    llama-3.1-8b-instruct: llama3.1
+    phogpt-4b-chat: phogpt
+    vistral-7b-chat: vistral
+    gpt-oss-120b: o200k
+    gpt-oss-20b: o200k
+    gemini-flash: gemini
+    gemini-flash-lite: gemini
+  pass_through_expected: [gemma_sp, llama3.1, phogpt, vistral, o200k]   # DD 7.2 expectations; the census verdict wins
+  census_overrides_expectation: true
+  min_viable_panel: {models: 8, families: 4, needs_non_gemma_pass_through: true}
+
+arms: {aliases: {base: nfc, pc: win1258}}            # docs/DATA_FORMAT.md names -> the runner's (noilai.eval.prompts.ARM_ALIASES)
+arm_scope_primary: whole_prompt
+baseline_arm: nfc
+default_condition: "vi-*-s3-explained-raw"            # PREREGISTRATION section 3: Vietnamese, explained, 3 shots, raw input
+
+bootstrap: {B: 2000, paired_B: 4000, seed: 0, level: 0.95, cluster: base_pair_id, strata: source,
+            bca_min_clusters: 50, small_cell_max_base_pairs: 20, paired_t_min_base_pairs: 200}
+
+holm:
+  alpha: 0.05
+  table3_family:   # mirror of noilai.constants.HOLM_FAMILY_TABLE3 (arm, task, item file); a test asserts equality
+    - [nfd, T1, main]
+    - [nfd, T3, main]
+    - [nfd, XCOPA, main]
+    - [pc, T1, main]
+    - [pc, T3, main]
+    - [pc, XCOPA, main]
+    - [strip_tones, T1, main]
+    - [strip_tones, T3, main]
+    - [strip_tones, XCOPA, main]
+    - [strip_all, T1, main]
+    - [strip_all, T3, main]
+    - [strip_all, XCOPA, main]
+    - [placement_new, T1, c2]
+    - [placement_new, T3, c2]
+  p_source: primary
+  h3: per_pass_through_model_family_of_2
+  h3b: four_did_contrasts
+  h4: across_panel
+  h6: across_panel
+  no_holm: [table2, explicit_input, ablations, probes, patching]
+
+pooling:
+  method: reml_hk                                     # DD 1 / PREREG 8.1: REML with the Hartung-Knapp adjustment
+  alternative: family_bootstrap                       # always computed beside it
+  min_reliable_families: {H3: 5, H4: 3, H6: 3}        # H3's five-family rule is pre-registered; H4 / H6 labelled
+h4_direction_from: BASELINE_PLACEMENT                 # constants.BASELINE_PLACEMENT == "old" -> placement_new expected < 0
+e2: {n_boot: 200}                                     # e2.bootstrap_mean_slopes replicates (author fixes B for E2)
+
+scoring_modes:
+  T1: correct
+  T2: correct
+  T3_generated: correct
+  T3_logprob: [forced_choice_correct, paired_correct, paired_correct_norm]
+  XCOPA: logprob_correct
+  t3_headline_excludes_twin: spelling
+
+reporting: {percent_digits: 1, every_cell_reports: [estimate, ci, n_items, n_base_pairs, deff, unparseable_rate],
+            headline_carries_cluster_count: true}
+
+labels:
+  interim: INTERIM
+  final: FINAL
+  notice_interim: "interim numbers are for monitoring only; no design or analysis change without a docs/DEVIATIONS.md entry; no paper prose"
+  final_requires:
+    - gates.preregistration.registration_url and registration_date non-null
+    - gates.scoring_rule_freeze.commit non-null and `scripts/freeze_scoring_rule.py --check` passes
+    - every live unit of lines.table2 and lines.table3 is done with hash_verified != no
+    - no analysed run has options.notes.smoke true
+  n_in_every_title: true
+
+provenance:
+  no_number_typed_by_hand: true
+  record_exact_call: true
+  header: "% GENERATED by noilai.stats.analyze from <inputs> on <UTC>; do not edit by hand."
+
+outputs: [table2_main, table2_paraphrase_range, table3_interventions, table3_mcnemar_appendix, table_h3, table_h4,
+          table_h1_e2, table_explicit_input, table_human, table_census, table_runs, table_h6, table_ablations,
+          table_errors, fig_errors, fig_deltatok, fig_probes, table_bf16_drift, table_engine_scope_agreement,
+          table_reasoning_curve, table_deff_icc, analysis_summary, results_log_entry]
