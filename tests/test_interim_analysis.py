@@ -18,10 +18,13 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "tests"))
 IA = importlib.import_module("interim_analysis")
+SB = importlib.import_module("_smoke_build")       # tests/_smoke_build.py: the shared smoke-build locator
 
 PY = sys.executable
-SMOKE_DEV = Path("/tmp/claude-0/-home-user-noilai/7ed5d88b-f91c-57ec-b5a3-07ddcf2f1a1c/scratchpad/smoke_build/v0.3-smoke/noilai_dev.jsonl")
+# NOILAI_SMOKE_BUILD: the smoke build's directory (holds noilai_dev.jsonl); unset, the session's scratchpad build
+SMOKE_DEV = SB.smoke_dev_file()
 DATE = "2026-10-07"
 N_BOOT = 300          # enough for the interval checks below; the driver's default is constants.BOOTSTRAP_B
 
