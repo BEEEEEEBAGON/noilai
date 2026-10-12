@@ -1,11 +1,55 @@
 # STATUS — experiments and validation workstreams
 
-Hand-maintained sections first (dated **2026-10-07**); the meter block at the end is written by `scripts/progress.py`
+Hand-maintained sections first (dated **2026-10-12**); the meter block at the end is written by `scripts/progress.py`
 and is never edited by hand. Blockers, in deadline order, are in `BLOCKED.md`; the author's rulings are in
 `docs/gate1/DD13_DECISION_MEMO.md` (reply with the row numbers you accept).
 
 ## Session log (newest first)
 
+- **2026-10-12 (analysis-code session, adoring-planck; no Kaggle or Hugging Face access).** Nothing ingested, nothing
+  launched: `www.kaggle.com` and `huggingface.co` are still unreachable from this environment, no token exists, the
+  frozen item files are still absent (`data/release/v0.3/` holds `manifest.json` only); the prerequisites table is
+  unchanged; the meter was not re-run (nothing to ingest). Built the analysis code of `BLOCKED.md` 34, each module
+  through an independent verifier:
+  - `noilai/stats/pooling.py` (PREREG 8.1 / DD 1, 8.1): the model-in-tokenizer-family pool, REML with the
+    Hartung–Knapp adjustment and the family-level bootstrap always beside it, k of N families, `k_of_n_models`
+    (Holm-significant AND on the predicted side) and `tost_paired` (δ = 2 points) for H4; it refuses to run without
+    the tokenizer-family map.
+  - `noilai/stats/aggregate.py` (PREREG 8.1, 8.2, 8.5, 8.13; DD 5.1, 5.3): run discovery over
+    `data/runs/<run>__<model>[__<tag>]` (the `p0p1` + `p2` directories of one line pooled, `cpu` apart), paraphrase
+    means over the paraphrases present (never filled), cell tables with the stratified base-pair bootstrap and the
+    small-cell rule, the primary metric, τ_m(a) per model and arm with the Table 3 family filtered per model (census
+    "normalizes" → 0 by construction, "corrupts" → refused, API → no XCOPA), the explicit-input gap (CIs only), the
+    T3 headline without the spelling twins.
+  - `noilai/stats/analyze.py` + `configs/analysis.yaml` (PREREG 8.13 / DD 8.8): `python -m noilai.stats.analyze
+    --config configs/analysis.yaml --runs data/runs [--ledger experiments/ledger.csv] [--out experiments/analysis]`
+    writes 21 .tex + .json artefacts with their provenance, `analysis_summary.json`, `results_log_entry.md` and
+    `analysis_report.md`, labelled INTERIM with n; `--label FINAL` is refused (exit 3) until the registration and the
+    scoring-rule freeze are recorded and every live Table 2 / Table 3 unit is done and hash-verified; `--out` under
+    `paper/` is refused; `--check` refuses stale outputs; the config is refused when it disagrees with
+    `noilai/constants.py`. Exercised on the local echo run (`--include-smoke`) and on the real ledger (0 runs; the
+    blockers name the 242 live units not done).
+  - `noilai.stats.agreement.weighted_precision` / `weighted_precision_from_rows` (DD 10.1): the stratified estimate
+    with a Wilson interval on the effective n (finite-population correction); `validation.stratified_precision` still
+    reports `wilson_unweighted` and should call it.
+  - Not implemented, written by `analyze` as `not computable` with the reason: the H1/E2 item-audit join and floor
+    gating, the H3b difference-in-differences and H6 matching helpers, the E4 retention table.
+  - Two defects fixed: `noilai/eval/backends.py` recognises the quantization methods as `configs/models.yaml` spells
+    them (`bnb_bits`: `bitsandbytes_nf4`, `bnb*`, `int8` → a bitsandbytes load-time request; awq/gptq left to the
+    engine; vLLM gets `quantization="bitsandbytes"` instead of the entry's own string), and the tests that read the
+    local smoke build take its directory from `NOILAI_SMOKE_BUILD` (`tests/_smoke_build.py`) and skip without it.
+    Consequence for the author: `qat_int4` entries are now quantized at load by the backends while
+    `scripts/pin_panel.py` treats them as checkpoint-carried (`BLOCKED.md` 22).
+  - Author rulings recorded in the handoffs, none edited into PREREG or DD: the seven tokenizer-family labels for
+    the 21 panel entries in `configs/analysis.yaml` (one entry's placement is a guess, marked in the file); REML+HK
+    as the primary pool with the family bootstrap beside it; standard HKSJ without the max(1, q) truncation; three
+    informative families as the H4/H6 floor (five for H3); H4's "adjusted CI excluding 0" read as Holm-significant
+    AND on the predicted side; the API models' C2 cell and the never-realizable (placement_new, T3, c2) cell
+    (`family_defined` stays 14).
+  - Documents: the `docs/DESIGN_DECISIONS.md` parentheticals "(to write)" for the four items now read "implemented
+    2026-10-12"; `docs/PREREGISTRATION.md` §2 ("the pooling helper is to write") and §8.13 ("analysis entry point ...
+    **planned**") keep their wording, the author's file — the stage-2 edit updates them. DD 10.1 still says
+    `cmd_sample` does round-robin allocation: superseded by `make_validation_forms.py packet` (1 Oct), not edited here.
 - **2026-10-07 (integration session).** Branch `claude/integrate-2026-10-07` at merge commit `6ee5bb6` =
   `origin/main` + the 1 Oct branch (PR #1, "lucid") + the PR #3 branch ("adoring"), with the paper ports of PR #2
   ("eloquent"). Merged from each, one line each:
@@ -92,6 +136,16 @@ with one; `BLOCKED.md` 21 decides it on 25 Oct). Reply to the memo with the row 
    (tagged-commit URL, OSF or similar) and when → `experiments/gates.yaml` `registration_url` / `registration_date`.
 6. **The canary digest mismatch** between `docs/RESULTS_LOG.md` RL-2026-10-01-01 and `data/release/v0.3/manifest.json`
    (`BLOCKED.md` 16): which record is right; the assistant edits neither.
+
+7. **Analysis rulings before any pooled number is reported** (`configs/analysis.yaml`, `noilai/stats/pooling.py`,
+   `noilai/stats/analyze.py`; built 2026-10-12, `BLOCKED.md` 34): the seven tokenizer-family labels of the 21 panel
+   entries (Sailor2 is placed under the Qwen BPE family); REML + Hartung–Knapp as the primary pool with the family
+   bootstrap beside it; the Hartung–Knapp variance is truncated at the fixed-effect variance (q = max(1, q), the raw
+   q reported) so the interval never collapses when family estimates coincide; the family floor for H4/H6 pooling (3)
+   against H3's 5; how an API model's placement cell enters its Table 3 family (the C2-enriched file is never run on
+   API models; `analyze` drops the cell, `aggregate.intervention_effects` pairs the core's C2-affected items); and
+   whether the `qat_int4` entries of `configs/models.yaml` are quantize-at-load requests (today the backends and
+   `scripts/pin_panel.py` both treat them as checkpoint-carried and unchosen).
 
 <!-- progress:begin -->
 _Generated by `scripts/progress.py` on 2026-10-07 22:06Z from `experiments/ledger.csv` (429 compute units in 31 chunks + non-chunked lines, 24 human units). Weights: 1 GPU-h = 1.0; 1 TPU-h = 1.0; 1 L4-h = 1.0; 1 CPU-h = 0.0 (`experiments/quota.yaml` cpu_sessions_count_against_gpu_quota: None); 1,000 API calls = 0.25; human person-hours on their own lines. A unit counts only when `done` and hash-verified; cut / zero_by_construction / unscheduled / alternative units leave the denominator._
