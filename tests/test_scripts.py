@@ -96,49 +96,88 @@ def test_build_attested(tmp_path):
     assert "0 exactness problems" in r.stdout
 
 
-def test_validation_forms_sample_and_score(release, tmp_path):
-    out = tmp_path / "val"
-    run("scripts/make_validation_forms.py", "sample", "--items", str(release / "noilai_test.jsonl"), "--dev",
-        str(release / "noilai_dev.jsonl"), "--out", str(out), "--n", "120", "--overlap", "30", "--validators", "A", "B", "C")
-    forms = sorted(out.glob("validation_form_*.csv"))
-    assert len(forms) == 3
-    meta = json.loads((out / "validation_manifest.json").read_text())
-    assert meta["n_items"] == 120 and meta["overlap"] == 30
-    # every non-overlap item on exactly two forms, overlap items on three
+def test_validation_packet_and_score(release, tmp_path):
+    """docs/gate1/VALIDATION_PROTOCOL.md: Parts A-E per validator, overlap rows on every sheet and the rest on exactly
+    two, the planted controls and the item ids only in the author's key, then fill the sheets and score them."""
     from collections import Counter
+    out = tmp_path / "val"
+    r = run("scripts/make_validation_forms.py", "packet", "--release", str(release), "--out", str(out), "--validators", "A", "B", "C",
+            "--per-cell", "3", "--controls-per-cell", "1", "--overlap", "6", "--t2-overlap", "4",
+            "--candidates", str(tmp_path / "none.tsv"))
+    info = json.loads(r.stdout.strip().splitlines()[-1])
+    assert info["sizes"]["n_sample"] == 36 and info["sizes"]["n_controls"] == 12 and info["sizes"]["calibration"] == 16
+    key = json.loads((out / "B_key.json").read_text())
+    assert len(key) == 48 and sum(k["control"] for k in key.values()) == 12
     c = Counter()
-    for f in forms:
-        with open(f, encoding="utf-8") as fh:
-            for r in csv.DictReader(fh):
-                c[r["item_id"]] += 1
-    assert Counter(c.values()) == {2: 90, 3: 30}
-    # fill in sheets and score
+    for v in "ABC":
+        with open(out / f"B_items_{v}.csv", encoding="utf-8") as fh:
+            rows = list(csv.DictReader(fh))
+        assert "item_id" not in rows[0] and "control" not in rows[0]          # the key never reaches a validator
+        text = (out / f"B_items_{v}.csv").read_text(encoding="utf-8")
+        assert not any(k["item_id"] in text for k in key.values())
+        c.update(row["row_id"] for row in rows)
+    assert Counter(c.values()) == {3: 6, 2: 42}
+    m = json.loads((out / "validation_manifest.json").read_text())
+    assert all(st["n_sampled"] == 0 or abs(st["weight"] * st["n_sampled"] - st["n_population"]) < 1e-6 for st in m["strata"].values())
+    with open(out / "A_calibration_A.csv", encoding="utf-8") as fh:
+        head = next(csv.reader(fh))
+    assert "key" not in head and "explanation_vi" not in head and "manipulation" not in head
+    # fill: everyone right on everything (controls answered "no"), and score
     ret = out / "returned"
     ret.mkdir()
-    for f in forms:
-        with open(f, encoding="utf-8") as fh:
-            rows = list(csv.DictReader(fh))
-        for r in rows:
-            r.update(correct="yes", spelling="yes", lexical="no", offensive="no")
-        with open(ret / f.name, "w", newline="", encoding="utf-8") as g:
-            w = csv.DictWriter(g, fieldnames=rows[0].keys())
-            w.writeheader()
-            w.writerows(rows)
-    r = run("scripts/make_validation_forms.py", "score", "--out", str(out), "--returned", str(ret / "*.csv"))
-    rep = json.loads((out / "validation_report.json").read_text())
-    assert rep["correct"]["percent_agreement"] == 1.0
-    assert rep["generator_precision"]["estimate"] == 1.0
+    for v in "ABC":
+        for sheet in ("B_items", "C_attested", "A_calibration"):
+            with open(out / f"{sheet}_{v}.csv", encoding="utf-8") as fh:
+                rows = list(csv.DictReader(fh))
+            for row in rows:
+                if sheet == "B_items":
+                    row.update(correct="no" if key[row["row_id"]]["control"] else "yes", spelling="yes", offensive="no")
+                elif sheet == "C_attested":
+                    row.update(valid="yes", known="no", offensive="no")
+            if v == "A":                                  # A flags one sampled B row and one C row offensive
+                b_row = next(r_ for r_ in rows if sheet == "B_items" and not key[r_["row_id"]]["control"]) if sheet == "B_items" else None
+                if b_row:
+                    b_row["offensive"], flagged_b = "yes", b_row
+                if sheet == "C_attested":
+                    rows[0]["offensive"], flagged_c = "yes", rows[0]
+            with open(ret / f"{sheet}_{v}.csv", "w", newline="", encoding="utf-8") as g:
+                w = csv.DictWriter(g, fieldnames=rows[0].keys())
+                w.writeheader()
+                w.writerows(rows)
+    run("scripts/make_validation_forms.py", "score", "--dir", str(out), "--n-boot", "100")
+    rep = json.loads((out / "report" / "validation_report.json").read_text())
+    b = rep["B"]
+    assert b["agreement"]["correct"]["percent_agreement"] == 1.0 and b["agreement"]["correct"]["alpha"] == 1.0
+    assert b["generator_precision"]["pooled"]["weighted_precision"] == 1.0 and b["generator_precision"]["pooled"]["n"] == 36
+    assert all(x["control_catch_rate"] == 1.0 for x in b["validators"].values())
+    assert rep["C"]["n_verified"] == rep["C"]["n_rows"] > 0
+    # DD 11.5: the flags file names the flagged item and the flagged texts by hash only (DD 11.1: no test-split text)
+    from noilai.eval.run import load_validator_flags, text_digest
+    raw = (out / "report" / "validator_flags.json").read_text(encoding="utf-8")
+    flags = load_validator_flags(out / "report" / "validator_flags.json")
+    assert flags["item_ids"] == {key[flagged_b["row_id"]]["item_id"]}
+    assert {text_digest(flagged_b["candidate"]), text_digest(flagged_c["input"]), text_digest(flagged_c["output"])} <= flags["text_sha256"]
+    assert all(re.fullmatch(r"[0-9a-f]{64}", h) for h in flags["text_sha256"])
+    assert flagged_b["candidate"] not in raw and flagged_c["output"] not in raw and '"A"' not in raw
 
 
 def test_human_baseline_forms(release, tmp_path):
+    """DD 10.2: the forms carry the models' exact p0 prompt per item (and its hash), one instruction-check row."""
+    from noilai.eval import prompts as P
+    from noilai.gen.generate import load_items
     out = tmp_path / "human"
     r = run("scripts/make_validation_forms.py", "baseline", "--items", str(release / "noilai_core.jsonl"), "--out", str(out),
             "--n-forms", "4", "--per-form", "24")
     info = json.loads(r.stdout.strip().splitlines()[-1])
-    assert info["forms"] == 4 and len(list(out.glob("baseline_form_*.csv"))) == 4
+    assert info["forms"] == 4 and len(list(out.glob("baseline_form_*.csv"))) == 4 and info["check_items_per_form"] == 1
     with open(out / "baseline_form_01.csv", encoding="utf-8") as fh:
         rows = list(csv.DictReader(fh))
-    assert len(rows) == 24 and {r["task"] for r in rows} == {"T1", "T2", "T3"}
+    main = [r_ for r_ in rows if r_["block"] == "main"]
+    assert len(main) == 24 and {r_["task"] for r_ in main} == {"T1", "T2", "T3"} and sum(r_["block"] == "check" for r_ in rows) == 1
+    items = {it["item_id"]: it for it in load_items(release / "noilai_core.jsonl")}
+    for r_ in main[:5]:
+        msgs = P.render(items[r_["item_id"]], paraphrase="p0", shots=3, arm="nfc")
+        assert r_["prompt_model"] == msgs[-1]["content"] and r_["prompt_hash"] == P.prompt_hash(msgs)
 
 
 def test_audit_script_on_gemma3_if_present(tmp_path):
@@ -310,3 +349,192 @@ def test_build_attested_refuses_a_declared_exact_row_the_engine_does_not_reprodu
     assert ba.reachable_by_named_change(S("đan giởn"), S("đang giỡn"), "approx(merger: n/ng + hỏi/ngã)") is True
     assert ba.reachable_by_named_change(S("đan giởn"), S("đang giỡn"), "approx(merger: hỏi/ngã)") is False   # n/ng unexplained
     assert ba.reachable_by_named_change(S("vẫn như củ"), S("vẫn như cũ"), "approx(merger: n/ng + hỏi/ngã)") is False  # n/ng unused
+
+
+# ------------------------------------------------------------------ returned human sheets (CLAUDE.md step 2)
+def _gold_answer(it: dict) -> str:
+    if it["task"] == "T1":
+        return it["gold"][0]
+    if it["task"] == "T2":
+        return it["gold"][0]["output"]
+    return "Có" if it["gold"] == "yes" else "Không"
+
+
+def _swap(text: str) -> str:
+    a, b = text.split()
+    return f"{b} {a}"
+
+
+def _no_personal_data(root: Path, *needles: str) -> None:
+    for p in root.rglob("*"):
+        if p.is_file():
+            text = p.read_text(encoding="utf-8")
+            for needle in needles:
+                assert needle not in text, (p, needle)
+
+
+def test_human_baseline_import_and_score(release, tmp_path):
+    """The one baseline scorer on the forms the author sends: Google Forms response CSVs -> `import-responses` (first
+    submission per form, e-mail in an answer cell redacted, coarse demographics only) -> `score-baseline` with the models'
+    scorer; the PREREG 5.7 exclusions plus WAS_VALIDATOR (docs/DEVIATIONS.md 1 Oct) and a duplicate response, every
+    reason listed and counted; strict / lenient / tolerant per row (DD 10.2 item 32); mean-human with the two-way
+    (person, item) bootstrap and the any-human ceiling (PREREG 8.11); alpha between the raters on the double-judged
+    items; the region split from demographics.csv; item-level rows in the git-ignored data tree, aggregates with the
+    file's SHA-256 under --out (CLAUDE.md: no names or e-mails there)."""
+    import hashlib
+    import importlib
+    import shutil
+    sys.path.insert(0, str(ROOT / "scripts"))
+    MVF = importlib.import_module("make_validation_forms")
+    from noilai.gen.generate import load_items
+    email = "respondent.07" + "@" + "example.invalid"                       # built here: no address literal in the tree
+    items = {it["item_id"]: it for it in load_items(release / "noilai_core.jsonl")}
+    out = tmp_path / "human"
+    run("scripts/make_validation_forms.py", "baseline", "--items", str(release / "noilai_core.jsonl"), "--out", str(out),
+        "--n-forms", "4", "--per-form", "24", "--no-model-prompt")
+    forms = {}
+    for k in range(1, 5):
+        with open(out / f"baseline_form_{k:02d}.csv", encoding="utf-8") as fh:
+            forms[k] = list(csv.DictReader(fh))
+    demo_titles = [t for t, _c, _r in MVF.DEMOGRAPHICS_VI]
+    region_title = next(t for t in demo_titles if "vùng" in t)
+
+    def answers(k: int, edit) -> dict[str, str]:
+        """{position: answer} for form k: gold everywhere, then `edit` changes some."""
+        got = {}
+        for r in forms[k]:
+            if r["block"] == "main":
+                got[r["position"]] = _gold_answer(items[r["item_id"]])
+            elif r["item_id"] == MVF.CHECK_ITEM["item_id"]:
+                got[r["position"]] = "Đã đọc."
+            elif r["item_id"] in ("TOOLS", "WAS_VALIDATOR"):
+                got[r["position"]] = "Không"
+        edit(got)
+        return got
+
+    main_rows = {k: [r for r in forms[k] if r["block"] == "main"] for k in forms}
+    t1_2 = [r for r in main_rows[2] if r["task"] == "T1"]
+    t2_2 = next(r for r in main_rows[2] if r["task"] == "T2")
+    t3_2 = next(r for r in main_rows[2] if r["task"] == "T3")
+    special = {k: {r["item_id"]: r["position"] for r in forms[k] if r["block"] != "main"} for k in forms}
+
+    def edit2(got):                                                 # a swapped T1 (lenient), a blank T1, a wrong T3, an e-mail
+        got[t1_2[0]["position"]] = _swap(got[t1_2[0]["position"]])
+        got[t1_2[1]["position"]] = ""
+        got[t3_2["position"]] = "Không" if got[t3_2["position"]] == "Có" else "Có"
+        got[t2_2["position"]] = email
+
+    def edit3(got):                                                 # five answers only, and tool use reported
+        for r in main_rows[3][5:]:
+            got[r["position"]] = ""
+        got[special[3]["TOOLS"]] = "Có"
+
+    def edit4(got):                                                 # the check without diacritics fails; a validator
+        got[special[4]["CHECK-01"]] = "da doc"
+        got[special[4]["WAS_VALIDATOR"]] = "Có"
+
+    edits = {1: lambda got: None, 2: edit2, 3: edit3, 4: edit4}
+    regions = {1: "Nam", 2: "Bắc", 3: "", 4: "Trung"}
+    (out / "responses").mkdir()
+    for k in range(1, 5):
+        got = answers(k, edits[k])
+        header = ["Timestamp", "Email Address", *demo_titles, *[f"{r['position']}. {r['question_short']}" for r in forms[k]],
+                  "Góp ý (không bắt buộc)"]
+        demo = dict.fromkeys(demo_titles, "")
+        demo[demo_titles[0]], demo[region_title] = MVF.DEMOGRAPHICS_VI[0][1][0], regions[k]       # the first age band
+        with open(out / "responses" / f"responses_form_{k:02d}.csv", "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(header)
+            w.writerow(["2026/11/03 10:00:00", email, *[demo[t] for t in demo_titles], *[got.get(r["position"], "") for r in forms[k]], ""])
+            if k == 1:                                              # a second submission: dropped by the importer, unread
+                w.writerow(["2026/11/03 11:00:00", email, *[demo[t] for t in demo_titles], *["x" for _ in forms[k]], ""])
+    r = run("scripts/make_validation_forms.py", "import-responses", "--dir", str(out))
+    info = json.loads(r.stdout.strip().splitlines()[-1])
+    assert info == {"responses": 4, "extra_submissions_dropped": {"1": 1}, "emails_redacted": 1, "written_to": str(out / "returned")}
+    assert sorted(p.name for p in (out / "returned").glob("*.csv")) == [f"baseline_form_{k:02d}_r1.csv" for k in range(1, 5)] + ["demographics.csv"]
+    _no_personal_data(out / "returned", email, "2026/11/03")
+    shutil.copy(out / "returned" / "baseline_form_01_r1.csv", out / "returned" / "baseline_form_01_r2.csv")   # a hand-imported duplicate
+
+    agg = tmp_path / "aggregates"
+    r = run("scripts/make_validation_forms.py", "score-baseline", "--items", str(release / "noilai_core.jsonl"), "--dir", str(out),
+            "--returned", str(out / "returned" / "baseline_form_*.csv"), "--out", str(agg), "--n-boot", "100", "--seed", "0")
+    assert "mean-human strict accuracy" in r.stdout
+    rep = json.loads((agg / "human_baseline_report.json").read_text(encoding="utf-8"))
+    assert sorted(p.name for p in agg.iterdir()) == ["human_baseline_report.json"]           # aggregates only under --out
+    _no_personal_data(agg, email, "2026/11/03")
+    # exclusions: every reason that applies is listed; forms_excluded gives the first (HUMAN_BASELINE_PROTOCOL section 5)
+    assert rep["forms_returned"] == 5 and rep["forms_scored"] == 2 and rep["forms_included"] == ["01", "02"]
+    assert rep["exclusions"]["by_reason"] == {"duplicate_form_response": 1, "failed_instruction_check": 1, "too_few_answers": 1,
+                                              "tool_use": 1, "was_validator": 1}
+    assert rep["forms_excluded"] == {"baseline_form_01_r2.csv": "duplicate_form_response", "baseline_form_03_r1.csv": "too_few_answers",
+                                     "baseline_form_04_r1.csv": "failed_instruction_check"}
+    reasons = {e["form"]: e["reasons"] for e in rep["exclusions"]["respondents"]}
+    assert reasons["03"] == ["too_few_answers", "tool_use"] and reasons["04"] == ["failed_instruction_check", "was_validator"]
+    assert rep["instruction_check"] == {"passed": 4, "failed": 1} and rep["tool_use"] == {"no": 4, "yes": 1}
+    assert rep["was_validator"] == {"no": 4, "yes": 1} and rep["problems"] == {}
+    assert rep["per_form"]["01"]["answered"] == 24 and rep["per_form"]["02"]["answered"] == 23
+    # item-level rows: in the git-ignored data tree, never under --out; the report carries their path and hash
+    item_level = out / "report" / "human_scores.jsonl"
+    rows = [json.loads(ln) for ln in item_level.read_text(encoding="utf-8").splitlines()]
+    assert rep["item_level"]["path"] == str(item_level) and rep["item_level"]["n_rows"] == len(rows) == 48
+    assert rep["item_level"]["sha256"] == hashlib.sha256(item_level.read_bytes()).hexdigest()
+    assert {r["respondent"] for r in rows} == {"01-r1", "02-r1"} and {r["form"] for r in rows} == {"01", "02"}
+    assert all(r["strict"] for r in rows if r["form"] == "01") and all(r["region"] == "Nam" for r in rows if r["form"] == "01")
+    by = {(r["form"], r["item_id"]): r for r in rows}
+    swapped = by[("02", t1_2[0]["item_id"])]
+    assert swapped["strict"] is False and swapped["lenient"] is True and swapped["tolerant"] is True and swapped["error_class"] == "lenient_only"
+    blank = by[("02", t1_2[1]["item_id"])]
+    assert blank["answer"] is None and blank["strict"] is False and blank["error_class"] == "unparseable"
+    assert by[("02", t3_2["item_id"])]["error_class"] == "wrong"
+    assert by[("02", t2_2["item_id"])]["answer"] == "[redacted]" and by[("02", t2_2["item_id"])]["strict"] is False
+    assert all(r["region"] == "Bắc" for r in rows if r["form"] == "02")
+    # PREREG 8.11: mean-human = the mean over items of the item's mean judgment, with the two-way bootstrap; any-human the ceiling
+    per_item = {}
+    for r in rows:
+        per_item.setdefault(r["item_id"], []).append(r["strict"])
+    expected = sum(sum(v) / len(v) for v in per_item.values()) / len(per_item)
+    mh = rep["accuracy"]["overall"]["strict"]["mean_human"]
+    assert mh["estimate"] == pytest.approx(expected) and mh["lo"] <= mh["estimate"] <= mh["hi"]
+    assert mh["n_boot"] == 100 and mh["n_persons"] == 2 and mh["n_items"] == len(per_item) and mh["method"] == "two_way_person_item_bootstrap_mean"
+    assert rep["accuracy"]["overall"]["strict"]["any_human"]["estimate"] >= mh["estimate"]
+    assert rep["accuracy"]["overall"]["lenient"]["mean_human"]["estimate"] > mh["estimate"]           # the swapped answer
+    assert set(rep["accuracy"]["by_task"]) == {"T1", "T2", "T3"} and set(rep["mean_human_by_task"]) == {"T1", "T2", "T3"}
+    assert any(k.startswith("T1-V") for k in rep["accuracy"]["by_task_variant"]) and rep["accuracy"]["by_output_lexicality"]
+    n_double = sum(1 for v in per_item.values() if len(v) == 2)
+    assert rep["items"]["n_double_judged"] == n_double >= 6                                 # the anchors at least
+    ag = rep["agreement"]["double_judged"]
+    assert ag["correct_strict"]["n_items"] == n_double and ag["correct_strict"]["n_ratings"] == 2 * n_double
+    assert ag["correct_strict"]["alpha_ci"][0] <= ag["correct_strict"]["alpha"] <= ag["correct_strict"]["alpha_ci"][1]
+    assert ag["answer"]["n_items"] == n_double and -1.0 <= ag["answer"]["alpha"] <= 1.0
+    assert rep["error_classes"]["T1"]["lenient_only"] == 1 and rep["error_classes"]["T1"]["unparseable"] == 1
+    assert set(rep["by_region"]) == {"Bắc", "Nam"} and rep["by_region"]["Nam"]["n_respondents"] == 1
+    assert rep["items"]["not_in_human_design"] == [] and rep["items"]["design_items_unanswered"] == 42 - len(per_item)
+    # nothing is written under paper/
+    bad = subprocess.run([PY, "scripts/make_validation_forms.py", "score-baseline", "--items", str(release / "noilai_core.jsonl"), "--dir", str(out),
+                          "--returned", str(out / "returned" / "baseline_form_*.csv"), "--out", str(ROOT / "paper" / "x")],
+                         cwd=ROOT, text=True, capture_output=True, check=False)
+    assert bad.returncode != 0 and "refusing to write under paper/" in bad.stderr and not (ROOT / "paper" / "x").exists()
+
+
+def test_sheet_scorers_write_nothing_without_returns_and_make_ingest_sheets_runs_both(tmp_path):
+    """`make ingest-sheets` is the one entry point for returned human sheets: it delegates to the validation `score`
+    and to `score-baseline`, and either writes nothing when no sheet has come back (CLAUDE.md step 2)."""
+    import shutil
+    r = run("scripts/make_validation_forms.py", "score", "--dir", str(tmp_path / "val"), "--returned", str(tmp_path / "val" / "returned" / "*"))
+    assert "nothing scored, nothing written" in r.stdout and not (tmp_path / "val").exists()
+    r = run("scripts/make_validation_forms.py", "score-baseline", "--items", str(tmp_path / "none.jsonl"), "--dir", str(tmp_path / "human"),
+            "--returned", str(tmp_path / "human" / "returned" / "baseline_form_*.csv"), "--out", str(tmp_path / "agg"))
+    assert "nothing scored, nothing written" in r.stdout and not (tmp_path / "human").exists() and not (tmp_path / "agg").exists()
+    mk = (ROOT / "Makefile").read_text(encoding="utf-8")
+    assert re.search(r"^ingest-sheets: validation-score baseline-score\s*$", mk, re.MULTILINE)
+    assert re.search(r"^\.PHONY:.*\bingest-sheets\b", mk, re.MULTILINE) and "scripts/ingest_sheets.py" not in mk
+    vs = mk[mk.index("validation-score:"):mk.index("baseline-score:")]
+    assert "make_validation_forms.py score --dir data/validation --returned 'data/validation/returned/*'" in vs
+    assert "--flags-out data/audit/validator_flags.json" in vs
+    bs = mk[mk.index("baseline-score:"):mk.index("ingest-sheets:")]
+    assert "make_validation_forms.py score-baseline --items $(RELEASE)/noilai_main.jsonl --dir data/human" in bs
+    assert "--returned 'data/human/returned/baseline_form_*.csv' --out experiments/human" in bs
+    if shutil.which("make"):
+        r = subprocess.run(["make", "-n", "ingest-sheets"], cwd=ROOT, text=True, capture_output=True, check=False)
+        assert r.returncode == 0 and "make_validation_forms.py score --dir data/validation" in r.stdout
+        assert "make_validation_forms.py score-baseline" in r.stdout and "ingest_sheets.py" not in r.stdout

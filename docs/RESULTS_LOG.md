@@ -182,3 +182,43 @@ Source: `data/audit/counts.json` (`scripts/reconcile_counts.py --release data/re
 `wordlist.distinct_canonical_pairs` (47,535), and the `release_strata` block (per task × variant
 degenerate counts, output-lexical share and C2-affected test counts over the v0.3 dev + test files).
 `data/audit/placement_xcopa*.json` carry per-file token counts (`scripts/count_placement.py`).
+
+## 2026-10-01 — Validation sample sizing by simulation (no data, no model outputs) [RL-2026-10-01-04]
+
+Source: `data/audit/validation_sizing.json` (`scripts/validation_sizing.py --out data/audit/validation_sizing.json --reps 40
+--n-boot 400`, seed 20261001). A simulation of candidate validation designs, not a measurement: a generated item is wrong with
+probability 0.02, a planted control is always wrong, a validator says "no" to a correct item with probability 0.02 and "yes" to a
+wrong one with probability 0.10 (expected scenario; pessimistic: 0.05 / 0.25), independently; 35 s per item (40 s pessimistic).
+Chosen design (30 items + 4 controls per cell, three validators, 60 rows to all three; `noilai.constants`): 408 rows, 292 per
+validator (≈ 2.8 h on the generated sheet), expected α on `correct` 0.76 with a mean 95% bootstrap width of 0.18, AC1 0.93 (width
+0.06); pessimistic scenario α 0.47 (width 0.23). The superseded 1,000-item design without controls: α 0.41–0.44 (width 0.28–0.29),
+≈ 6.5–7 h per validator. Per cell: Wilson 95% lower bound 0.886 when all 30 items are judged correct; P(a bug affecting 10% / 5% of a
+cell appears in its sample) 0.96 / 0.79. The vectorized α and AC1 are asserted equal to `noilai.stats.agreement` on the first
+replicate of every design.
+
+## 2026-10-01 — Prompt lengths under the real Gemma 3 tokenizer, and the stand-in harness smoke (no model outputs) [RL-2026-10-01-05]
+
+Engineering record, not a result about any model. (1) Prompt lengths: 1,200 items of a THROWAWAY scratch build (seed
+999001, never committed; the same generator and sizes as v0.3, whose item files are private) rendered with
+`noilai.eval.prompts.render` (3 shots, explained instruction, whole-prompt scope) under a stand-in of the Gemma 3 chat
+template and tokenized with the real Gemma 3 SentencePiece model through HF `tokenizers` (ids identical to the native
+`sentencepiece` ids on four probe strings). Maximum tokens per prompt, p0 / p1 / p2: NFC T1 522 / 535 / 529, T2 521 /
+548 / 535, T3 576 / 602 / 598; PC T1 815 / 840 / 832, T2 833 / 882 / 860, T3 905 / 946 / 946; NFD T1 968 / 1,003 / 991,
+T2 1,020 / 1,076 / 1,056, T3 1,078 / 1,126 / 1,131; explicit onset–rime–tone input (NFC p0) T1 683, T2 677, T3 845.
+Every NFD T2/T3 prompt and 98 of 413 NFD T1 prompts exceed the 960-token budget of `max_model_len` 1,024 −
+64 → `max_model_len` 2,048 (DEVIATIONS). (2) `scripts/standin_smoke.py`: a random-weight 2-layer Gemma3ForCausalLM with the
+real tokenizer ran 20 dev items × {nfc, nfd} through `run_eval.py --t1-forced-choice --score` and `scripts/check_run.py`
+on CPU in 34 s (item gate, deterministic rescoring, statistics and results hashes all pass; `--verify` passes and
+catches a one-byte change). Two defects found and fixed on the way (DEVIATIONS rows of 1 October: HF log-probability
+memory, paired-difference interval). Its accuracies are those of random weights and are not reported anywhere.
+
+## 2026-10-01 — CPU cost of the pilot's operations for a Gemma-3-1B-sized model (no model outputs) [RL-2026-10-01-06]
+
+Engineering measurement for the compute plan, not a result about any model: `scripts/cpu_bench.py` →
+`data/audit/cpu_bench_gemma3_1b_shape.json`. A Gemma3ForCausalLM with gemma-3-1b-it's published dimensions and RANDOM
+weights (the arithmetic of the trained model) in float32 on the build machine's 4 CPU cores (torch 2.14.1), medians:
+one pass over a 520-token prompt 2.95 s, over a 950-token prompt 5.58 s; a 3-token continuation on a copy of the
+prompt's cache 0.14–0.16 s; generating 24 tokens after a 520-token prompt 5.6 s at batch 1 (29.2 s for 8 prompts),
+after a 950-token prompt 8.0 s (51.3 s for 8). Batching gains little on 4 cores. Kaggle CPU sessions have different
+cores [UNCERTAIN: verify]; `docs/COMPUTE_PLAN.md` derives its CPU pilot estimates from these numbers with that caveat.
+

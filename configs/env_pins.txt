@@ -1,0 +1,29 @@
+# Run-environment pins for every model run (pip constraints file: pip install -c configs/env_pins.txt ...).
+# DESIGN_DECISIONS 7.3: one engine version for the whole campaign. Checked on PyPI (pypi.org JSON API) on
+# 1 October 2026 from the build machine; each line says what was verified. Huggingface.co and the Kaggle
+# images could not be reached from here, so whether these wheels install cleanly on a Kaggle T4 / TPU image is
+# NOT verified: the smoke lines (configs/run_plan.yaml smoke_20 / smoke_20_tpu) are the check, and a failed
+# install is fixed by changing this file in a commit that names the smoke run (docs/DEVIATIONS.md).
+# tests/test_cloud.py keeps vllm / llama-cpp-python equal to pyproject.toml's extras and the notebooks' pins.
+#
+# engines
+vllm==0.30.0                 # exists on PyPI (uploaded 2026-09-22, latest); requires torch==2.13.0, transformers>=5.10.4, tokenizers>=0.21.1
+torch==2.13.0                # vllm 0.30.0's exact torch pin (torch 2.13.0 uploaded 2026-07-08); Kaggle ships an older torch -> venv (notebook INSTALL_MODE)
+llama-cpp-python==0.3.35     # exists on PyPI (uploaded 2026-08-17; 0.3.36 is newer and NOT used); the GGUF fallback engine (PhoGPT, T4 fallbacks)
+# Hugging Face stack (the HF backend: PhoGPT, the E4 probes, the DD 6.2 two-engine check)
+transformers==5.17.0         # = requirements-lock.txt (2026-09-09); satisfies vllm's >=5.10.4; requires tokenizers>=0.23.1,<0.24, huggingface-hub>=1.5,<2
+tokenizers==0.23.2           # = requirements-lock.txt (the build environment)
+huggingface_hub==1.33.0      # = requirements-lock.txt; within transformers 5.17's range
+safetensors==0.8.0           # = requirements-lock.txt
+sentencepiece==0.2.2         # = requirements-lock.txt; the native path of the census (DD 6.2)
+accelerate==1.15.0           # = requirements-lock.txt
+protobuf==7.36.2             # = requirements-lock.txt
+# API clients (the Groq / OpenRouter / Gemini backends)
+openai==3.22.1               # = requirements-lock.txt
+google-genai==2.25.0         # = requirements-lock.txt
+groq==1.7.0                  # = requirements-lock.txt
+# analysis (identical to the build environment, so that scores and statistics recompute bit-for-bit)
+numpy==2.4.6
+scipy==1.17.1
+statsmodels==0.15.0
+pandas==3.0.6
