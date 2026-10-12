@@ -238,6 +238,22 @@ _DTYPES = {"float32": "float32", "fp32": "float32", "float16": "float16", "fp16"
            "bfloat16": "bfloat16", "bf16": "bfloat16", "auto": "auto", None: "auto"}
 
 
+def bnb_bits(quantization: dict | None) -> int | None:
+    """The bit width of a bitsandbytes quantize-at-load request in a configs/models.yaml `quantization` block,
+    or None when the block names no such request. Any method whose lower-case name starts with `bitsandbytes`
+    or `bnb`, or contains `nf4`, `int4` or `int8`, is that request (models.yaml spells it `bitsandbytes_nf4`);
+    awq / gptq names a checkpoint that carries its own quantization and is left to the engine, as is any other
+    name (fp8, ...) and any `qat` name (a quantization-aware-trained checkpoint to be chosen, DD 7.1; scripts/pin_panel.py
+    treats it as checkpoint-unchosen too). `int8` is 8-bit; otherwise `bits` (default 4)."""
+    q = quantization or {}
+    method = str(q.get("method") or "").strip().lower()
+    if not method or "awq" in method or "gptq" in method or "qat" in method:
+        return None                     # checkpoint-carried (awq/gptq) or a QAT checkpoint still to be chosen (qat_int4)
+    if not (method.startswith(("bitsandbytes", "bnb")) or any(t in method for t in ("nf4", "int4", "int8"))):
+        return None
+    return 8 if "int8" in method else int(q.get("bits", 4))
+
+
 class HFBackend(Backend):
     kind = "hf"
     supports_logprobs = True
@@ -298,20 +314,20 @@ class HFBackend(Backend):
 
     def _quant_config(self):
         q = self.quantization
-        if not q:
+        bits = bnb_bits(q)
+        if bits is None:
+            # no quantization, or an awq / gptq checkpoint that carries its own quantization config; load the checkpoint id
             return None
-        method = str(q.get("method", "")).lower()
-        if method in ("bitsandbytes", "bnb", "nf4", "int4", "int8"):
-            from transformers import BitsAndBytesConfig
+        from transformers import BitsAndBytesConfig
 
-            bits = int(q.get("bits", 4))
-            if bits == 4:
-                return BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type=q.get("quant_type", "nf4"),
-                                          bnb_4bit_compute_dtype=getattr(self.torch, q.get("compute_dtype", "float16")),
-                                          bnb_4bit_use_double_quant=bool(q.get("double_quant", True)))
-            return BitsAndBytesConfig(load_in_8bit=True)
-        # awq / gptq checkpoints carry their own quantization config; load the checkpoint id
-        return None
+        if bits == 4:
+            method = str(q.get("method") or "").lower()
+            # an explicit quant_type wins; else the type the method name spells (bitsandbytes_nf4 -> nf4)
+            quant_type = q.get("quant_type") or ("fp4" if "fp4" in method else "nf4")
+            return BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type=quant_type,
+                                      bnb_4bit_compute_dtype=getattr(self.torch, q.get("compute_dtype", "float16")),
+                                      bnb_4bit_use_double_quant=bool(q.get("double_quant", True)))
+        return BitsAndBytesConfig(load_in_8bit=True)
 
     def _load(self, attn_implementation):
         from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -555,7 +571,10 @@ class VLLMBackend(Backend):
         self.engine_flags = {
             "dtype": self.dtype, "max_model_len": max_model_len, "gpu_memory_utilization": gpu_memory_utilization,
             "enforce_eager": enforce_eager, "tensor_parallel_size": tensor_parallel_size,
-            "quantization": q.get("method"), "seed": seed, "trust_remote_code": trust_remote_code,
+            # vLLM's name for any bitsandbytes quantize-at-load request (models.yaml: bitsandbytes_nf4); awq / gptq /
+            # fp8 names pass through verbatim
+            "quantization": "bitsandbytes" if bnb_bits(q) is not None else q.get("method"),
+            "seed": seed, "trust_remote_code": trust_remote_code,
             **(extra_engine_kwargs or {}),
         }
         load_id = q.get("checkpoint") or model_id
