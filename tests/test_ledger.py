@@ -15,13 +15,16 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "tests"))
 L = importlib.import_module("ledger")             # scripts/ledger.py (imported after the path insert)
 P = importlib.import_module("progress")           # scripts/progress.py
 PC = importlib.import_module("plan_chunks")       # scripts/plan_chunks.py: the chunk generator
 KRP = importlib.import_module("kaggle_run_plan")
 CL = importlib.import_module("compute_log")
+SB = importlib.import_module("_smoke_build")      # tests/_smoke_build.py: the shared smoke-build locator
 
-SMOKE_DEV = Path("/tmp/claude-0/-home-user-noilai/7ed5d88b-f91c-57ec-b5a3-07ddcf2f1a1c/scratchpad/smoke_build/v0.3-smoke/noilai_dev.jsonl")
+# NOILAI_SMOKE_BUILD: the smoke build's directory (holds noilai_dev.jsonl); unset, the session's scratchpad build
+SMOKE_DEV = SB.smoke_dev_file()
 PY = sys.executable
 CHUNK_COLUMNS = ("chunk_id", "chunk_order", "tier", "queue", "window", "tag", "chunk_hours_low", "chunk_hours_high", "notebook")
 

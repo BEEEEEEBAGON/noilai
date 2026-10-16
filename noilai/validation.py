@@ -724,6 +724,16 @@ def stratified_precision(final: dict[str, str | None], key: dict) -> dict:
     lo, hi = wilson(tot_yes, tot_n)
     out["pooled"] = {"weighted_precision": (tot_wsum / tot_pop) if tot_pop else float("nan"), "n": tot_n, "n_yes": tot_yes,
                      "wilson_unweighted": [lo, hi], "n_unresolved": sum(unresolved.values())}
+    # the design-based interval of the weighted estimate (noilai.stats.agreement.weighted_precision; DD 10.1 :505)
+    from noilai.stats.agreement import weighted_precision_from_rows
+    try:
+        weighted = weighted_precision_from_rows(final, key)
+    except (ValueError, KeyError, ZeroDivisionError):
+        weighted = {}
+    for cell, rec in out.items():
+        w = weighted.get(cell)
+        rec["weighted_ci"] = [w["lo"], w["hi"]] if w and w.get("lo") == w.get("lo") else None
+        rec["weighted_ci_method"] = w.get("method") if w else None
     return out
 
 

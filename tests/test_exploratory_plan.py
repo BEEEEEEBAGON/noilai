@@ -24,9 +24,11 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "tests"))
 
 KBN = importlib.import_module("kaggle_build_notebooks")   # scripts/kaggle_build_notebooks.py, imported after the path insert
 KRP = importlib.import_module("kaggle_run_plan")   # scripts/kaggle_run_plan.py, imported after the path insert
+SB = importlib.import_module("_smoke_build")       # tests/_smoke_build.py: the shared smoke-build locator
 
 EXPLORATORY = ROOT / "configs" / "run_plan_exploratory.yaml"
 PREREGISTERED = ROOT / "configs" / "run_plan.yaml"
@@ -40,7 +42,8 @@ FLOOR_MODELS = ["gemma-3-1b-it", "qwen3.5-0.8b", "qwen3.5-2b", "gemma-4-e2b", "g
 THROUGHPUT_MODELS = ["gemma-3-1b-it", "qwen3.5-2b", "phogpt-4b-chat", "llama-3.1-8b-instruct", "gemma-3-4b-it"]
 # a NON-frozen local dev split for exercising the derivation (the frozen release files are absent from this
 # checkout); NOILAI_DEV_SOURCE overrides the location. The real public dev split is used when it is built.
-SMOKE_BUILD = Path("/tmp/claude-0/-home-user-noilai/7ed5d88b-f91c-57ec-b5a3-07ddcf2f1a1c/scratchpad/smoke_build/v0.3-smoke")
+# NOILAI_SMOKE_BUILD: the smoke build's directory (holds noilai_dev.jsonl); unset, the session's scratchpad build
+SMOKE_BUILD = SB.smoke_build_dir()
 
 
 def _dev_source() -> Path | None:

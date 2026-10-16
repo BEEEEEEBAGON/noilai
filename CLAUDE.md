@@ -50,9 +50,11 @@ ledger (`experiments/ledger.csv`), one runbook (`RUNBOOK.md`).
    (`RUNBOOK.md` §2), run only when the author asks.
 4. Interim analysis on completed units only: `python scripts/interim_analysis.py` (labelled INTERIM
    with n; monitoring only; no design or analysis change without a `docs/DEVIATIONS.md` entry; no
-   paper prose).
+   paper prose); the pre-registered tables through `python -m noilai.stats.analyze --config
+   configs/analysis.yaml --runs data/runs --ledger experiments/ledger.csv --label INTERIM` (writes to
+   `experiments/analysis/<date>/`, never under `paper/`; `--label FINAL` only when every unit is done).
 5. Update `STATUS.md` (hand sections) and `BLOCKED.md`; commit `experiments/` (ledger, aggregates,
-   human, `panel_pins.json`), `STATUS.md`, `BLOCKED.md`, `data/compute_log.csv`,
+   human, analysis, `panel_pins.json`), `STATUS.md`, `BLOCKED.md`, `data/compute_log.csv`,
    `data/audit/validator_flags.json`, and any script change together with the notebooks it regenerates;
    never commit `data/runs/` or item-level outputs (`outputs.jsonl`, `scores.jsonl`, `items_*.jsonl`,
    `human_scores.jsonl`).
@@ -87,11 +89,15 @@ ledger (`experiments/ledger.csv`), one runbook (`RUNBOOK.md`).
 - `experiments/ledger.csv` (units with their chunk, order, tier, queue, cut rank, cost, status, result
   hashes), `experiments/aggregates/` (per run: `summary.json`, `stats.json`, `results_hashes.json`, a
   manifest excerpt; never item-level rows), `experiments/interim/` (interim analyses),
+  `experiments/analysis/` (the default `--out` of `python -m noilai.stats.analyze --config configs/analysis.yaml`:
+  one `.tex` + `.json` per table or figure with its provenance, `analysis_summary.json`, `results_log_entry.md`,
+  `analysis_report.md`; labelled INTERIM with n until the gates and the scoring-rule freeze are recorded; never
+  item-level rows; `configs/analysis.yaml` mirrors `noilai/constants.py` and the run is refused when they disagree),
   `experiments/human/` (`human_baseline_report.json`: aggregates only, no names or e-mails),
   `experiments/quota.yaml` (quota assumptions until verified), `experiments/gates.yaml` (the gate),
   `experiments/panel_pins.json` (the whole-panel pin from `kaggle_cpu_jobs.py pin`; committed together
-  with the `configs/models.yaml` it was applied to). `aggregates/`, `human/` and `interim/` are created
-  by the first ingest, scoring and interim run.
+  with the `configs/models.yaml` it was applied to). `aggregates/`, `human/`, `interim/` and `analysis/` are
+  created by the first ingest, scoring, interim and analyze run.
 - The chunk plan: `configs/compute_chunks.yaml`, `notebooks/chunks/c01_cpu_t0.ipynb` …
   `c31_tpu_t5.ipynb` and the generated block of `docs/COMPUTE_PLAN.md`, all written by
   `scripts/plan_chunks.py --write` from `configs/run_plan.yaml`, `configs/models.yaml` and the census
@@ -115,4 +121,7 @@ D,ANN,T201,PLR,S,CPY,E501,FBT,PTH,TRY,EM,PLW,C901,PLC,ERA,N,ARG,B,UP,SIM,RET,INP
 as well as the default rules. Import scripts in tests through `importlib.import_module` after the
 `sys.path` insert (clean under both rule sets). `tests/test_cloud.py::test_readme_statements_are_true_against_the_tree`
 requires every `tests/test_*.py` module to be named in the README's test list. CI has no release item
-files and no local smoke build: a test that reads either must skip cleanly without them.
+files and no local smoke build: a test that reads either must skip cleanly without them. The tests that
+read the local non-frozen smoke build take its directory from `NOILAI_SMOKE_BUILD` (the directory holding
+`noilai_dev.jsonl`; `tests/_smoke_build.py`), `tests/test_analyze.py` its scored echo run from
+`NOILAI_ECHO_RUN`; unset, both fall back to the git-ignored `data/smoke_build/` (a symlink or copy of a local build) and skip when absent.

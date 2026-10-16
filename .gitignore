@@ -25,3 +25,5 @@ data/release/*/*.jsonl
 data/release/*/manifest_private.json
 data/audit/items_*.jsonl
 dist/
+# a local NON-frozen smoke build and its echo run for exercising code (never under data/release/); tests read it
+data/smoke_build/

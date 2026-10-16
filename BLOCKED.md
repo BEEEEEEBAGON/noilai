@@ -1,7 +1,7 @@
 # BLOCKED — one list, ordered by the date each item blocks (experiments and validation workstreams)
 
-Updated **2026-10-07**. One entry per thing that waits on a person, ordered by the date it blocks; **PAST DUE** = a
-deadline before 7 October. Each entry: deadline, who (author / adult collaborator / validators / respondents /
+Updated **2026-10-12**. One entry per thing that waits on a person, ordered by the date it blocks; **PAST DUE** = a
+deadline before 12 October (status unknown to the assistant: nothing has been handed back). Each entry: deadline, who (author / adult collaborator / validators / respondents /
 assistant), exact steps, what it blocks, and the row of `docs/gate1/DD13_DECISION_MEMO.md` that already answers it
 (the memo is the author's record, not edited here; reply to it with the row numbers you accept). Dates are the
 protocols': invitations 8 Oct, packet 12 Oct, Gate 1 18 Oct, panel freeze 25 Oct, stage-2 commit 8 Nov at the
@@ -45,7 +45,7 @@ latest (25 Oct recommended, memo N13), results freeze 22 Nov, E4 23 Nov–6 Dec.
    requests to the maintainers of the two GPL word lists (DD 4.1; `README.md` "Resources and licensing", line 342,
    reads "requested 30 September 2026") went out; if not, send them now. No reply by 8 Nov → entry 30. Blocks: the
    release licence story (`docs/DATA_STATEMENT.md` §H, checklist B2, the dataset cards); no run. Memo 1 (a)+(b), 19 (a).
-7. **[by 8 Oct] Reply to the decision memo.** Who: author. Steps: answer `docs/gate1/DD13_DECISION_MEMO.md` with the
+7. **[by 8 Oct] PAST DUE — Reply to the decision memo.** Who: author. Steps: answer `docs/gate1/DD13_DECISION_MEMO.md` with the
    row numbers accepted and any override; rows 7, 17, N1, N2 feed the invitations and the consent form (entry 9),
    row 15 entry 4, rows 3 and 5 the gate file (entry 31); until then nothing is recorded in `experiments/gates.yaml`
    (the assistant never guesses a value). Blocks: entries 4, 9, 20, 31. Memo header.
@@ -55,7 +55,7 @@ latest (25 Oct recommended, memo N13), results freeze 22 Nov, E4 23 Nov–6 Dec.
    cloud environment's network settings and provide `KAGGLE_API_TOKEN` or `~/.kaggle/access_token` (today both hosts
    are unreachable here and no token exists; the `kaggle` CLI is installed). Blocks: nothing hard; without (b) every
    session goes through `RUNBOOK.md` by hand (the default every entry assumes). Memo N7.
-9. **[8 Oct] Validator invitations out; consent form finished.** Who: author (own account, personal messages only;
+9. **[8 Oct] PAST DUE — Validator invitations out; consent form finished.** Who: author (own account, personal messages only;
    `docs/gate1/RECRUITMENT.md` §1); a native speaker for every `[NATIVE-CHECK]` passage; the adult collaborator for
    any step the author's age excludes. Steps: (i) fill `docs/CONSENT_FORM.md` `[NAME]`, `[EMAIL]`, the retention
    date in §5 (HBP §9 decision 6), and §9 `[ADULT NAME]`/`[ADULT EMAIL]` if the author is under 18; (ii) native check
@@ -231,9 +231,22 @@ latest (25 Oct recommended, memo N13), results freeze 22 Nov, E4 23 Nov–6 Dec.
     reference stays unscheduled: drop it from the bf16 appendix and say so (the author edits `configs/run_plan.yaml`
     `bf16_drift_200.fallback`). Blocks: Gate 3. Memo 11, N9 (a), N13, Q-C1..Q-C4.
 34. **[before the first confirmatory ingest; hard by 22 Nov] Analysis code the DD names "to write".** Who:
-    assistant (after the pilot). Steps: `noilai/stats/pooling.py`, `aggregate.py`, `analyze.py` +
-    `configs/analysis.yaml`, release encryption, weighted validation sampling. Blocks: the pooled estimates (H3/H4/H6),
-    not any run. Memo: none.
+    assistant (after the pilot). Built 2026-10-12 (`STATUS.md` log): `noilai/stats/pooling.py` (the
+    model-in-tokenizer-family pool, REML + Hartung–Knapp with the family bootstrap beside it, k of N, TOST),
+    `noilai/stats/aggregate.py` (paraphrase means, cell tables, τ_m(a), explicit-input gap, T3 headline),
+    `noilai/stats/analyze.py` + `configs/analysis.yaml` (`python -m noilai.stats.analyze`: 21 labelled artefacts to
+    `experiments/analysis/`, FINAL refused until the gates are recorded) and `noilai.stats.agreement.weighted_precision`;
+    the weighted sampling itself has been in `make_validation_forms.py packet` since 1 Oct
+    (`validation.probability_sample` records `n_population`, `n_sampled`, `weight` per stratum). Still to write: release
+    encryption (DD 12 item 23: no release script encrypts), `noilai/vi/mergers.py` (DD 2.1 O3), the weighted interval in
+    `noilai/validation.py` `stratified_precision` (reports `wilson_unweighted`; it should call
+    `agreement.weighted_precision_from_rows`), the H3b and H6 matching helpers and the H1 item-audit join (`analyze`
+    writes them as `not computable` with the reason), and in `scripts/reconcile_counts.py` (exists:
+    `data/audit/counts.json`) the RESULTS_LOG entry and the two reconciliations DD §0 still lists. Before any pooled
+    number the author confirms the seven tokenizer-family labels for the 21 panel entries in `configs/analysis.yaml` (one
+    entry's placement is a guess, marked in the file), REML+HK as the primary pool (standard HKSJ, no truncation), three
+    informative families as the H4/H6 floor (five for H3), and the API models' C2 cell / the never-realizable
+    (placement_new, T3, c2) cell. Blocks: the pooled estimates (H3/H4/H6), not any run. Memo: none.
 35. **[22 Nov] Results freeze (Gate 3; milestone).** Who: author. Withdrawal possible until then (consent §4); after
     publication delete the form-number key and `data/human/responses/` (HBP §4 step 11). Memo: none.
 36. **[23 Nov – 6 Dec] E4: notebook resume and the protocol.** Who: assistant (code), author on 2xT4 (5–15 GPU-h,

@@ -14,10 +14,16 @@ import subprocess
 import sys
 from pathlib import Path
 
-import httpx
 import pytest
 import yaml
-from huggingface_hub.errors import GatedRepoError, RemoteEntryNotFoundError, RepositoryNotFoundError
+
+# the fake hub raises the real hub error classes around real httpx responses; both are transitive dependencies of the
+# `eval` extra, so an environment without them skips this module instead of failing its collection
+httpx = pytest.importorskip("httpx", reason="httpx is a dependency of the `eval` extra (pip install -e .[eval])")
+_hub_errors = pytest.importorskip("huggingface_hub.errors",
+                                  reason="huggingface_hub is a dependency of the `eval` extra (pip install -e .[eval])")
+GatedRepoError, RemoteEntryNotFoundError, RepositoryNotFoundError = (
+    _hub_errors.GatedRepoError, _hub_errors.RemoteEntryNotFoundError, _hub_errors.RepositoryNotFoundError)
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"

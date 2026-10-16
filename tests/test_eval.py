@@ -1704,6 +1704,62 @@ def test_vllm_backend_tokenizes_once_passes_token_ids_and_asserts_the_prefix_pro
         B.VLLMBackend("m", llm=llm, tokenizer=tok)                  # injected engine without a SamplingParams class
 
 
+def test_quantization_methods_are_recognised_as_models_yaml_spells_them(monkeypatch):
+    """configs/models.yaml spells the quantize-at-load method `bitsandbytes_nf4` (two panel entries); the HF path
+    builds a 4-bit nf4 BitsAndBytesConfig for it and for `bnb`, an 8-bit one for `int8`, none for an awq / gptq
+    checkpoint (it carries its own), and the vLLM path hands vLLM its own name `bitsandbytes` while awq / gptq / fp8
+    pass through verbatim. A stub torch and transformers: no weights, only the configuration derivation."""
+    import types
+
+    class _BnbConfig:
+        def __init__(self, **kw):
+            self.kw = kw
+
+    monkeypatch.setitem(sys.modules, "transformers", types.SimpleNamespace(BitsAndBytesConfig=_BnbConfig))
+    fake_torch = types.SimpleNamespace(float16="torch.float16", bfloat16="torch.bfloat16")
+
+    def hf_quant(q):
+        be = B.HFBackend.__new__(B.HFBackend)          # no __init__: nothing is loaded
+        be.torch, be.quantization = fake_torch, q
+        return be._quant_config()
+
+    nf4 = hf_quant({"method": "bitsandbytes_nf4", "bits": 4, "checkpoint": None})       # the models.yaml spelling
+    assert isinstance(nf4, _BnbConfig)
+    assert nf4.kw == {"load_in_4bit": True, "bnb_4bit_quant_type": "nf4", "bnb_4bit_compute_dtype": "torch.float16",
+                      "bnb_4bit_use_double_quant": True}
+    assert hf_quant({"method": "bnb"}).kw == nf4.kw and hf_quant({"method": "BitsAndBytes"}).kw == nf4.kw
+    explicit = hf_quant({"method": "bitsandbytes_nf4", "quant_type": "fp4", "compute_dtype": "bfloat16", "double_quant": False})
+    assert explicit.kw == {"load_in_4bit": True, "bnb_4bit_quant_type": "fp4", "bnb_4bit_compute_dtype": "torch.bfloat16",
+                           "bnb_4bit_use_double_quant": False}                       # an explicit quant_type wins
+    assert hf_quant({"method": "int8"}).kw == {"load_in_8bit": True}
+    assert hf_quant({"method": "bitsandbytes", "bits": 8}).kw == {"load_in_8bit": True}
+    assert hf_quant({"method": "awq", "bits": 4, "checkpoint": "org/checkpoint-AWQ-INT4"}) is None
+    assert hf_quant({"method": "gptq", "bits": 4}) is None and hf_quant({"method": "awq_or_int8"}) is None
+    assert hf_quant(None) is None and hf_quant({}) is None and hf_quant({"method": None}) is None
+    assert B.bnb_bits({"method": "bitsandbytes_nf4", "bits": 4}) == 4 and B.bnb_bits({"method": "int8", "bits": 4}) == 8
+    # every quantize-at-load entry of the real panel file is recognised; every awq entry is left to its checkpoint
+    cfg = B.load_models_config()
+    at_load = [e for e in cfg["models"] if str((e.get("quantization") or {}).get("method", "")).startswith("bitsandbytes")]
+    assert len(at_load) >= 2 and all(B.bnb_bits(e["quantization"]) == 4 for e in at_load)
+    assert all(B.bnb_bits(e["quantization"]) is None for e in cfg["models"]
+               if "awq" in str((e.get("quantization") or {}).get("method", "")))
+
+    tok = _FakeTok()
+
+    def vllm_backend(q):
+        return B.VLLMBackend("m", quantization=q, llm=_FakeLLM(tok), tokenizer=tok, sampling_params_cls=_FakeSP)
+
+    be = vllm_backend({"method": "bitsandbytes_nf4", "bits": 4, "checkpoint": None})
+    assert be.engine_flags["quantization"] == "bitsandbytes"
+    assert be.info()["quantization"] == {"method": "bitsandbytes_nf4", "bits": 4, "checkpoint": None}   # the manifest keeps the entry's block
+    assert vllm_backend({"method": "bnb"}).engine_flags["quantization"] == "bitsandbytes"
+    assert vllm_backend({"method": "int8"}).engine_flags["quantization"] == "bitsandbytes"
+    assert vllm_backend({"method": "awq", "bits": 4, "checkpoint": "org/checkpoint-AWQ-INT4"}).engine_flags["quantization"] == "awq"
+    assert vllm_backend({"method": "gptq"}).engine_flags["quantization"] == "gptq"
+    assert vllm_backend({"method": "fp8"}).engine_flags["quantization"] == "fp8"
+    assert vllm_backend(None).engine_flags["quantization"] is None
+
+
 # --- revision pin (DD 7.1)
 def test_revision_pin_is_checked_before_any_weight_is_downloaded(item_file, tmp_path, capsys):
     sys.path.insert(0, str(ROOT / "scripts"))
