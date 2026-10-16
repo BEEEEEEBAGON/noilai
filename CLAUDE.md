@@ -31,7 +31,9 @@ ledger (`experiments/ledger.csv`), one runbook (`RUNBOOK.md`).
    lists its units), one Kaggle session per chunk through `notebooks/chunks/<id>.ipynb` (`RUNBOOK.md`
    §1): the CPU chunks `c01`–`c04` first (`c01` = the first real run, `c02`–`c04` the Gate 1 pilot;
    memo N10, N11), then `c06` / `c07` (the smoke week), then, after the stage-2 commit and with every
-   gate recorded, `c08`–`c31` in chunk order; `c05` is the T4 alternative to `c02`–`c04`. On Kaggle only
+   gate recorded, `c08`–`c31` in chunk order; `c05` is the T4 alternative to `c02`–`c04`. On the rented box the
+   same chunks run through `scripts/cuda_box.py --chunks` (`RUNBOOK.md` §6); the directories are the ledger's
+   units. On Kaggle only
    the account-holder settings of the parameters cell are edited (`ACCOUNT_HOLDER_ROLE`, `REPO_REF`,
    `CREATE_DATASET`, the `PUSH_*` settings); `JOBS`, `MODE`, `MODELS`, `RUN_ID(S)`, `RUN_LABEL`,
    `VERIFY_ITEM_KEYS`, `SMOKE_RUN_IDS`, `PLAN_PATH`, `FORCED_CHOICE` are the plan and change only through
@@ -107,7 +109,7 @@ ledger (`experiments/ledger.csv`), one runbook (`RUNBOOK.md`).
   (git-ignored; item-level `data/validation/report/validation_report.json` and
   `data/human/report/human_scores.jsonl`), with `data/audit/validator_flags.json` committed.
 - `RUNBOOK.md`: click steps for running a chunk on Kaggle by hand (§1), the CPU hub jobs (§3), the API
-  runs (§4) and for handing results back (§5).
+  runs (§4), for handing results back (§5) and for the rented CUDA box (§6); the never-list is §7.
 
 ## Lint and tests, as CI runs them
 

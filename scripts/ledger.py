@@ -18,7 +18,9 @@ unscheduled job (bf16_drift_200 x phogpt-4b-chat--bf16, memo N9), the dev-only e
 configs/run_plan_exploratory.yaml (not in the chunk plan), and the human-lane deliverables (a validator's packet by
 region, a human-baseline form, the attested-set expansion). Chunk ids renumber when the census moves E3 jobs
 (plan_chunks.py), so rows are KEYED by unit_id, which stays stable; `init --force` re-derives chunk columns and carries
-observed statuses over.
+observed statuses over. `ingest` books a WHOLE-LINE directory `<run>__<model>` of a split line (a rented box running the
+line whole, scripts/cuda_box.py --runs) on both split units, each counting the outputs rows of its own paraphrases
+(ingest_run_dir); an `E1_main__<TPU-trio model>` directory books the `tpu_main` units (RUN_ALIAS).
 
 Order. `chunk_order` (the chunk's position, tier-major, the reverse of the pre-registered cut order) is the LAUNCH
 order: the next chunk per queue is the lowest order with a unit still to do (scripts/progress.py). `cut_rank` stays
@@ -135,6 +137,9 @@ PREREQUISITE_EXPERIMENTS = {"smoke", "pilot"}
 EXPLORATORY_EXPERIMENTS = {"pilot", "pilot_exploratory", "throughput", "smoke"}
 RUN_ALIAS = {"tpu_main": "E1_main"}         # the TPU trio's E1 run directories; the analyses pool them under E1_main
 THINKING_EXPERIMENTS = {"reasoning"}        # the only units for which `finished_thinking_present` counts as finished
+SPLIT_TAGS = ("p0p1", "p2")                 # the paraphrase split of DD 8.5 (plan_chunks.py): the two units of a split line
+PARAPHRASES_OF_TAG = {"p0p1": ["p0", "p1"], "p2": ["p2"]}
+WHOLE_LINE_NOTE = "whole-line directory {dir} covers this split unit (box run; DD 8.5)"
 
 # ---- human lane (the 1 Oct packet) ---------------------------------------------------------------------------
 VALIDATION_REGIONS = ("N", "C", "S")        # memo row 7: one validator per region (North, Central, South)
@@ -539,8 +544,13 @@ def plan_sha_for(plan: dict, item_key: str) -> str | None:
     return spec.get("sha256")
 
 
-def _count_jsonl(path: Path, key: str, default: str) -> dict[str, int]:
-    out: dict[str, int] = {}
+def count_jsonl_rows(path: Path, keys: tuple[str, ...] = ("arm", "paraphrase"),
+                     defaults: tuple[str, ...] = ("nfc", "p0")) -> dict[tuple[str, ...], int]:
+    """Rows of a JSONL file counted by the tuple of `keys`; a key that is absent or null takes its default. run_eval's
+    outputs rows carry `arm` and `paraphrase`, and so do its unchanged rows (DD 6.1) written since 2026-10-16; the
+    unchanged rows of an older run carry `arm` alone, hence the `p0` default. A missing file counts nothing; an
+    unparsable line is skipped."""
+    out: dict[tuple[str, ...], int] = {}
     if path.exists():
         with open(path, encoding="utf-8") as f:
             for line in f:
@@ -548,9 +558,40 @@ def _count_jsonl(path: Path, key: str, default: str) -> dict[str, int]:
                     d = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                k = d.get(key, default)
+                k = tuple(dflt if d.get(key) is None else str(d[key]) for key, dflt in zip(keys, defaults, strict=True))
                 out[k] = out.get(k, 0) + 1
     return out
+
+
+def rows_of(counts: dict[tuple[str, ...], int], arm: str, paraphrases: list[str] | None = None) -> int:
+    """The rows of one arm in an (arm, paraphrase) count, restricted to `paraphrases` when given (a split unit's)."""
+    return sum(n for (a, p), n in counts.items() if a == arm and (paraphrases is None or p in paraphrases))
+
+
+def line_candidates(line_id: str) -> list[str]:
+    """The run ids a whole-line directory `<line>__<model>` may book: the line, then RUN_ALIAS either way (an `E1_main`
+    directory of a TPU-trio model books the `tpu_main` units; a `tpu_main` directory is E1_main's TPU part)."""
+    out = [line_id, *(k for k, v in RUN_ALIAS.items() if v == line_id)]
+    if line_id in RUN_ALIAS:
+        out.append(RUN_ALIAS[line_id])
+    return list(dict.fromkeys(out))
+
+
+def split_units_of(rows_by_unit: dict[str, dict], line_id: str, model: str, arm: str) -> list[dict]:
+    """The paraphrase-split units (`__p0p1`, `__p2`; DD 8.5) an UNTAGGED directory `<line>__<model>` covers for one arm,
+    looked up under the line and then its alias (line_candidates); [] when that (run, model, arm) is not split."""
+    for cand in line_candidates(line_id):
+        found = [rows_by_unit[u] for t in SPLIT_TAGS if (u := unit_id_of(cand, model, arm, t)) in rows_by_unit]
+        if found:
+            return found
+    return []
+
+
+def unit_paraphrases(row: dict) -> list[str]:
+    """The paraphrases a split unit counts: its `paraphrases` column ("p0|p1" / "p2"), else those of its tag."""
+    ps = [p for p in (row.get("paraphrases") or "").split("|") if p]
+    tag = row.get("tag") or (row.get("unit_id") or "").rsplit("__", 1)[-1]
+    return ps or PARAPHRASES_OF_TAG.get(tag, [])
 
 
 def mirror_aggregates(run_dir: Path, m: dict, dest: Path) -> list[str]:
@@ -568,8 +609,17 @@ def mirror_aggregates(run_dir: Path, m: dict, dest: Path) -> list[str]:
 
 
 def ingest_run_dir(run_dir: Path, rows_by_unit: dict[str, dict], plans: list[dict], aggregates: Path) -> tuple[list[str], dict | None]:
-    """Update the ledger rows of one run directory data/runs/<run>__<model>[__<tag>]/. Returns (unit ids touched,
-    an `unmatched` record when the directory names no unit of the ledger, else None)."""
+    """Update the ledger rows of one run directory data/runs/<run>__<model>[__<tag>]/.
+
+    A tagged directory (`__cpu`, `__p0p1`, `__p2`) or an untagged one whose (run, model, arm) has an untagged unit books
+    that unit: n_expected = n_selected x the directory's paraphrases - the arm's unchanged prompts, n = the arm's outputs
+    rows. An UNTAGGED directory whose (run, model, arm) has no untagged unit but the paraphrase-split units `__p0p1` and
+    `__p2` (a whole-line run of E1_main / tpu_main / E1_attested on a rented box, scripts/cuda_box.py --runs; an
+    `E1_main__<TPU-trio model>` directory books the `tpu_main` units through RUN_ALIAS, a `tpu_main__<model>` directory
+    the same units) books BOTH split units: each unit's n_expected and n count the paraphrases of its `paraphrases`
+    column alone (DD 8.5), the status rule is the one above per unit, the result file and the hashes are the directory's
+    for both, and a note names the directory once (withdrawn when the unit's own tagged directory books it later). Returns
+    (unit ids touched, an `unmatched` record when the directory names no unit of the ledger, else None)."""
     mpath = run_dir / "manifest.json"
     if not mpath.exists():
         return [], None
@@ -586,9 +636,9 @@ def ingest_run_dir(run_dir: Path, rows_by_unit: dict[str, dict], plans: list[dic
     item_file = m.get("item_file") if isinstance(m.get("item_file"), dict) else {}
     observed_sha = data.get("item_file_sha256") or item_file.get("sha256")
     n_selected = item_file.get("n_selected") or data.get("n_items") or 0
-    rows_per_arm = _count_jsonl(run_dir / "outputs.jsonl", "arm", "nfc")
-    unchanged_per_arm = _count_jsonl(run_dir / "unchanged.jsonl", "arm", "")
     outputs = run_dir / "outputs.jsonl"
+    rows_by_key = count_jsonl_rows(outputs)                                              # (arm, paraphrase) -> rows
+    unchanged_by_key = count_jsonl_rows(run_dir / "unchanged.jsonl", defaults=("", "p0"))
     out_sha = sha256_file(outputs) if outputs.exists() else ""
     scores = run_dir / "scores.jsonl"
     scores_sha = sha256_file(scores) if scores.exists() else ""
@@ -598,17 +648,27 @@ def ingest_run_dir(run_dir: Path, rows_by_unit: dict[str, dict], plans: list[dic
             results_sha = json.loads((run_dir / "results_hashes.json").read_text(encoding="utf-8")).get("results_sha256") or ""
         except json.JSONDecodeError:
             results_sha = ""
-    touched, unknown = [], []
+    # (unit id, arm, row, the paraphrases the unit counts; None = the directory's) per unit the directory books
+    targets: list[tuple[str, str, dict, list[str] | None]] = []
+    unknown: list[str] = []
     for arm in arms:
         uid = unit_id_of(line_id, model, arm, tag)
         row = rows_by_unit.get(uid)
-        if row is None:
-            unknown.append(uid)
+        if row is not None:
+            targets.append((uid, arm, row, None))
             continue
+        split = split_units_of(rows_by_unit, line_id, model, arm) if not tag else []
+        if split:
+            targets += [(r["unit_id"], arm, r, unit_paraphrases(r)) for r in split]
+        else:
+            unknown.append(uid)
+    touched = []
+    for uid, arm, row, unit_ps in targets:
         finished = m.get("status") == "finished" or (m.get("status") == "finished_thinking_present"
                                                      and row.get("experiment") in THINKING_EXPERIMENTS)
-        expected = int(n_selected) * len(paraphrases) - unchanged_per_arm.get(arm, 0)
-        n = rows_per_arm.get(arm, 0)
+        n_para = len(paraphrases) if unit_ps is None else len(unit_ps)
+        expected = int(n_selected) * n_para - rows_of(unchanged_by_key, arm, unit_ps)
+        n = rows_of(rows_by_key, arm, unit_ps)
         ref = None                                   # the primary plan's hash wins; a later plan fills in only a missing one
         for p in plans:
             if ref is None:
@@ -625,17 +685,26 @@ def ingest_run_dir(run_dir: Path, rows_by_unit: dict[str, dict], plans: list[dic
         row.update(status=status, hash_verified=hv, result_file=str(outputs.relative_to(ROOT)) if outputs.is_relative_to(ROOT) else str(outputs),
                    result_sha256=out_sha, scores_sha256=scores_sha, results_sha256=results_sha, n_rows=n, n_expected=expected,
                    updated_utc=utc_now())
-        if hv == "no" and ref is not None and "ITEM FILE HASH MISMATCH" not in (row.get("notes") or ""):
-            row["notes"] = (row["notes"] + "; " if row["notes"] else "") + f"ITEM FILE HASH MISMATCH: run read {observed_sha}, plan records {ref}"
-        elif hv != "no" and "ITEM FILE HASH MISMATCH" in (row.get("notes") or ""):   # verified since: the stale note goes
-            row["notes"] = "; ".join(x for x in row["notes"].split("; ") if not x.startswith("ITEM FILE HASH MISMATCH"))
+        notes = row.get("notes") or ""
+        if hv == "no" and ref is not None and "ITEM FILE HASH MISMATCH" not in notes:
+            notes = (notes + "; " if notes else "") + f"ITEM FILE HASH MISMATCH: run read {observed_sha}, plan records {ref}"
+        elif hv != "no" and "ITEM FILE HASH MISMATCH" in notes:   # verified since: the stale note goes
+            notes = "; ".join(x for x in notes.split("; ") if not x.startswith("ITEM FILE HASH MISMATCH"))
+        if unit_ps is not None:
+            note = WHOLE_LINE_NOTE.format(dir=run_dir.name)
+            if note not in notes:
+                notes = (notes + "; " if notes else "") + note
+        elif WHOLE_LINE_NOTE[: WHOLE_LINE_NOTE.index("{")] in notes:    # the unit's own directory books it now: the note goes
+            notes = "; ".join(x for x in notes.split("; ") if not x.startswith(WHOLE_LINE_NOTE[: WHOLE_LINE_NOTE.index("{")]))
+        row["notes"] = notes
         touched.append(uid)
     if touched:
         mirror_aggregates(run_dir, m, aggregates / run_dir.name)
     unmatched = None
     if unknown:
+        why = " (tag)" if tag else " (no untagged unit and no p0p1/p2 split units of this (run, model, arm), the alias included)"
         unmatched = {"dir": run_dir.name, "run_id": run_id, "units": unknown,
-                     "reason": "no such unit in the ledger" + (" (tag)" if tag else "") + "; run `ledger.py init --force` if the plan changed"}
+                     "reason": "no such unit in the ledger" + why + "; run `ledger.py init --force` if the plan changed"}
     return touched, unmatched
 
 

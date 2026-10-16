@@ -1,4 +1,4 @@
-# RUNBOOK — running the compute chunks on Kaggle by hand (2026-10-07)
+# RUNBOOK — running the compute chunks on Kaggle by hand (2026-10-07; §6, the rented box, added 2026-10-16)
 
 The assistant's machine has no Kaggle token and cannot reach `www.kaggle.com` or `huggingface.co`
 (BLOCKED.md), so every session is launched by the author in the Kaggle web UI and the results come back as
@@ -10,7 +10,9 @@ file expands. The ledger (`experiments/ledger.csv`) and the meter (`STATUS.md`) 
 `STATUS.md` "Next chunk per queue" names the chunk to import next on each queue (cpu / gpu / tpu). In every
 notebook the **first code cell (the parameters cell) is the only cell to edit**; a chunk notebook's header says
 "do not edit" because `JOBS` and the other presets are the plan. Kaggle UI labels are given as they read in
-2026; where a label may have moved it is marked "(as of 2026)".
+2026; where a label may have moved it is marked "(as of 2026)". §6 is the paid alternative to the Kaggle sessions:
+a rented CUDA box runs the SAME chunks through `scripts/cuda_box.py --chunks`, and its run directories are the
+ledger's units; §7 is the list of things never to do, on either route.
 
 ## 0. One-time setup
 
@@ -154,7 +156,8 @@ notebook the **first code cell (the parameters cell) is the only cell to edit**;
   family for the DD 8.5 re-pricing; take the x1/x2 quota reading (step 0.8). `c05_gpu_t0` is the Gate 1 pilot
   on the T4, the ALTERNATIVE to `c02`–`c04` (same lines, no `__cpu` tag): run it only if the CPU route will not
   finish by Gate 1 (18 Oct); whichever route finishes, the ledger marks the other `cut`. Its pilot lines are
-  non-smoke, so its three models must be pinned in the bundled `configs/models.yaml` first (§3).
+  non-smoke, so its three models must be pinned in the bundled `configs/models.yaml` first (§3). On the rented
+  box `c05` IS the pilot route (`--chunks tier0`, §6 step 5), pinned on the box itself (§6 step 4).
 - **Tiers 1–5 are gated twice.** Every job of `c08`–`c31` reads a test-split or core file or is confirmatory,
   so the driver reports `skipped: gate: ...` until the author has recorded in `experiments/gates.yaml` the
   registration link and date (`preregistration.registration_url`, `registration_date`) and the `qu` and `i/y`
@@ -290,11 +293,13 @@ repository root:
    `python3 scripts/check_run.py --run "$d"` (scores it if needed, writes stats and hashes), then `--verify`.
 2. `python3 scripts/ledger.py ingest --runs ~/noilai-runs-2026-10-20/runs` — updates `experiments/ledger.csv`
    (status, item-file hash gate, row counts) per unit, tag-aware (`<run>__<model>__<tag>` directories map to
-   their tagged units), copies the aggregates (`summary.json`, a manifest excerpt, `stats.json`,
+   their tagged units; an untagged whole-line directory of a split line — `tpu_main__<model>`, or an `E1_main`
+   directory of a TPU / 2xT4 model, as a box run in `--runs` mode writes it (§6) — maps to its `__p0p1` and `__p2`
+   units, each counted from the rows of its own paraphrases, with the note "whole-line directory <dir> covers this
+   split unit"), copies the aggregates (`summary.json`, a manifest excerpt, `stats.json`,
    `results_hashes.json`) into `experiments/aggregates/<directory name>/` (created here), reports every directory that
-   matches no unit (a whole-line untagged directory of a split line such as `tpu_main__<model>`, or an `E1_main`
-   directory of a TPU model, matches none: only the chunk notebooks produce countable directories), and exits 1 on a
-   hash mismatch (then nothing from that directory is a result, and `scripts/interim_analysis.py` skips it).
+   matches no unit, and exits 1 on a hash mismatch (then nothing from that directory is a result, and
+   `scripts/interim_analysis.py` skips it).
 3. Merge the compute log: `data/compute_log.csv` in the repository is replaced by the downloaded
    `compute_log.csv` when the session chain restored it every time (the Kaggle copy is then the full campaign
    log); otherwise append the new rows. Check with `python3 scripts/compute_log.py totals`.
@@ -323,7 +328,241 @@ repository root:
    `[UNCERTAIN: verify]` you resolved (vLLM version, TPU package and version, the Gemma 4 ids, the PhoGPT
    transformers version).
 
-## 6. What never to do
+## 6. A rented CUDA box (the paid route; `scripts/cuda_box.py`)
+
+The box the author bought: 2x NVIDIA A800-SXM4-40GB (80 GB of VRAM in all; compute capability 8.0, so bf16 works),
+16 cores, 48 GB RAM, 200 GB disk, $1.33 per hour; the $33 credit is about 24 hours. `nvidia-smi` names the card
+"NVIDIA A800-SXM4-40GB", which `--session auto` reads as the session `a800-sxm4-40gb:40x2`. What fits where
+(`kaggle_run_plan.cuda_fit`): a 27B model in bf16 needs about 60.4 GB and runs on BOTH cards (tensor parallel 2);
+`gemma-3-12b-it` in bf16 needs about 27.8 GB and runs on one card; every other panel entry runs on one card. The
+driver runs the SAME chunks as the Kaggle sessions (`--chunks`), so its run directories are the ledger's units
+(`<run>__<model>[__<tag>]`) and §5 counts them as they are. You need a terminal on two machines: your laptop
+("laptop") and, over SSH, the box ("box"). In the commands below replace `<box>` by the SSH address the provider
+shows (`user@host`, with `-p <port>` if it names a port), `/workspace` by the data disk found in step 1, `<commit>` by
+the hash of the commit you want to run. If `python` is not found on the box, type `python3` wherever this section
+says `python`.
+
+**What the box can and cannot do today**
+
+| line | on the box? | why |
+|---|---|---|
+| tier 0: `c05_gpu_t0` (the Gate 1 pilot, 3 models), `c06_gpu_t0` (smoke, 14 models), `c07_tpu_t0` (smoke on the TPU trio; the two 27B models on both cards) | **yes, now** (`--chunks tier0`, step 5) | dev split only; `c05` needs its three models pinned first (step 4); `c06` / `c07` are `limit` lines and run unpinned |
+| tiers 1–5: `c08_gpu_t1` … `c31_tpu_t5` | **only after the gate** (`--chunks from:c08_gpu_t1`, step 6) | `experiments/gates.yaml` is all null today, so the driver prints every one of their models as `skipped: gate: ...` and runs none; §7 item 4 forbids them before the stage-2 commit (BLOCKED 31) |
+| the API lines (`E1_api_core`, `E1_api_paraphrase`, `E3_api_core`, `reasoning_500_api`) | **never from the box** | they need no GPU; `notebooks/api_runs.ipynb` runs them from anywhere once the API gate is open (§4) |
+| E4 (probes and patching) | **no** | not a `run_eval.py` line; `notebooks/colab_probe_gemma3.ipynb` |
+
+1. **Rent the box (the provider's website).**
+   1. Pick the listing **2x NVIDIA A800-SXM4-40GB** (two cards: one card cannot hold a 27B model).
+   2. Image: **Ubuntu with CUDA**, Python **3.11 or newer** (after the first login run `python3 --version`; if it
+      is older, pick another image).
+   3. Access: add your **SSH public key** (never a password). Write down the SSH address the provider shows.
+   4. From the laptop log in once (`ssh <box>`) and run `df -h`. Find the big data disk (about 200 GB) and its
+      mount point: `/workspace` below (your provider may call it otherwise). Everything below lives there, never
+      on the small system disk.
+   5. Run `nvidia-smi`: two rows named `NVIDIA A800-SXM4-40GB`.
+   6. Billing runs from now on, even while nothing is running. Step 8 stops it.
+
+2. **On the laptop: copy the frozen item files to the box.** They exist only on the author's machine (the
+   repository holds `manifest.json` alone; BLOCKED 3) and are never committed, bundled or made public.
+
+   ```bash
+   rsync -a --exclude manifest_private.json data/release/v0.3/ <box>:/workspace/release_v0.3/
+   ```
+
+   `manifest_private.json` (the build seed and the canary GUID, §0.4) stays home: nothing on the box needs it (the
+   item gate reads the public `manifest.json` when it is absent), and the paid box is not the author's machine.
+
+   The Hugging Face token (§0.3) stays in your shell: it is typed into the `export HF_TOKEN=...` line of step 3 and
+   never into a file inside the repository.
+
+3. **On the box: clone the code and set the environment.** One command per line, in order.
+
+   ```bash
+   git clone <ssh url of the repository> /workspace/noilai   # log in with `ssh -A <box>` so the laptop's key does the clone
+   cd /workspace/noilai
+   git checkout <commit>
+   mkdir -p data/release
+   cp -r /workspace/release_v0.3 data/release/v0.3
+   export HF_HOME=/workspace/hf
+   export HF_TOKEN=<your Hugging Face read token>
+   ```
+
+   Optional, for the push of every finished model into the private Kaggle dataset `noilai-runs` (step 5):
+
+   ```bash
+   export KAGGLE_USERNAME=<kaggle user>
+   export KAGGLE_KEY=<kaggle key>
+   ```
+
+   (`kaggle.json` from §0.7 holds both values.) Without them the driver prints ONE warning at the start and keeps
+   the outputs under `data/runs` only. Licences: the gated entries (the Gemma 3 / Gemma 4, Llama 3.1 and Vistral
+   entries, §0.3) must be accepted on the Hugging Face account whose token you exported; a refused download fails
+   that model (`failed (<rc>)`) and the loop goes on to the next one. The `export` lines live only in the shell
+   that ran them: after a new login (or inside the `tmux` session of step 5) run them again, never save them in a
+   file under `/workspace/noilai`.
+
+4. **Bootstrap and pin (once per box).**
+   1. Preview everything. Under `--dry-run` nothing is installed and nothing runs:
+
+      ```bash
+      python scripts/cuda_box.py --bootstrap --session auto --chunks tier0 --dry-run
+      ```
+
+      Expect `[session] cuda a800-sxm4-40gb:40x2` (another card or count: stop and report it), four `[boot ]` lines
+      (the install commands), then `[chunk] c05_gpu_t0 (order 5, tier 0, queue gpu): 2 jobs`, `[chunk] c06_gpu_t0
+      …`, `[chunk] c07_tpu_t0 …`, each followed by one `run_eval.py` command per model: the two 27B models of `c07`
+      carry `--tensor-parallel-size 2`, every other vLLM model `--tensor-parallel-size 1` (`phogpt-4b-chat` runs on the
+      HF backend and carries none).
+   2. Install: the four `[boot ]` commands of the preview, exactly as printed (10–20 minutes; vLLM 0.30.0 is the
+      engine pinned for the whole campaign, DD 7.3):
+
+      ```bash
+      python -m pip install -q vllm==0.30.0
+      python -m pip install -q -e "/workspace/noilai[eval]"
+      python scripts/fetch_resources.py
+      python scripts/kaggle_run_plan.py --materialize
+      ```
+
+      `fetch_resources.py` downloads the third-party files into `data/external/` (SHA-256 against
+      `data/HASHES.json`); `--materialize` derives `pilot_t1_200`, `pilot_xcopa_200` and the other seeded files from
+      the frozen files of step 2 (a missing release file stops here and names itself). With `--kaggle-dataset`
+      (step 5) the preview prints a fifth line, `python -m pip install -q kaggle`: run it too.
+   3. Pin the panel (needs `HF_TOKEN`; minutes; the same pin §3 runs on a Kaggle CPU session):
+
+      ```bash
+      python scripts/pin_panel.py --apply --partial --out experiments/panel_pins.json
+      ```
+
+      It writes the resolved revisions into this clone's `configs/models.yaml` and the record into
+      `experiments/panel_pins.json`. `--partial` is required: the five panel entries waiting for a
+      `quantization.checkpoint` stay unpinned and the driver skips them on every non-smoke line (`skipped: revision
+      not pinned`; BLOCKED 22, memo row 9). A `gated` result means the licence of step 3 is not accepted on this
+      account.
+   4. Hand the pins home. On the laptop, from the repository root:
+
+      ```bash
+      scp <box>:/workspace/noilai/configs/models.yaml configs/models.yaml
+      scp <box>:/workspace/noilai/experiments/panel_pins.json experiments/panel_pins.json
+      ```
+
+      Commit the two files TOGETHER (§3 step 4; then `make bundle` so the Kaggle route sees the pins too).
+   5. The hub audits (CPU, minutes; write `data/audit/<name>.json`, `<name>_rows.csv` and `items_*.jsonl`):
+
+      ```bash
+      python scripts/kaggle_cpu_jobs.py audit-tokenizers audit-items
+      ```
+
+      Copy `data/audit/*.json` and `data/audit/*_rows.csv` home the same way and commit them (`items_*.jsonl` stay
+      local, git-ignored).
+
+5. **Tier 0 now (both cards, one process).** Start a `tmux` session first so that a dropped SSH connection does
+   not kill the run (`tmux new -s box`; later `tmux attach -t box`), run the `export` lines of step 3 inside it,
+   `cd /workspace/noilai`, then:
+
+   ```bash
+   python scripts/cuda_box.py --session auto --chunks tier0 --platform rented
+   ```
+
+   With the Kaggle push (the first push creates the dataset; leave `--create-dataset` out of every later call):
+
+   ```bash
+   python scripts/cuda_box.py --session auto --chunks tier0 --platform rented --kaggle-dataset noilai-runs --create-dataset
+   ```
+
+   What runs, in order: `c05_gpu_t0` (the Gate 1 pilot: `pilot_t1_200` and `pilot_xcopa_200` on `gemma-3-1b-it`,
+   `qwen3.5-2b`, `phogpt-4b-chat`), `c06_gpu_t0` (`smoke_20` on 14 models), `c07_tpu_t0` (`smoke_20_tpu` on
+   `gemma-3-12b-it`, `qwen3.8-27b`, `qwen-sea-lion-v4.5-27b-it`; the two 27B models on both cards). Expect about
+   2–3 hours, most of it downloads: the 20 models of tier 0 are about 280 GB of weights, and each one is deleted after its
+   smoke run (watch the first download's speed: at 50 MB/s the downloads alone take 1.5 h). After every model the driver runs `check_run.py` on its directory
+   (`[check] FAILED <dir>` is printed, never fatal), pushes `data/runs` and `data/compute_log.csv` to `noilai-runs`
+   when the Kaggle variables are set (in the background: `[kaggle] started: c05_gpu_t0/pilot_t1_200/gemma-3-1b-it ok @
+   <hash>` / `[kaggle] rc=0`; `[sync ] started` / `[sync ] rc=0` are the lines of an optional `--sync-cmd`), and deletes the
+   model's weights from the hub cache unless a later model of the same chunk or the next chunk uses them (`[purge]
+   <repo> (<n> GB freed)`); while a chunk runs, the next chunk's weights download in the background (`[prefetch]
+   …`). The last line is `[summary] <n> commands, <failed> failed, <refused> refused, <skipped> skipped, <gated>
+   gated`; exit code 1 means a model failed or was refused: read its `[done ]` block, fix the cause (licence, pin),
+   run the same command again — finished rows resume (`--resume`); a finished model is still loaded again (its purged
+   weights download again) and finds nothing to do, so pass `--models <the unfinished ones>` to skip it. On the box
+   `c05` IS the pilot route: the ledger counts it
+   `alternative` until it is launched; whichever route finishes, the ledger marks the other (`c02`–`c04` here)
+   `cut` (memo N11). Everything beyond tier 0 waits for the gate (step 6).
+
+6. **After the gate (the stage-2 commit and `experiments/gates.yaml` filled, BLOCKED 31): ONE command drives both
+   cards.** Preview first (prints the schedule and every child command; runs nothing):
+
+   ```bash
+   python scripts/cuda_box.py --session auto --chunks from:c08_gpu_t1 --lanes 2 --platform rented --kaggle-dataset noilai-runs --dry-run
+   ```
+
+   Then the same without `--dry-run`, inside `tmux`:
+
+   ```bash
+   python scripts/cuda_box.py --session auto --chunks from:c08_gpu_t1 --lanes 2 --platform rented --kaggle-dataset noilai-runs
+   ```
+
+   The driver walks the tiers in order (tier 1 before tier 2 …: the cut order, DD 7.1 / 8.8). Inside a tier the
+   one-card chunks run on the two cards in parallel (`[phase] tier 1 lanes: A=[...] B=[...]`, balanced by the
+   chunks' estimated hours; a model repository used by both lanes is never purged by either lane: it stays in the
+   hub cache until a later chunk uses and releases it, or until step 8), then the chunks
+   with a 27B model run alone on both cards with tensor parallel 2 (`[phase] tier 1 exclusive: [...]`): `c16`,
+   `c20`, `c21`, `c26`, `c31`. Each lane logs to `data/runs/_box_<phase>_<lane>.log` (the paths are printed; `tail
+   -f` one to watch). `--max-hours N` launches no new model after N hours (the credit is about 24 h in all: subtract
+   what tier 0 used). If the box dies or the credit runs out: rent again, repeat steps 1–4 (`git checkout` the
+   commit that carries the pins), then RESTORE the outputs before anything else — a fresh box has an empty
+   `data/runs`, and without them every model runs again on paid time: from the laptop `rsync -az
+   ~/noilai-runs-<date>/runs/ <box>:/workspace/noilai/data/runs/` (step 7's copy), or download the latest
+   `noilai-runs` version into `data/runs` (§5 (b)) — and run the same command: finished rows resume (`--resume`); a
+   finished model is still loaded again (its weights download again) and finds nothing to do, so pass `--chunks <the
+   unfinished ids>` or `--models <the unfinished ones>` to skip it. Gated models are not a bug: until the gate file is filled every one of them is `skipped: gate: ...` and counted
+   under `gated` in the summary.
+
+7. **Hand-back (laptop).** Copy the outputs and the compute log OUTSIDE the repository (replace `<date>`):
+
+   ```bash
+   mkdir -p ~/noilai-runs-<date>
+   rsync -az <box>:/workspace/noilai/data/runs/ ~/noilai-runs-<date>/runs/
+   scp <box>:/workspace/noilai/data/compute_log.csv ~/noilai-runs-<date>/
+   ```
+
+   (or download the latest version of `noilai-runs` as §5 (b) when the pushes ran). Then §5 steps 1–8 unchanged:
+   `check_run.py --verify` on every directory, `ledger.py ingest --runs ~/noilai-runs-<date>/runs`, the compute-log
+   merge, `progress.py`, the commit. The directories are the chunk units' own (`<run>__<model>[__<tag>]`: chunk
+   mode), so `ledger.py ingest` counts them directly; a whole-line directory of a split line (`E1_main__gemma-3-4b-it`,
+   `E1_main__qwen3.8-27b`, `tpu_main__<model>`, written only in `--runs` mode) is mapped to its `__p0p1` and `__p2`
+   units with a note. The `_box_*.log` and `_prefetch.log` files under `runs/` are the driver's logs, not run
+   directories.
+
+8. **Stop the box (billing) and wipe it.** The item files, the outputs, the hub cache and the dataset staging copy
+   `/workspace/noilai_runs_dataset` (the push's `--staging` default, `<root>/../noilai_runs_dataset`: a full copy of
+   `data/runs` and the compute log) on the box are private data (DD 11.1): wipe `/workspace` before releasing the
+   machine.
+
+   ```bash
+   rm -rf /workspace/hf
+   rm -rf /workspace/noilai_runs_dataset
+   rm -rf /workspace/noilai /workspace/release_v0.3
+   ```
+
+   Then, on the provider's website, **stop and destroy the instance** (a stopped instance may still bill for its
+   disk; destroy it once step 7 is verified). Check the credit balance afterwards.
+
+**The flags, in one place** (`python scripts/cuda_box.py --help` lists them all). `--chunks ID [ID ...]`: the chunks
+to run, in plan order — `all` (every GPU / TPU chunk `c05`–`c31`; the default when neither `--chunks` nor `--runs`
+is given), `tier0` (`c05`, `c06`, `c07`), `from:<id>` (that chunk and every later one) or explicit ids; the CPU
+chunks `c01`–`c04` are refused (they are the HF-on-CPU route; `c05` replaces them on a box). `--runs RUN_ID ...`:
+the whole-line mode (one directory per plan line; the ledger counts it directly only for lines that are not split,
+§5 step 2). `--models NAME ...`: restrict every chunk to these entries. `--lanes 2`: the driver schedules the two
+cards itself (step 6). `--keep-weights`: keep every model's weights in the hub cache (the 200 GB disk cannot hold
+the whole panel, about 270 GB: leave it off). `--no-prefetch`: do not download the next chunk's weights in the
+background. `--no-check`: skip `check_run.py` after each model. `--kaggle-dataset SLUG` and `--create-dataset`:
+push `data/runs` and `data/compute_log.csv` after every model (step 5). `--sync-cmd "<command>"`: any other copy
+command, run from the project root after every model, in the background (an `rsync` to the laptop, `rclone`).
+`--max-hours N`: launch no new model after N hours. `--keep-repos REPO ...` and `--disk-headroom-gb GB`: passed by
+the driver to its own lane children (the repositories both lanes share; twice the 20 GB a prefetch must leave free,
+because a lane does not see the other lane's downloads); never typed by hand. `--lanes N` above the card count uses
+one lane per card. `--dry-run`: print everything; run, delete and prefetch nothing.
+
+## 7. What never to do
 
 1. Never make `noilai-release`, `noilai-runs` or `noilai-bundle` public, and never attach a public dataset in
    their place: the test split is gated and every output quotes test items (DD 11.1).
@@ -346,3 +585,7 @@ repository root:
 8. Never edit `configs/run_plan.yaml` to launch an exploratory line (§2 uses `PLAN_PATH` in the non-chunk T4
    notebook), never record a quota reading there (step 0.8), never rebuild the frozen release, and never commit
    `data/runs/`.
+9. Never release a rented box (§6) without wiping `/workspace` (the frozen item files, the outputs, the hub cache,
+   the dataset staging copy `/workspace/noilai_runs_dataset`),
+   never save `HF_TOKEN`, `KAGGLE_USERNAME` or `KAGGLE_KEY` in a file under the clone, and never run the CPU
+   chunks `c01`–`c04` on a box (the driver refuses them; `c05` is the pilot route there).

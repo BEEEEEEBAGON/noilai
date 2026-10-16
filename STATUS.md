@@ -1,11 +1,36 @@
 # STATUS — experiments and validation workstreams
 
-Hand-maintained sections first (dated **2026-10-12**); the meter block at the end is written by `scripts/progress.py`
+Hand-maintained sections first (dated **2026-10-16**); the meter block at the end is written by `scripts/progress.py`
 and is never edited by hand. Blockers, in deadline order, are in `BLOCKED.md`; the author's rulings are in
 `docs/gate1/DD13_DECISION_MEMO.md` (reply with the row numbers you accept).
 
 ## Session log (newest first)
 
+- **2026-10-16 (box-kit session, adoring-planck; no Kaggle or Hugging Face access).** Merged before this session:
+  PR #5 (`036f603`), the rented-CUDA-box kit (`scripts/cuda_box.py`, `kaggle_run_plan.CudaSession`, `cuda_fit`,
+  `tensor_parallel_for`; DEVIATIONS row of 2026-10-12). The author bought about 24 h on a 2x NVIDIA A800-SXM4-40GB
+  box (80 GB VRAM, 48 GB RAM, 200 GB disk, $1.33/h, a $33 credit). This session makes the box run the CHUNK PLAN
+  instead of whole plan lines (DEVIATIONS row of 2026-10-16):
+  - `scripts/cuda_box.py --chunks` (the default `all` = every GPU / TPU chunk `c05`–`c31` in plan order; `tier0`;
+    `from:<id>`; the CPU chunks `c01`–`c04` are refused) runs each chunk's jobs through `kaggle_run_plan.execute`
+    with the job's tag, so the run directories are the ledger's units; after every executed model: `check_run.py`
+    (`--no-check`), the push of `data/runs` + `data/compute_log.csv` to the private Kaggle dataset
+    (`--kaggle-dataset noilai-runs`, `--create-dataset` once; `--sync-cmd` in the background) and the chunk-scoped
+    purge of the model's weights (`--keep-weights` turns it off), with the next chunk's weights prefetched meanwhile
+    (`--no-prefetch`); `--lanes 2` schedules the two cards tier by tier (one-card chunks in parallel under
+    `CUDA_VISIBLE_DEVICES`, the 27B chunks `c16`, `c20`, `c21`, `c26`, `c31` on both cards); the summary counts the
+    gated models apart (`skipped: gate: ...`).
+  - `scripts/ledger.py ingest` maps an untagged whole-line directory of a split line (`E1_main__gemma-3-4b-it`,
+    `E1_main__qwen3.8-27b`, `tpu_main__<model>`: the `--runs` mode) to its `__p0p1` / `__p2` units with a note.
+  - Documents: `RUNBOOK.md` §6 (the box, click by click; the never-list is now §7), the README box paragraph, the
+    DEVIATIONS row, this file, `BLOCKED.md` 14 / 19 / 33 (the box as the primary route of the pilot and the smoke
+    week; the lanes command after the gate), `CLAUDE.md` step 3.
+  - What did NOT happen: still no model run, nothing ingested, the meter not re-run (nothing to ingest);
+    `www.kaggle.com` and `huggingface.co` unreachable from this environment; the frozen item files absent here; the
+    gate file all null, so on the box only tier 0 runs today. Fit on the box (`cuda_fit`): a 27B model in bf16
+    ≈ 60.4 GB → both cards (tensor parallel 2); `gemma-3-12b-it` ≈ 27.8 GB → one card; every other entry one card.
+    Before the box runs anything: `RUNBOOK.md` §6 steps 1–4 (the frozen files `scp`'d in, the pin with `--partial`
+    on the box, the audits), then `--chunks tier0` (step 5).
 - **2026-10-12 (analysis-code session, adoring-planck; no Kaggle or Hugging Face access).** Nothing ingested, nothing
   launched: `www.kaggle.com` and `huggingface.co` are still unreachable from this environment, no token exists, the
   frozen item files are still absent (`data/release/v0.3/` holds `manifest.json` only); the prerequisites table is
@@ -91,7 +116,7 @@ and is never edited by hand. Blockers, in deadline order, are in `BLOCKED.md`; t
 
 | prerequisite | state on 2026-10-07 |
 |---|---|
-| pinned panel (`configs/models.yaml` revisions) | **missing**: `experiments/panel_pins.json` not yet produced; every self-hosted `revision` null (34 entries; 35 `revision: null` lines counting the defaults block), 24 ids `hf_id_status: uncertain` (21 self-hosted, 3 API); the kit is ready (`scripts/kaggle_cpu_jobs.py pin` on a Kaggle CPU session with `HF_TOKEN`, then `scripts/pin_panel.py --apply --from`; a full apply is refused until the five panel `quantization.checkpoint` values are chosen) — `BLOCKED.md` 19, 22 |
+| pinned panel (`configs/models.yaml` revisions) | **missing**: `experiments/panel_pins.json` not yet produced; every self-hosted `revision` null (34 entries; 35 `revision: null` lines counting the defaults block), 24 ids `hf_id_status: uncertain` (21 self-hosted, 3 API); the kit is ready (`scripts/kaggle_cpu_jobs.py pin` on a Kaggle CPU session with `HF_TOKEN`, then `scripts/pin_panel.py --apply --from`; or on the rented box `scripts/pin_panel.py --apply --partial --out experiments/panel_pins.json`, `RUNBOOK.md` §6 step 4; a full apply is refused until the five panel `quantization.checkpoint` values are chosen) — `BLOCKED.md` 19, 22 |
 | passing ~20-item end-to-end run | echo backend **passes** on the local non-frozen smoke build (20/20 rows scored and ingested); the first real run, chunk `c01_cpu_t0`, has **not run** — `BLOCKED.md` 5 |
 | frozen item files present and passing the hash gate | **absent here** (`data/release/v0.3/` holds `manifest.json` only; the files live on the author's machine and in the private Kaggle dataset); the gate code (`scripts/kaggle_verify_items.py`, `ledger.py ingest`) is in place and tested against a mismatching file |
 
@@ -102,13 +127,14 @@ Every value is null: `stage1_commit`, `stage2_commit`, `registration_url`, `regi
 commit fields. → every confirmatory unit (chunks `c08`–`c31`) and the whole API lane are **gated**; only the author
 records a value (`BLOCKED.md` 4, 20, 31); the assistant never runs `scripts/freeze_scoring_rule.py --record`.
 
-## Next chunk per queue (`configs/compute_chunks.yaml`; recipes in `RUNBOOK.md` §1)
+## Next chunk per queue (`configs/compute_chunks.yaml`; recipes in `RUNBOOK.md` §1, the rented box in §6)
 
 | queue | next | then | waits on |
 |---|---|---|---|
 | cpu | `c01_cpu_t0` — first real run, `smoke_20` on 20 dev items (memo N10) | `c02`–`c04`, the Gate 1 pilot, one model per session (memo N11) | `BLOCKED.md` 1–3, 5 |
 | gpu (T4 x2) | `c06_gpu_t0` — smoke week (19–25 Oct), `smoke_20` on every T4/2xT4 model, unpinned allowed; take the x1/x2 quota reading | `c08_gpu_t1` after the stage-2 commit; `c05_gpu_t0` only as the alternative to `c02`–`c04` if the CPU route will not finish by 18 Oct (needs its three models pinned; the ledger counts it as `alternative`) | `BLOCKED.md` 14, 19, 31 |
 | tpu (v5e-8) | `c07_tpu_t0` — smoke week (19–25 Oct), `smoke_20_tpu` on the TPU trio (a `limit` line: unpinned allowed; the whole-panel pin runs the same week) | `c16_tpu_t1` after the stage-2 commit | `BLOCKED.md` 19, 31 |
+| box (2x A800-40GB, paid) | `tier0` through `RUNBOOK.md` §6 (`python scripts/cuda_box.py --session auto --chunks tier0 --platform rented`, after the pin on the box): `c05_gpu_t0` as the pilot route instead of `c02`–`c04` (the ledger counts `c05` `alternative` until launched, memo N11), then `c06_gpu_t0` and `c07_tpu_t0` (the two 27B models on both cards) | `c08`–`c31` after the gate: `--chunks from:c08_gpu_t1 --lanes 2` (`RUNBOOK.md` §6 step 6); every one of them `skipped: gate: ...` until then | `BLOCKED.md` 2, 3 (the frozen release files, `scp`'d to the box), 4 / 31, 14 and 19 (the box steps) |
 | api | nothing: gated on the Gemini route and the registration | the four API lines daily from the stage-2 commit | `BLOCKED.md` 20, 31, 32 |
 | human | validator invitations 8 Oct; packet 12 Oct; ~20 respondents 12 Oct | calibration 13–17 Oct; Parts B–E 19 Oct–1 Nov; baseline 2–8 Nov | `BLOCKED.md` 9–13, 18, 26 |
 

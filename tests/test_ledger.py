@@ -1,10 +1,12 @@
 """experiments/ledger.csv and scripts/progress.py: the chunk units of configs/compute_chunks.yaml, their cost split,
-ingest (tagged run directories, unmatched directories, the human reports, re-pricing) and the per-chunk meter.
+ingest (tagged run directories, whole-line directories of a split line booked on their p0p1 / p2 units, unmatched
+directories, the human reports, re-pricing) and the per-chunk meter.
 The echo runs use the local NON-frozen smoke build when present, else a small seeded build in a temporary directory."""
 from __future__ import annotations
 
 import importlib
 import json
+import shutil
 import subprocess
 import sys
 from collections import Counter
@@ -62,10 +64,11 @@ def item_file(tmp_path_factory) -> Path:
     return out / "noilai_dev.jsonl"
 
 
-def _echo_run(runs: Path, run_id: str, item_file: Path, check: bool = False) -> Path:
+def _echo_run(runs: Path, run_id: str, item_file: Path, check: bool = False, paraphrases: tuple[str, ...] = ("p0",)) -> Path:
     out = runs / run_id
     subprocess.run([PY, str(ROOT / "scripts" / "run_eval.py"), "--items", str(item_file), "--backend", "echo", "--smoke",
-                    "--limit", "20", "--tasks", "T1", "T3", "--variants", "V1", "--run-id", run_id, "--out-root", str(runs)],
+                    "--limit", "20", "--tasks", "T1", "T3", "--variants", "V1", "--paraphrases", *paraphrases,
+                    "--run-id", run_id, "--out-root", str(runs)],
                    check=True, capture_output=True, cwd=ROOT)
     subprocess.run([PY, str(ROOT / "scripts" / "score_run.py"), "--run", str(out), "--items", str(item_file)],
                    check=True, capture_output=True, cwd=ROOT)
@@ -73,6 +76,25 @@ def _echo_run(runs: Path, run_id: str, item_file: Path, check: bool = False) -> 
         subprocess.run([PY, str(ROOT / "scripts" / "check_run.py"), "--run", str(out), "--items", str(item_file), "--n-boot", "20"],
                        check=True, capture_output=True, cwd=ROOT)
     return out
+
+
+def _derived_run(src: Path, runs: Path, run_id: str, paraphrases: tuple[str, ...] | None = None) -> Path:
+    """A copy of an echo run under another run id (the manifest's run_id and identity.run_id), its outputs rows restricted
+    to `paraphrases` when given (options.paraphrases follows): a whole-line directory of another split line, or a tagged one."""
+    dst = runs / run_id
+    dst.mkdir()
+    m = json.loads((src / "manifest.json").read_text(encoding="utf-8"))
+    m["run_id"] = m["identity"]["run_id"] = run_id
+    lines = (src / "outputs.jsonl").read_text(encoding="utf-8").splitlines()
+    if paraphrases is not None:
+        m["options"]["paraphrases"] = list(paraphrases)
+        lines = [x for x in lines if json.loads(x).get("paraphrase", "p0") in paraphrases]
+    (dst / "manifest.json").write_text(json.dumps(m), encoding="utf-8")
+    (dst / "outputs.jsonl").write_text("".join(x + "\n" for x in lines), encoding="utf-8")
+    for name in ("scores.jsonl", "summary.json", "unchanged.jsonl"):
+        if (src / name).exists():
+            shutil.copy(src / name, dst / name)
+    return dst
 
 
 def _ledger_ingest(led: Path, runs: Path, tmp_path: Path, capsys, plan_path: Path | None = None) -> tuple[int, dict]:
@@ -331,6 +353,111 @@ def test_ingest_reports_two_directories_that_name_the_same_unit(tmp_path, capsys
     assert summary["conflicts"] == [{"unit": "smoke_20__gemma-3-1b-it__nfc__cpu", "dirs": ["copy_of_the_run", "smoke_20__gemma-3-1b-it__cpu"],
                                      "reason": summary["conflicts"][0]["reason"]}] and "more than one run directory" in summary["conflicts"][0]["reason"]
     assert summary["unmatched"] == [] and summary["touched"] == 2                 # the unit (once) and attested__expansion
+
+
+def test_ingest_books_a_whole_line_directory_of_a_split_line_on_its_p0p1_and_p2_units(tmp_path, item_file, capsys):
+    """A rented box running a split line whole (scripts/cuda_box.py --runs) writes `<run>__<model>` without a tag: the
+    directory books both split units (its own line's, or the tpu_main units of a TPU-trio model through RUN_ALIAS), each
+    counting the outputs rows of its own paraphrases; a tagged directory keeps today's path; `unmatched` stays empty."""
+    runs = tmp_path / "runs"
+    whole = _echo_run(runs, "E1_main__gemma-3-4b-it", item_file, paraphrases=("p0", "p1", "p2"))   # c22 (p0p1) + c30 (p2)
+    m = json.loads((whole / "manifest.json").read_text(encoding="utf-8"))
+    n_sel = int(m["item_file"]["n_selected"])
+    assert n_sel > 0 and m["options"]["paraphrases"] == ["p0", "p1", "p2"]
+    counts = L.count_jsonl_rows(whole / "outputs.jsonl")
+    assert counts == {("nfc", "p0"): n_sel, ("nfc", "p1"): n_sel, ("nfc", "p2"): n_sel}
+    assert L.rows_of(counts, "nfc", ["p0", "p1"]) == 2 * n_sel and L.rows_of(counts, "nfc") == 3 * n_sel and L.rows_of(counts, "nfd") == 0
+    assert L.count_jsonl_rows(whole / "unchanged.jsonl", defaults=("", "p0")) == {}        # arms [nfc]: no unchanged prompt
+    _derived_run(whole, runs, "E1_main__qwen3.8-27b")                                     # a TPU-trio model: the tpu_main units (c16 + c31)
+    _derived_run(whole, runs, "tpu_main__qwen-sea-lion-v4.5-27b-it")                      # the tpu_main line whole (c26 + c31)
+    _derived_run(whole, runs, "E1_main__gemma-4-12b", paraphrases=("p0", "p1"))           # whole-line, p2 not run yet (c28 + c30)
+    _derived_run(whole, runs, "tpu_main__gemma-3-12b-it__p0p1", paraphrases=("p0", "p1"))  # a tagged directory: today's path
+    led = tmp_path / "ledger.csv"
+    assert L.main(["--ledger", str(led), "init"]) == 0
+    by = {r["unit_id"]: r for r in L.read_ledger(led)}
+    assert L.line_candidates("E1_main") == ["E1_main", "tpu_main"] and L.line_candidates("tpu_main") == ["tpu_main", "E1_main"]
+    assert L.line_candidates("smoke_20") == ["smoke_20"]
+    assert L.split_units_of(by, "E1_main", "gemma-3-1b-it", "nfc") == []                   # not split: one untagged unit
+    assert [r["unit_id"] for r in L.split_units_of(by, "E1_main", "qwen3.8-27b", "nfc")] == \
+        ["tpu_main__qwen3.8-27b__nfc__p0p1", "tpu_main__qwen3.8-27b__nfc__p2"]
+    assert L.unit_paraphrases(by["E1_main__gemma-3-4b-it__nfc__p0p1"]) == ["p0", "p1"] and L.unit_paraphrases(by["E1_main__gemma-3-4b-it__nfc__p2"]) == ["p2"]
+    assert L.unit_paraphrases({"unit_id": "x__m__nfc__p2", "paraphrases": ""}) == ["p2"]
+    # the plan's reference hash set to the file the run read, so the gate passes and the status is the point
+    plan = yaml.safe_load((ROOT / "configs" / "run_plan.yaml").read_text(encoding="utf-8"))
+    plan["item_files"]["noilai_main"]["sha256"] = m["data"]["item_file_sha256"]
+    plan_path = tmp_path / "plan.yaml"
+    plan_path.write_text(yaml.safe_dump(plan, sort_keys=False), encoding="utf-8")
+    rc, summary = _ledger_ingest(led, runs, tmp_path, capsys, plan_path)
+    assert rc == 0 and summary["unmatched"] == [] and summary["conflicts"] == []
+    assert summary["touched"] == 10 and summary["done"] == 8     # 4 whole-line directories x 2 units, the tagged unit, attested__expansion
+    by = {r["unit_id"]: r for r in L.read_ledger(led)}
+    out_sha, scores_sha = L.sha256_file(whole / "outputs.jsonl"), L.sha256_file(whole / "scores.jsonl")
+    note = L.WHOLE_LINE_NOTE.format(dir="E1_main__gemma-3-4b-it")
+    for uid, n_para in (("E1_main__gemma-3-4b-it__nfc__p0p1", 2), ("E1_main__gemma-3-4b-it__nfc__p2", 1)):
+        r = by[uid]
+        assert r["status"] == "done" and r["hash_verified"] == "yes" and "HASH MISMATCH" not in r["notes"], uid
+        assert int(r["n_rows"]) == int(r["n_expected"]) == n_para * n_sel, uid
+        assert r["result_file"].endswith("E1_main__gemma-3-4b-it/outputs.jsonl") and r["result_sha256"] == out_sha and r["scores_sha256"] == scores_sha
+        assert r["notes"].count(note) == 1 and "paraphrase split (DD 8.5)" in r["notes"], uid
+    # the alias: an E1_main directory of a TPU-trio model fills the tpu_main units; a tpu_main directory whole fills its own
+    for dirname, model in (("E1_main__qwen3.8-27b", "qwen3.8-27b"), ("tpu_main__qwen-sea-lion-v4.5-27b-it", "qwen-sea-lion-v4.5-27b-it")):
+        for tag, n_para in (("p0p1", 2), ("p2", 1)):
+            r = by[f"tpu_main__{model}__nfc__{tag}"]
+            assert r["status"] == "done" and int(r["n_rows"]) == int(r["n_expected"]) == n_para * n_sel, (dirname, tag)
+            assert r["result_file"].endswith(f"{dirname}/outputs.jsonl") and L.WHOLE_LINE_NOTE.format(dir=dirname) in r["notes"]
+    assert "E1_main__qwen3.8-27b__nfc" not in by and "E1_main__qwen3.8-27b__nfc__p0p1" not in by   # nothing invented under E1_main
+    # a whole-line directory holding p0 + p1 rows only: p0p1 done, p2 launched with n 0 and its own n_expected
+    a, b = by["E1_main__gemma-4-12b__nfc__p0p1"], by["E1_main__gemma-4-12b__nfc__p2"]
+    assert a["status"] == "done" and int(a["n_rows"]) == int(a["n_expected"]) == 2 * n_sel
+    assert b["status"] == "launched" and int(b["n_rows"]) == 0 and int(b["n_expected"]) == n_sel
+    assert L.WHOLE_LINE_NOTE.format(dir="E1_main__gemma-4-12b") in b["notes"] and b["result_sha256"] == a["result_sha256"]
+    # the tagged directory: its unit alone, n_expected from the directory's paraphrases, no whole-line note; its p2 twin untouched
+    t, t2 = by["tpu_main__gemma-3-12b-it__nfc__p0p1"], by["tpu_main__gemma-3-12b-it__nfc__p2"]
+    assert t["status"] == "done" and int(t["n_rows"]) == int(t["n_expected"]) == 2 * n_sel and "whole-line directory" not in t["notes"]
+    assert t2["status"] == "planned" and t2["n_rows"] == "" and t2["result_file"] == ""
+    # aggregates mirrored under the directory name, never item-level rows
+    agg = tmp_path / "agg"
+    assert {p.name for p in (agg / "E1_main__gemma-3-4b-it").iterdir()} == {"summary.json", "manifest_excerpt.json"}
+    assert (agg / "E1_main__qwen3.8-27b" / "manifest_excerpt.json").exists() and not any(agg.rglob("outputs.jsonl"))
+    # the meter: the split units count in their own chunks
+    d = P.compute(led, tmp_path / "nogates.yaml", ROOT / "experiments" / "quota.yaml", tmp_path / "nolog.csv")
+    chunks = {c["chunk_id"]: c for c in d["chunks"]}
+    assert chunks["c22_gpu_t3"]["status"] == "partial" and chunks["c22_gpu_t3"]["units_done"] == 1       # E1_main gemma-3-4b-it p0p1
+    assert chunks["c30_gpu_t5"]["status"] == "partial" and chunks["c30_gpu_t5"]["units_done"] == 1       # its p2; gemma-4-12b's p2 launched
+    assert chunks["c16_tpu_t1"]["units_done"] == 1 and chunks["c31_tpu_t5"]["units_done"] == 2            # qwen p0p1; qwen + sea-lion p2
+    # a second ingest adds the note once; a second directory naming the same split units is a per-unit conflict, as today
+    _derived_run(whole, runs, "tpu_main__qwen3.8-27b")
+    rc, summary = _ledger_ingest(led, runs, tmp_path, capsys, plan_path)
+    by = {r["unit_id"]: r for r in L.read_ledger(led)}
+    assert rc == 0 and summary["unmatched"] == [] and by["E1_main__gemma-3-4b-it__nfc__p2"]["notes"].count(note) == 1
+    conflicts = {c["unit"]: c["dirs"] for c in summary["conflicts"]}
+    assert conflicts == {"tpu_main__qwen3.8-27b__nfc__p0p1": ["E1_main__qwen3.8-27b", "tpu_main__qwen3.8-27b"],
+                         "tpu_main__qwen3.8-27b__nfc__p2": ["E1_main__qwen3.8-27b", "tpu_main__qwen3.8-27b"]}
+    r = by["tpu_main__qwen3.8-27b__nfc__p0p1"]
+    assert r["result_file"].endswith("tpu_main__qwen3.8-27b/outputs.jsonl")                  # the last in name order wrote the row
+    assert r["notes"].count("whole-line directory") == 2                                      # one note per directory that covers it
+    # a whole-line directory of a model that is in no split and has no untagged unit stays unmatched
+    _derived_run(whole, runs, "E1_main__gemini-flash")
+    _rc, summary = _ledger_ingest(led, runs, tmp_path, capsys, plan_path)
+    assert [u["dir"] for u in summary["unmatched"]] == ["E1_main__gemini-flash"]
+    assert summary["unmatched"][0]["units"] == ["E1_main__gemini-flash__nfc"] and "split" in summary["unmatched"][0]["reason"]
+    # the unit's own tagged directory books it later (the conflict the report names): the whole-line note is withdrawn from
+    # that unit, and stays on the p2 twin the whole-line directory still covers, also once that directory is gone
+    shutil.rmtree(runs / "E1_main__gemini-flash")
+    _derived_run(whole, runs, "E1_main__gemma-3-4b-it__p0p1", paraphrases=("p0", "p1"))
+    rc, summary = _ledger_ingest(led, runs, tmp_path, capsys, plan_path)
+    by = {r["unit_id"]: r for r in L.read_ledger(led)}
+    assert rc == 0 and {c["unit"]: c["dirs"] for c in summary["conflicts"]}["E1_main__gemma-3-4b-it__nfc__p0p1"] == \
+        ["E1_main__gemma-3-4b-it", "E1_main__gemma-3-4b-it__p0p1"]
+    a, b = by["E1_main__gemma-3-4b-it__nfc__p0p1"], by["E1_main__gemma-3-4b-it__nfc__p2"]
+    assert a["result_file"].endswith("E1_main__gemma-3-4b-it__p0p1/outputs.jsonl") and "whole-line directory" not in a["notes"]
+    assert a["status"] == "done" and "paraphrase split (DD 8.5)" in a["notes"], a["notes"]
+    assert b["notes"].count(note) == 1 and b["result_file"].endswith("E1_main__gemma-3-4b-it/outputs.jsonl")
+    shutil.rmtree(runs / "E1_main__gemma-3-4b-it")
+    rc, summary = _ledger_ingest(led, runs, tmp_path, capsys, plan_path)
+    by = {r["unit_id"]: r for r in L.read_ledger(led)}
+    assert rc == 0 and "E1_main__gemma-3-4b-it__nfc__p0p1" not in {c["unit"] for c in summary["conflicts"]}
+    assert "whole-line directory" not in by["E1_main__gemma-3-4b-it__nfc__p0p1"]["notes"] and by["E1_main__gemma-3-4b-it__nfc__p2"]["notes"].count(note) == 1
 
 
 def test_ingest_human_reads_the_packet_report_and_the_baseline_report(tmp_path):
