@@ -6,6 +6,17 @@ and is never edited by hand. Blockers, in deadline order, are in `BLOCKED.md`; t
 
 ## Session log (newest first)
 
+- **2026-10-16, later (the release rebuilt as v0.4; the first paid run lost).** The author rented 2 h on the 2x A800
+  box and ran `scripts/box/laptop_start_nogit.sh`; the frozen item files were on no machine the author could reach,
+  so the box ran only what needs none, and the rental ended before the hand-back ran: nothing came back (no result,
+  no pin, no audit). The frozen v0.3 release and its private manifest (seed, canary GUID) could not be found anywhere;
+  the history's pre-redaction seed (the September Makefile's default) does not reproduce v0.3's content hash at the
+  freeze commit, so the freeze had drawn its own seed. Rebuilt as **v0.4** (DEVIATIONS row 2026-10-16): same generator and arguments, a new
+  private seed, 10,000 items / 2,500 base pairs / the same core counts; `configs/run_plan.yaml` `release` → v0.4 with
+  every item-file hash re-recorded (six base files, five derived files; `pilot_xcopa_200` unchanged);
+  `data/release/v0.4/manifest.json` committed; the eight files sent to the author (two private copies to keep;
+  `BLOCKED.md` 3). The next rental runs tier 0 whole once the files are on the author's Mac. Not done: the PREREG /
+  RESULTS_LOG / paper references to v0.3 (author's edits), the `noilai-release` dataset.
 - **2026-10-16 (box-kit session, adoring-planck; no Kaggle or Hugging Face access).** Merged before this session:
   PR #5 (`036f603`), the rented-CUDA-box kit (`scripts/cuda_box.py`, `kaggle_run_plan.CudaSession`, `cuda_fit`,
   `tensor_parallel_for`; DEVIATIONS row of 2026-10-12). The author bought about 24 h on a 2x NVIDIA A800-SXM4-40GB

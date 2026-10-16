@@ -27,12 +27,13 @@ fi
 source "$BOXDIR/venv/bin/activate"
 echo "[box] python $(python --version 2>&1) at $(command -v python)"
 
-mkdir -p data/release/v0.3
-if [ -f "$BOXDIR/release_v0.3/noilai_dev.jsonl" ]; then
-  cp -rn "$BOXDIR/release_v0.3/." data/release/v0.3/       # the frozen files; manifest.json from the archive stays
+REL=$(sed -n 's/^release: *\([^ #]*\).*/\1/p' configs/run_plan.yaml | head -1)   # data/release/v0.4
+mkdir -p "$REL"
+if [ -f "$BOXDIR/release/noilai_dev.jsonl" ]; then
+  cp -rn "$BOXDIR/release/." "$REL/"       # the frozen files; manifest.json from the archive stays
   FROZEN=1
 else
-  echo "[box] NO frozen item files under $BOXDIR/release_v0.3: only the lines that need none run (the XCOPA pilot); the others are skipped by the item gate"
+  echo "[box] NO frozen item files under $BOXDIR/release: only the lines that need none run (the XCOPA pilot); the others are skipped by the item gate"
   FROZEN=0
 fi
 python -m pip install -q --upgrade pip

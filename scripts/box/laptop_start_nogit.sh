@@ -2,7 +2,7 @@
 # Run on the laptop from the folder that holds noilai.bundle (the code, sent by the assistant), e.g. ~/Downloads:
 #   bash laptop_start_nogit.sh <minutes of rental left>      (HF_TOKEN=hf_... and HF_ENDPOINT=... in front if you have them)
 # No repository clone is needed on the laptop: the box clones the bundle. The frozen item files are found with
-# Spotlight (or given as RELEASE_DIR=/path/to/release/v0.3); without them the box runs only what needs none.
+# Spotlight (or given as RELEASE_DIR=/path/to/release/v0.4); without them the box runs only what needs none.
 set -euo pipefail
 BOX="${BOX:-root@js4.blockelite.cn}"
 PORT="${PORT:-14024}"
@@ -19,15 +19,15 @@ scp -P "$PORT" "$BUNDLE" "$BOX:$BOXDIR/noilai.bundle"
 $SSH "$BOX" "rm -rf $BOXDIR/noilai && git clone -q --branch $BRANCH $BOXDIR/noilai.bundle $BOXDIR/noilai && cp $BOXDIR/noilai/scripts/box/box_run.sh $BOXDIR/box_run.sh && echo code: \$(git -C $BOXDIR/noilai rev-parse --short HEAD)"
 REL="${RELEASE_DIR:-}"
 if [ -z "$REL" ] && command -v mdfind >/dev/null 2>&1; then
-  HIT=$(mdfind -name noilai_dev.jsonl 2>/dev/null | grep '/release/v0.3/noilai_dev.jsonl$' | head -1 || true)
+  HIT=$(mdfind -name noilai_dev.jsonl 2>/dev/null | grep -E '/release/v0\.[0-9]+/noilai_dev\.jsonl$' | sort | tail -1 || true)   # the newest release folder
   [ -n "$HIT" ] && REL="$(dirname "$HIT")"
 fi
 if [ -n "$REL" ] && [ -f "$REL/noilai_dev.jsonl" ]; then
   echo "frozen item files: $REL"
-  rsync -a -e "ssh -p $PORT" --exclude manifest_private.json "$REL/" "$BOX:$BOXDIR/release_v0.3/"
+  rsync -a -e "ssh -p $PORT" --exclude manifest_private.json "$REL/" "$BOX:$BOXDIR/release/"
 else
   echo "NO frozen item files found on this Mac: the box runs what needs none (the XCOPA pilot, the pin, the tokenizer audits)."
-  echo "If you know where data/release/v0.3/ is, run again with RELEASE_DIR=/that/path in front."
+  echo "If you know where the release/v0.4/ folder is, run again with RELEASE_DIR=/that/path in front."
 fi
 $SSH "$BOX" "cd $BOXDIR && HF_TOKEN='${HF_TOKEN:-}' HF_ENDPOINT='${HF_ENDPOINT:-}' BOXDIR=$BOXDIR nohup setsid bash $BOXDIR/box_run.sh $MINUTES_LEFT > $BOXDIR/box_run.log 2>&1 < /dev/null & sleep 3; head -5 $BOXDIR/box_run.log"
 echo

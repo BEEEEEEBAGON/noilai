@@ -1,7 +1,8 @@
 PY ?= /home/user/venv-noilai/bin/python
-# RELEASE is the run plan's `release:` key (DESIGN_DECISIONS 12.30: v0.1 superseded; v0.3 at the generator freeze). No trailing
-# comment on the assignment: make keeps the blanks before a comment in the value, and `$(RELEASE)/file` then splits into two words.
-RELEASE ?= data/release/v0.3
+# RELEASE is the run plan's `release:` key (DESIGN_DECISIONS 12.30: v0.1 superseded; v0.3 at the generator freeze; v0.3 lost and
+# rebuilt as v0.4 on 16 Oct 2026, docs/DEVIATIONS.md). No trailing comment on the assignment: make keeps the blanks before a
+# comment in the value, and `$(RELEASE)/file` then splits into two words.
+RELEASE ?= data/release/v0.4
 # SEED has NO default: the build seed is private (DESIGN_DECISIONS 4.6, item 51) and lives in $(RELEASE)/manifest_private.json;
 # run `make data SEED=<from the private release manifest>`. The sampling seeds below are public: they select from the built test split.
 

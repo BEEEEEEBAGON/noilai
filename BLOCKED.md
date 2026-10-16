@@ -23,8 +23,11 @@ latest (25 Oct recommended, memo N13), results freeze 22 Nov, E4 23 Nov–6 Dec.
    Kaggle Add-ons → Secrets as `HF_TOKEN` (never in a cell or the repository); on the rented box the same token goes
    into `export HF_TOKEN=...` in the shell only (`RUNBOOK.md` §6 step 3). Blocks: c01 (entry 5), the pin run and
    the audits (entry 19), every GPU/TPU chunk, the box's tier 0 (entry 14). Memo 17.
-3. **[1 Oct → now] PAST DUE — Kaggle datasets and secrets for the notebooks.** Who: author (the frozen item files
-   exist only on the author's machine; here `data/release/v0.3/` holds `manifest.json` alone). Steps: `make bundle` →
+3. **[1 Oct → now] PAST DUE — Kaggle datasets and secrets for the notebooks.** Who: author. **16 Oct: the v0.3
+   files were lost and the release was rebuilt as v0.4** (DEVIATIONS 2026-10-16): the eight files were sent to the
+   author in the chat; save them as `…/release/v0.4/` on the Mac AND on a drive (`manifest_private.json` never leaves
+   those two places), then upload the seven item files (not the private manifest) as the private dataset
+   `noilai-release`; `scripts/box/laptop_start_nogit.sh` finds the folder by itself. Steps: `make bundle` →
    private dataset `noilai-bundle`; the frozen `data/release/v0.3/` tree without `manifest_private.json` and `sealed/`
    → private dataset `noilai-release` (`RUNBOOK.md` §0.4); Secrets `KAGGLE_USERNAME`, `KAGGLE_KEY`; c01 with
    `CREATE_DATASET = True` creates `noilai-runs`. The rented box needs no dataset: the frozen files reach it by
@@ -130,11 +133,12 @@ latest (25 Oct recommended, memo N13), results freeze 22 Nov, E4 23 Nov–6 Dec.
     then a RESULTS_LOG entry (corpora, dates, download hashes, both `old_share` values). Blocks: H4's direction (new
     style winning in both registers flips the baseline: a DEVIATIONS row and the C2 arm, not the data), E2's
     `logfreq` covariates, stage 2. Memo 2 ((a) or (b), two registers, ≥ 10M each), N12.
-16. **[18 Oct, before the registration link of entry 4 is recorded] Canary digest mismatch (author item).**
-    Who: author. The `canary_sha256` in `docs/RESULTS_LOG.md` RL-2026-10-01-01 (`07fb9d79…8ca5`) differs from
-    `data/release/v0.3/manifest.json` line 344 and `paper/tables/release_facts.json` (`dedff579…701c`). Steps: find
-    which digest the frozen build produced and correct the other record with a dated note (no test covers it); the
-    assistant never edits either file. Blocks: the release facts the paper and the registration cite. Memo: none
+16. **[18 Oct, before the registration link of entry 4 is recorded] Release facts now v0.4 (author item).**
+    Who: author. Superseded on 16 Oct: v0.3 is lost and v0.4 is the frozen release (DEVIATIONS 2026-10-16), so the old
+    canary-digest question (`docs/RESULTS_LOG.md` RL-2026-10-01-01 `07fb9d79…8ca5` vs the v0.3 manifest's
+    `dedff579…701c`) is moot. Steps: cite v0.4 wherever v0.3 is cited — `docs/PREREGISTRATION.md` (stage 1),
+    `docs/RESULTS_LOG.md` (a dated RL entry from `data/release/v0.4/manifest.json`: counts, `content_sha256`,
+    `canary_sha256`), `paper/tables/release_facts.json` and the paper's prose; the assistant never edits those files. Blocks: the release facts the paper and the registration cite. Memo: none
     (found 7 Oct by the paper review; `paper/claims.md` §12).
 17. **[18 Oct] Gate 1 decision (milestone).** Who: author. Steps: the go/no-go of PREREG §10 from the three pilot
     files; the novelty verdict (hand-repeat the arXiv searches of `docs/NOVELTY_SWEEP_2026-09-30.md`); the scope

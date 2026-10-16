@@ -85,7 +85,7 @@ def _source_chain(plan: dict, key: str) -> str:
 def test_every_run_is_exploratory_dev_only_and_reads_no_test_split_core_or_sealed_file(plan, models_cfg):
     assert {r["id"] for r in plan["runs"]} == EXPLORATORY_RUN_IDS
     assert plan.get("preregistered") is False and plan["preregistered_plan"] == "configs/run_plan.yaml"
-    assert plan["release"] == "data/release/v0.3" and plan["runs_root"] == "data/runs"
+    assert plan["release"] == "data/release/v0.4" and plan["runs_root"] == "data/runs"
     assert set(plan["item_files"]).isdisjoint(TEST_SPLIT_KEYS)
     for key, spec in plan["item_files"].items():
         assert spec.get("canary_required") is False, (key, "a canary marks a test-split file (DD 4.6): none here")
@@ -128,7 +128,7 @@ def test_the_two_new_lines_are_as_specified(plan, models_cfg):
         assert needle in purpose, needle
     spec = plan["item_files"]["pilot_t1t3_dev"]
     assert spec["derive"] == {"source": "noilai_dev", "seed": 20261012, "tasks": ["T1", "T3"], "per_cell": {"T1": 50, "T3": 50}}
-    assert spec["expected_counts"]["n_items"] == 400 and spec["path"] == "data/release/v0.3/pilot_t1t3_dev.jsonl"
+    assert spec["expected_counts"]["n_items"] == 400 and spec["path"] == "data/release/v0.4/pilot_t1t3_dev.jsonl"
     # throughput: one model per backend/precision class, 300 T1 dev items
     assert thr["experiment"] == "throughput"
     assert KRP.expand_models(thr, plan, models_cfg) == THROUGHPUT_MODELS
@@ -215,7 +215,7 @@ def test_every_command_of_every_line_is_accepted_by_the_real_run_eval_cli(plan, 
     floor = KRP.find_run(plan, "floor_pilot_dev")
     cmd = KRP.build_command(floor, "gemma-3-1b-it", plan, models_cfg)
     assert cmd[cmd.index("--tasks"):cmd.index("--variants")] == ["--tasks", "T1", "T3"]
-    assert "data/release/v0.3/pilot_t1t3_dev.jsonl" in cmd
+    assert "data/release/v0.4/pilot_t1t3_dev.jsonl" in cmd
 
 
 def test_run_plan_cli_lists_and_dry_runs_the_exploratory_plan_through_its_plan_flag():
@@ -352,7 +352,7 @@ def test_the_gate_cell_runs_against_the_exploratory_plan_without_the_network(tmp
          "SMOKE_RUN_IDS": [], "PROJECT": tmp_path, "subprocess": subprocess}
     monkeypatch.chdir(ROOT)
     exec(compile(gate, "gate_cell", "exec"), g)  # noqa: S102  (a notebook cell under test)
-    assert g["KEYS"] == ["pilot_t1t3_dev"] and g["PLAN"]["release"] == "data/release/v0.3"
+    assert g["KEYS"] == ["pilot_t1t3_dev"] and g["PLAN"]["release"] == "data/release/v0.4"
     verify_calls = [c for c in calls if "scripts/kaggle_verify_items.py" in c]
     assert verify_calls == [[sys.executable, "scripts/kaggle_verify_items.py", "--plan", str(EXPLORATORY), "--key", "pilot_t1t3_dev", "--materialize"]]
     # two run ids: two keys, in order, no duplicates
