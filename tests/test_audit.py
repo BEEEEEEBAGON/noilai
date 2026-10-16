@@ -257,7 +257,7 @@ def _run_script(*args, cwd=ROOT):
 @pytest.fixture(scope="module")
 def counts(tmp_path_factory):
     out = tmp_path_factory.mktemp("counts") / "counts.json"
-    _run_script("scripts/reconcile_counts.py", "--out", str(out), "--release", str(ROOT / "data" / "release" / "v0.3"))
+    _run_script("scripts/reconcile_counts.py", "--out", str(out), "--release", str(ROOT / "data" / "release" / "v0.4"))
     return json.loads(out.read_text(encoding="utf-8"))
 
 
@@ -301,9 +301,9 @@ def test_reconcile_counts_emits_the_design_document_tables(counts):
 
 def test_reconcile_counts_release_strata_block_and_its_absence(counts, tmp_path):
     rs = counts["release_strata"]
-    if rs["status"] != "computed" and not (ROOT / "data" / "release" / "v0.3" / "noilai_test.jsonl").exists():
+    if rs["status"] != "computed" and not (ROOT / "data" / "release" / "v0.4" / "noilai_test.jsonl").exists():
         pytest.skip("no built release (the item files are private and git-ignored; run make data)")
-    assert rs["status"] == "computed" and rs["release"] == "data/release/v0.3" and rs["n_items"] == 10000
+    assert rs["status"] == "computed" and rs["release"] == "data/release/v0.4" and rs["n_items"] == 10000
     cells = rs["cells"]
     assert set(cells) == {f"{t}-{v}" for t in ("T1", "T2", "T3") for v in ("V1", "V2", "V3", "V4")}
     for c in cells.values():

@@ -47,7 +47,7 @@ run_eval_cli: scripts/run_eval.py
 run_eval_out_style: run_id_root      # run_id_root -> "--run-id <id>__<name> --out-root <runs_root>"; out -> "--out <runs_root>/<id>__<name>"
 runs_root: data/runs
 compute_log: data/compute_log.csv    # [UNCERTAIN: verify] location pending the author's confirmation (README, open question)
-release: data/release/v0.3           # DESIGN_DECISIONS 12.30: v0.1 and v0.2 are superseded; v0.3 is rebuilt at the generator-freeze commit (stage 1) -- bump this key then and re-record the item_files hashes
+release: data/release/v0.4           # DESIGN_DECISIONS 12.30: v0.1 and v0.2 are superseded; v0.3 (built at the generator-freeze commit, stage 1) was lost with its private manifest on 16 Oct 2026 and rebuilt as v0.4 from a new private seed with the same generator and arguments (docs/DEVIATIONS.md 2026-10-16); the item_files hashes below are v0.4's
 release_manifest: "{release}/manifest.json"
 
 api:
@@ -57,12 +57,12 @@ api:
 item_files:
   noilai_test:
     path: "{release}/noilai_test.jsonl"
-    sha256: 35aed39d14b03de34b90758651bdd8c6d345607aa2472380d346c6c3d2942723           # recorded at the data freeze; verified by scripts/kaggle_verify_items.py
+    sha256: 63ed58a2990e0450b4f88ac2c69ea20705aa108b720db1477ad163fe1639e7d3           # recorded at the v0.4 data freeze (16 Oct 2026); verified by scripts/kaggle_verify_items.py
     description: "gated test split (CC BY-NC-ND 4.0), header record + canary on every row; the source of noilai_main and noilai_core; no run line reads it whole"
     canary_required: true
   noilai_main:
     path: "{release}/noilai_main.jsonl"
-    sha256: 9e2165baf004c92aa0cf247cdeddd40ea7fe618144228d8a575d2f2dde9c9d53
+    sha256: debc0ad8f4829a2cbc8aadd0c05b2ac8bcebd6eea77f88558a9558ab42e9af98
     description: "open-model main sample: 4,200 test items = 350 per T1/T2/T3 x variant cell (DD 12.11; T3 as 175 yes/no pairs), contains the core; written by scripts/sample_items.py main"
     canary_required: true
     produced_by: "scripts/sample_items.py main --release {release} --per-cell 350 --seed 20261201"
@@ -70,17 +70,17 @@ item_files:
     expected_counts: {per_cell: 350, n_items: 4200}
   noilai_core:
     path: "{release}/noilai_core.jsonl"
-    sha256: 4be46cc642158dac3ec4fef922465fa900ef92bea2bf3fcdc34e497415a89fda
+    sha256: 53a996689b55a9f1f72f311f15a595c45884d51826cdaa63ce24d663863a8f35
     description: "balanced core: 125 per T1/T2 cell, 62 yes/no pairs per T3 cell (1,496 items in v0.3; DD 4.5 allows 1,496-1,500); the only NóiLái test items an API may see, and only a provider with no-training terms (DD 11.2: Groq; never Gemini's unpaid tier); the source of the derived core subsets"
     canary_required: true
   noilai_dev:
     path: "{release}/noilai_dev.jsonl"
-    sha256: f0052e688d43407c5ee6e116b3bca195d35a7cb6281da7be7573d1f00bd03cc7
+    sha256: 762d21ff404be7529277c640360bc8a761cb3196dc402d470e6fcb7df22050ef
     description: "public dev split (CC BY 4.0); prompt development, smoke tests and the pilot"
     canary_required: false
   noilai_c2:
     path: "{release}/noilai_c2.jsonl"
-    sha256: 08d6c30ba6aade640019351192a8b933a5e07fcdf70072ab4868a1f9274980a0
+    sha256: 67947da47e893cfa3c9a1432d22b9eed41d0f62fa70a3860fc0b1ab5fd5ff03d
     description: "C2-enriched T1 set for H4 (DD 4.5 / 12.6): a separate seeded build from an independent pseudo pool, every item C2-affected, excluded from E1/E2; written by scripts/sample_items.py c2 (the verify gate refuses the file while it holds no items)"
     canary_required: true
     produced_by: "scripts/sample_items.py c2 --release {release} --n 500 --seed 20261202"
@@ -99,35 +99,35 @@ item_files:
   # ---- derived, seeded sub-samples (DD 4.5): written by `kaggle_run_plan.py --materialize`, never drawn at run time
   noilai_api_para300:
     path: "{release}/noilai_api_para300.jsonl"
-    sha256: 514854a5f196c6eb5bd42bceb623849a13811fb92434d529b9b3458efdcef7b6
+    sha256: null   # v0.4: re-derived from noilai_core at the first --materialize; record with `kaggle_verify_items.py --key noilai_api_para300 --materialize`
     description: "DD 4.5 paraphrase subset for API models: 296 core items (25 per T1/T2 cell, 12 yes/no pairs per T3 cell) under p1 and p2; also the E3 API set"
     canary_required: true
     derive: {source: noilai_core, seed: 20261006, per_cell: {T1: 25, T2: 25, T3: 24}, in_core_only: true}
     expected_counts: {n_items: 296}
   noilai_reasoning500:
     path: "{release}/noilai_reasoning500.jsonl"
-    sha256: 3b4b448adfb4450561e5b97ec7850072477f1f73d86b4685b1946329fb68e996
+    sha256: null   # v0.4: re-derived at the first --materialize; record with `kaggle_verify_items.py --key noilai_reasoning500 --materialize`
     description: "the 500-item thinking-ON sub-study set: core items so that the API variants see nothing new (43/42/40 per T1/T2/T3 cell)"
     canary_required: true
     derive: {source: noilai_core, seed: 20261007, per_cell: {T1: 43, T2: 42, T3: 40}, in_core_only: true}
     expected_counts: {n_items: 500}
   noilai_bf16_200:
     path: "{release}/noilai_bf16_200.jsonl"
-    sha256: 3050fb29fd5dce14266960efeb117bfeb73808ac6e4d2e1b28edfd43ea5b409f
+    sha256: null   # v0.4: re-derived at the first --materialize; record with `kaggle_verify_items.py --key noilai_bf16_200 --materialize`
     description: "the ~200-item bf16 drift set: core items so the same rows exist in every T4 run (17/17/16 per T1/T2/T3 cell)"
     canary_required: true
     derive: {source: noilai_core, seed: 20261008, per_cell: {T1: 17, T2: 17, T3: 16}, in_core_only: true}
     expected_counts: {n_items: 200}
   noilai_scope500:
     path: "{release}/noilai_scope500.jsonl"
-    sha256: ceffc093f900807f78d54e8cd900440bd7b69efdfe4277b3166f6e9bbbe7d453
+    sha256: null   # v0.4: re-derived at the first --materialize; record with `kaggle_verify_items.py --key noilai_scope500 --materialize`
     description: "DD 6.1 / 6.2 agreement-check set: 500 core items (63 per T1 cell, 31 yes/no pairs per T3 cell; the two E3 Holm tasks) on which Gemma 3 1B runs the secondary arm scope `item` and the C1 arm through a second engine (HF); a subset of noilai_main, so the vLLM whole_prompt reference comes from E3_noilai on the same rows"
     canary_required: true
     derive: {source: noilai_core, seed: 20261011, tasks: [T1, T3], per_cell: {T1: 63, T3: 62}, in_core_only: true}
     expected_counts: {n_items: 500}
   pilot_t1_200:
     path: "{release}/pilot_t1_200.jsonl"
-    sha256: 4d44c98958c4a724b45493e60cced56e7049bb6173b297980e215676ddb02e87
+    sha256: null   # v0.4: re-derived from noilai_dev at the first --materialize; record with `kaggle_verify_items.py --key pilot_t1_200 --materialize`
     description: "Gate 1 pilot (DD 8.5): 200 dev items, 50 per T1 variant; its go/no-go criterion lives in docs/PREREGISTRATION.md section 10"
     canary_required: false
     derive: {source: noilai_dev, seed: 20261009, tasks: [T1], per_cell: {T1: 50}}

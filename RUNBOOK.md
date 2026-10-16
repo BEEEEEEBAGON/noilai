@@ -31,16 +31,16 @@ ledger's units; §7 is the list of things never to do, on either route.
    Create new token**, type *Read* (as of 2026 the fine-grained form has a box "Read access to contents of all
    public gated repos you can access"; tick it). The token goes once into the Kaggle Secret `HF_TOKEN` (step 7)
    and is never pasted into a cell.
-4. **Private dataset `noilai-release`** (the frozen `data/release/v0.3/` tree; the test split is gated, so the
+4. **Private dataset `noilai-release`** (the frozen `data/release/v0.4/` tree; the test split is gated, so the
    dataset stays private forever). kaggle.com → **Datasets → + New Dataset** → **Upload** → drag the folder
-   `v0.3` (so that the dataset holds `v0.3/manifest.json` and `v0.3/*.jsonl`; a flat upload also works: the
+   `v0.4` (so that the dataset holds `v0.4/manifest.json` and `v0.4/*.jsonl`; a flat upload also works: the
    gate cell (d) accepts either layout) → **Dataset Title** `noilai-release` → visibility **Private** (the default
    as of 2026) → **Create**. Leave out `manifest_private.json` (build seed, canary GUID) and the sealed split
    `data/release/sealed/`, which no notebook may read. Derived files (`pilot_t1_200`, `noilai_api_para300`,
    `noilai_reasoning500`, `noilai_bf16_200`, `noilai_scope500`, the exploratory dev sets) are NOT uploaded:
    cell (d) materializes them from the frozen files with the plan's seeds. CLI alternative (token, step 7), from
-   a CLEAN copy: `mkdir -p /tmp/noilai-release/v0.3 && cp data/release/v0.3/manifest.json
-   data/release/v0.3/*.jsonl /tmp/noilai-release/v0.3/` → `kaggle datasets init -p /tmp/noilai-release` → edit
+   a CLEAN copy: `mkdir -p /tmp/noilai-release/v0.4 && cp data/release/v0.4/manifest.json
+   data/release/v0.4/*.jsonl /tmp/noilai-release/v0.4/` → `kaggle datasets init -p /tmp/noilai-release` → edit
    its `dataset-metadata.json` (`"id": "<kaggle-user>/noilai-release"`, `"title": "noilai-release"`) →
    `kaggle datasets create -p /tmp/noilai-release --dir-mode zip` → `rm -r /tmp/noilai-release`.
 5. **Private dataset `noilai-bundle`** (the code, pinned to a commit). On the author's machine: `make bundle`
@@ -217,7 +217,7 @@ need the hub but no GPU, so everything runs in one CPU session.
    os.environ["HF_TOKEN"] = UserSecretsClient().get_secret("HF_TOKEN")          # exported, never printed
    subprocess.run([sys.executable, "scripts/fetch_resources.py"], check=True)
    rc = subprocess.run([sys.executable, "scripts/kaggle_cpu_jobs.py", "all",
-                        "--release-dir", "/kaggle/input/noilai-release/v0.3",     # or /kaggle/input/noilai-release for a flat upload
+                        "--release-dir", "/kaggle/input/noilai-release/v0.4",     # or /kaggle/input/noilai-release for a flat upload
                         "--report", "data/audit/cpu_jobs_report.json"]).returncode
    print("cpu jobs exit code", rc, "(1 = a whole job could not run; see the report)")
    ```
@@ -283,7 +283,7 @@ a token into the chat.
 
 (b) **Otherwise, by hand.** On the dataset page of `noilai-runs` click **Download** (top right, as of 2026; a
 zip of the latest version) and unzip it OUTSIDE the repository, e.g. `~/noilai-runs-2026-10-20/` holding `runs/`
-and `compute_log.csv`. Then, on a machine with the frozen `data/release/v0.3/` files (the author's), from the
+and `compute_log.csv`. Then, on a machine with the frozen `data/release/v0.4/` files (the author's), from the
 repository root:
 
 1. Verify every run directory (the notebook wrote `stats.json` and `results_hashes.json`; this recomputes every
@@ -377,7 +377,7 @@ and the ingest on the box); `bash scripts/box/laptop_finish.sh` copies the outpu
    repository holds `manifest.json` alone; BLOCKED 3) and are never committed, bundled or made public.
 
    ```bash
-   rsync -a --exclude manifest_private.json data/release/v0.3/ <box>:/workspace/release_v0.3/
+   rsync -a --exclude manifest_private.json data/release/v0.4/ <box>:/workspace/release/
    ```
 
    `manifest_private.json` (the build seed and the canary GUID, §0.4) stays home: nothing on the box needs it (the
@@ -393,7 +393,7 @@ and the ingest on the box); `bash scripts/box/laptop_finish.sh` copies the outpu
    cd /workspace/noilai
    git checkout <commit>
    mkdir -p data/release
-   cp -r /workspace/release_v0.3 data/release/v0.3
+   cp -r /workspace/release data/release/v0.4
    export HF_HOME=/workspace/hf
    export HF_TOKEN=<your Hugging Face read token>
    ```
@@ -551,7 +551,7 @@ and the ingest on the box); `bash scripts/box/laptop_finish.sh` copies the outpu
    ```bash
    rm -rf /workspace/hf
    rm -rf /workspace/noilai_runs_dataset
-   rm -rf /workspace/noilai /workspace/release_v0.3
+   rm -rf /workspace/noilai /workspace/release
    ```
 
    Then, on the provider's website, **stop and destroy the instance** (a stopped instance may still bill for its

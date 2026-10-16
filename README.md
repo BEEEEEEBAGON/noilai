@@ -130,7 +130,7 @@ from `google/gemma_pytorch` on GitHub and the Hunspell/word-list resources from 
 ## Build the data
 
 ```bash
-python scripts/build_data.py --out data/release/v0.3 --seed <private>
+python scripts/build_data.py --out data/release/v0.4 --seed <private>
 python scripts/build_data.py --out data/release/sealed --seed <private> --sealed   # regenerated at release; never sent to any API
 make data SEED=<private>                                                           # build + attested.jsonl + the sampled files
 ```
@@ -153,8 +153,10 @@ no-training terms (Groq); a provider whose tier trains on inputs (Gemini unpaid)
 the run driver refuses the combination until the author decides, DD 13.18); every test-split row carries
 the canary `NOILAI-CANARY-<uuid>` and every test/core file begins with the BIG-bench header
 record (`{"_header": ..., "canary": ..., "do_not_train": true, "evaluation_only": true}`) that
-loaders skip by key. The current working build is `data/release/v0.3`; DD 12.30 supersedes it by
-v0.3 at the generator freeze (bump the run plan's `release:` key then and re-record the hashes).
+loaders skip by key. The current working build is `data/release/v0.4`: DD 12.30 superseded v0.1 and v0.2 by
+v0.3 at the generator freeze (1 Oct 2026); v0.3 was lost with its private manifest on 16 Oct 2026 and rebuilt
+as v0.4 from the same generator and arguments with a new private seed (`docs/DEVIATIONS.md`; the run plan's
+`release:` key and hashes point at v0.4).
 Sub-samples are seeded files, never drawn at run time (DD 4.5 / 12.32): `scripts/sample_items.py
 main` writes the 4,200-item open-model sample (`noilai_main.jsonl`, 350 per cell, contains the
 core) and `c2` the C2-enriched set; the smaller core subsets the run plan needs (296-item API
@@ -400,7 +402,7 @@ per the ARR policy on generative assistance.
   (`--run-id`/`--out-root`) and a test keeps the two in step. No model has been run yet; every
   Vietnamese string awaits native validation.
 * **2026-09-30 (cloud kit review)** — The item-file gate accepts and checks the BIG-bench header
-  record (DD 4.6); the run plan points at `data/release/v0.3` through one `release:` key, replaces
+  record (DD 4.6); the run plan points at the release (`data/release/v0.3` then, v0.4 since 16 Oct) through one `release:` key, replaces
   every `--limit` sample by a seeded file (`noilai_main` from `scripts/sample_items.py`; derived
   core subsets and the two pilot files from `derive` blocks), adds the explicit-input main result
   (DD 12.17), the four prompt ablations, the E3 C2-enriched line and the TPU smoke line, and
@@ -426,7 +428,7 @@ per the ARR policy on generative assistance.
   token export (the GIT_ASKPASS fallback was unrunnable), take `ACCOUNT_HOLDER_ROLE`,
   `ALLOW_UNPINNED_REVISION`, `ALLOW_UNCAPPED_API` and push every 30 minutes; the E4 pair is the
   aligned *công tử* / *công tự*; `record_environment` probes the engine interpreter; `pyproject`
-  pins vLLM 0.30.0 and llama-cpp-python 0.3.35; the Makefile builds v0.3 with the sampled files and
+  pins vLLM 0.30.0 and llama-cpp-python 0.3.35; the Makefile builds the release (v0.4 today) with the sampled files and
   refuses the superseded 20 × 40 baseline forms; `data/validation/` and `data/human/` are ignored.
   Still no model run.
 * **2026-10-07 (integration of the 1 and 7 October branches)** — The Gate 1 validation packet (Parts A–E
