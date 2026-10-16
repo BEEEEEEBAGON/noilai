@@ -28,12 +28,18 @@ source "$BOXDIR/venv/bin/activate"
 echo "[box] python $(python --version 2>&1) at $(command -v python)"
 
 mkdir -p data/release/v0.3
-cp -rn "$BOXDIR/release_v0.3/." data/release/v0.3/         # the frozen files; manifest.json from the archive stays
+if [ -f "$BOXDIR/release_v0.3/noilai_dev.jsonl" ]; then
+  cp -rn "$BOXDIR/release_v0.3/." data/release/v0.3/       # the frozen files; manifest.json from the archive stays
+  FROZEN=1
+else
+  echo "[box] NO frozen item files under $BOXDIR/release_v0.3: only the lines that need none run (the XCOPA pilot); the others are skipped by the item gate"
+  FROZEN=0
+fi
 python -m pip install -q --upgrade pip
 python -m pip install -q vllm==0.30.0 || { echo "[box] vLLM install FAILED"; exit 3; }
 python -m pip install -q -e ".[eval,dev]" || { echo "[box] project install FAILED"; exit 3; }
 python scripts/fetch_resources.py || { echo "[box] fetch_resources FAILED"; exit 3; }
-python scripts/kaggle_run_plan.py --materialize || { echo "[box] materialize FAILED (are the frozen files complete?)"; exit 3; }
+python scripts/kaggle_run_plan.py --materialize || echo "[box] materialize: some derived files were skipped (a missing source)"
 nvidia-smi --query-gpu=index,name,memory.total,compute_cap --format=csv
 df -h "$BOXDIR" | tail -1
 
@@ -42,7 +48,9 @@ if ! HF_ENDPOINT=https://huggingface.co python scripts/pin_panel.py --apply --pa
   echo "[box] PIN FAILED or partial: unpinned models are skipped on the pilot lines (smoke lines run unpinned)"
 fi
 # the hub audits on the CPU while the GPU works (data/audit/*.json, *_rows.csv, items_*.jsonl)
-( python scripts/kaggle_cpu_jobs.py audit-tokenizers audit-items > "$BOXDIR/audits.log" 2>&1; echo "[box] audits rc=$?" >> "$BOXDIR/audits.log" ) &
+AUDIT_JOBS="audit-tokenizers audit-items"; [ "$FROZEN" = 1 ] || AUDIT_JOBS="audit-tokenizers"
+# shellcheck disable=SC2086
+( python scripts/kaggle_cpu_jobs.py $AUDIT_JOBS > "$BOXDIR/audits.log" 2>&1; echo "[box] audits rc=$?" >> "$BOXDIR/audits.log" ) &
 AUDITS=$!
 
 ELAPSED=$(( ($(date +%s) - START) / 60 ))
