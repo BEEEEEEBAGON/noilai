@@ -361,8 +361,8 @@ upstream file is kept with a `.UNVERIFIED` suffix and the build stops).
 | `gemma3_tokenizer.model`, `gemma2_tokenizer.model` | google/gemma_pytorch | Apache-2.0 repository | tokenizer audit without hub access |
 
 The GPL lists are consulted at build time (legality, lexicality, frequency proxies) and the items
-are produced by the rule engine, but the lexical base pairs ARE Viet74K entries: 1,183 two-syllable
-Viet74K entries appear verbatim as inputs or gold of the released lexical items in v0.3 (6,012 items
+are produced by the rule engine, but the lexical base pairs ARE Viet74K entries: 1,212 two-syllable
+Viet74K entries appear verbatim as inputs or gold of the released lexical items in v0.4 (5,984 items
 across dev and test; counted from the release files, `tests/test_cloud.py` keeps this number
 current), and are released under the terms `docs/DATA_STATEMENT.md` §H and DD 4.1 / 11.1 / 12.22
 state: written permission from the lists' authors (requested 30 September 2026) or, failing a reply

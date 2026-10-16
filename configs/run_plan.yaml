@@ -99,35 +99,35 @@ item_files:
   # ---- derived, seeded sub-samples (DD 4.5): written by `kaggle_run_plan.py --materialize`, never drawn at run time
   noilai_api_para300:
     path: "{release}/noilai_api_para300.jsonl"
-    sha256: null   # v0.4: re-derived from noilai_core at the first --materialize; record with `kaggle_verify_items.py --key noilai_api_para300 --materialize`
+    sha256: 83965c567ec7af651da0a29b022e4c405b2b9546a54e988ace9b693d5fa64d1c   # v0.4 (16 Oct 2026)
     description: "DD 4.5 paraphrase subset for API models: 296 core items (25 per T1/T2 cell, 12 yes/no pairs per T3 cell) under p1 and p2; also the E3 API set"
     canary_required: true
     derive: {source: noilai_core, seed: 20261006, per_cell: {T1: 25, T2: 25, T3: 24}, in_core_only: true}
     expected_counts: {n_items: 296}
   noilai_reasoning500:
     path: "{release}/noilai_reasoning500.jsonl"
-    sha256: null   # v0.4: re-derived at the first --materialize; record with `kaggle_verify_items.py --key noilai_reasoning500 --materialize`
+    sha256: ce9cca6da204a85d8556206b6b54f14257dbd2c018d775b633b83ad30edcd0b9   # v0.4 (16 Oct 2026)
     description: "the 500-item thinking-ON sub-study set: core items so that the API variants see nothing new (43/42/40 per T1/T2/T3 cell)"
     canary_required: true
     derive: {source: noilai_core, seed: 20261007, per_cell: {T1: 43, T2: 42, T3: 40}, in_core_only: true}
     expected_counts: {n_items: 500}
   noilai_bf16_200:
     path: "{release}/noilai_bf16_200.jsonl"
-    sha256: null   # v0.4: re-derived at the first --materialize; record with `kaggle_verify_items.py --key noilai_bf16_200 --materialize`
+    sha256: d33aba5b5d2a950dd58c6d45b631603f9dbfdcd41af985a9bbc6cf2eef34662a   # v0.4 (16 Oct 2026)
     description: "the ~200-item bf16 drift set: core items so the same rows exist in every T4 run (17/17/16 per T1/T2/T3 cell)"
     canary_required: true
     derive: {source: noilai_core, seed: 20261008, per_cell: {T1: 17, T2: 17, T3: 16}, in_core_only: true}
     expected_counts: {n_items: 200}
   noilai_scope500:
     path: "{release}/noilai_scope500.jsonl"
-    sha256: null   # v0.4: re-derived at the first --materialize; record with `kaggle_verify_items.py --key noilai_scope500 --materialize`
+    sha256: 2c3db8de4d3e1d7f1c76a324f7dc31cd3165127a8da457cdc87e3854c3e94036   # v0.4 (16 Oct 2026)
     description: "DD 6.1 / 6.2 agreement-check set: 500 core items (63 per T1 cell, 31 yes/no pairs per T3 cell; the two E3 Holm tasks) on which Gemma 3 1B runs the secondary arm scope `item` and the C1 arm through a second engine (HF); a subset of noilai_main, so the vLLM whole_prompt reference comes from E3_noilai on the same rows"
     canary_required: true
     derive: {source: noilai_core, seed: 20261011, tasks: [T1, T3], per_cell: {T1: 63, T3: 62}, in_core_only: true}
     expected_counts: {n_items: 500}
   pilot_t1_200:
     path: "{release}/pilot_t1_200.jsonl"
-    sha256: null   # v0.4: re-derived from noilai_dev at the first --materialize; record with `kaggle_verify_items.py --key pilot_t1_200 --materialize`
+    sha256: 63667119857e569c85bb7beedae12721f189160a4f7c6436d55d551cc9a8b04e   # v0.4 (16 Oct 2026)
     description: "Gate 1 pilot (DD 8.5): 200 dev items, 50 per T1 variant; its go/no-go criterion lives in docs/PREREGISTRATION.md section 10"
     canary_required: false
     derive: {source: noilai_dev, seed: 20261009, tasks: [T1], per_cell: {T1: 50}}

@@ -13,11 +13,10 @@ and is never edited by hand. Blockers, in deadline order, are in `BLOCKED.md`; t
   the history's pre-redaction seed (`20261004`) does not reproduce v0.3's content hash at the freeze commit, so the
   freeze had drawn its own seed. Rebuilt as **v0.4** (DEVIATIONS row 2026-10-16): same generator and arguments, a new
   private seed, 10,000 items / 2,500 base pairs / the same core counts; `configs/run_plan.yaml` `release` → v0.4 with
-  the six base-file hashes re-recorded and the five derived files' hashes null until the first `--materialize`
-  records them; `data/release/v0.4/manifest.json` committed; the eight files sent to the author (two private copies
-  to keep; `BLOCKED.md` 3). The next rental runs tier 0 whole once the files are on the author's Mac. Not done: the
-  derived-file hashes (the session's permission filter refused `--materialize` here), the PREREG / RESULTS_LOG / paper
-  references to v0.3 (author's edits), the `noilai-release` dataset.
+  every item-file hash re-recorded (six base files, five derived files; `pilot_xcopa_200` unchanged);
+  `data/release/v0.4/manifest.json` committed; the eight files sent to the author (two private copies to keep;
+  `BLOCKED.md` 3). The next rental runs tier 0 whole once the files are on the author's Mac. Not done: the PREREG /
+  RESULTS_LOG / paper references to v0.3 (author's edits), the `noilai-release` dataset.
 - **2026-10-16 (box-kit session, adoring-planck; no Kaggle or Hugging Face access).** Merged before this session:
   PR #5 (`036f603`), the rented-CUDA-box kit (`scripts/cuda_box.py`, `kaggle_run_plan.CudaSession`, `cuda_fit`,
   `tensor_parallel_for`; DEVIATIONS row of 2026-10-12). The author bought about 24 h on a 2x NVIDIA A800-SXM4-40GB
