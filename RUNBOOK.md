@@ -342,6 +342,17 @@ shows (`user@host`, with `-p <port>` if it names a port), `/workspace` by the da
 the hash of the commit you want to run. If `python` is not found on the box, type `python3` wherever this section
 says `python`.
 
+**The scripted route (`scripts/box/`).** The three scripts do steps 2–5 and 7 for you: on the laptop, inside the
+repository folder that holds the frozen files, `bash scripts/box/laptop_start.sh <minutes of rental left>` (with
+`HF_TOKEN=...` and, for a provider's hub mirror, `HF_ENDPOINT=...` in front of it; the box address is at the top
+of the script) copies the code of `origin/main`, the frozen files and `box_run.sh` to the box and starts the run in
+the background (`box_run.sh`: Python 3.12 through `uv` when the image's is older, vLLM 0.30.0, resources,
+`--materialize`, the pin with `--partial`, the audits on the CPU, then `--chunks c05_gpu_t0 c06_gpu_t0 c07_tpu_t0`
+with `--max-hours` set from the minutes left, a rehearsal of the pilot on any model the pin could not resolve,
+and the ingest on the box); `bash scripts/box/laptop_finish.sh` copies the outputs to `~/noilai-runs-<date>/`
+(never committed) and pushes the aggregates, ledger, pins, audits, compute log and the driver logs on a branch
+`box-run-<date>`. Step 8 (the wipe) stays by hand.
+
 **What the box can and cannot do today**
 
 | line | on the box? | why |
