@@ -84,6 +84,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import random
 import re
 import shlex
@@ -516,31 +517,60 @@ def parse_cuda_session(spec: str) -> CudaSession:
     return CudaSession(gpu_type=parts[0], vram_gb=float(m.group(1)), n_gpus=n_gpus, bf16=bf16)
 
 
-NVIDIA_SMI_QUERY = ["nvidia-smi", "--query-gpu=name,memory.total,compute_cap", "--format=csv,noheader,nounits"]
+NVIDIA_SMI_QUERY = ["nvidia-smi", "--query-gpu=index,name,memory.total,compute_cap", "--format=csv,noheader,nounits"]
 
 
-def cuda_session_from_nvidia_smi(text: str) -> CudaSession:
-    """The session on this box from `nvidia-smi --query-gpu=name,memory.total,compute_cap --format=csv,noheader,nounits`
-    (one line per GPU: `NVIDIA GeForce RTX 3090, 24576, 8.6`). Every GPU must be the same card."""
+def visible_gpu_indices(value: str | None) -> list[int] | None:
+    """CUDA_VISIBLE_DEVICES as nvidia-smi indices: None when unset or not a plain list of integers (UUIDs, MIG ids:
+    every card stays), [] when set and empty (no GPU is visible to the process)."""
+    if value is None:
+        return None
+    items = [v.strip() for v in value.split(",") if v.strip()]
+    if not items:
+        return []
+    if not all(it.isdigit() for it in items):
+        return None
+    return [int(it) for it in items]
+
+
+def cuda_session_from_nvidia_smi(text: str, visible: str | None = None) -> CudaSession:
+    """The session on this box from NVIDIA_SMI_QUERY (one line per GPU: `0, NVIDIA GeForce RTX 3090, 24576, 8.6`; the
+    older three-field form without the index is read too). `visible` (default: CUDA_VISIBLE_DEVICES) keeps only the
+    indexed rows it lists, so a lane started with CUDA_VISIBLE_DEVICES=0 describes one card; an empty value is an
+    error (no GPU visible), a list of UUIDs keeps every row. Every GPU must be the same card."""
     rows = []
     for ln in text.strip().splitlines():
         fields = [f.strip() for f in ln.split(",")]
-        if len(fields) != 3:
-            raise ValueError(f"nvidia-smi line {ln!r}: expected name, memory.total, compute_cap")
-        name, mib, cap = fields
+        if len(fields) == 4:
+            idx, name, mib, cap = fields
+            index: int | None = int(idx)
+        elif len(fields) == 3:
+            name, mib, cap = fields
+            index = None
+        else:
+            raise ValueError(f"nvidia-smi line {ln!r}: expected [index,] name, memory.total, compute_cap")
         slug = re.sub(r"^(nvidia|tesla)\s+", "", name.lower()).strip()
-        rows.append((re.sub(r"\s+", "-", slug), float(mib) / 1024.0, float(cap)))
+        rows.append((index, re.sub(r"\s+", "-", slug), float(mib) / 1024.0, float(cap)))
     if not rows:
         raise ValueError("nvidia-smi reported no GPU")
-    if len({(r[0], r[1]) for r in rows}) != 1:
-        raise ValueError(f"the box mixes GPU types {sorted({r[0] for r in rows})}: one session is one kind of card")
-    slug, vram_gb, cap = rows[0]
+    if visible is None:
+        visible = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if visible is not None and all(r[0] is not None for r in rows):
+        wanted = visible_gpu_indices(visible)
+        if wanted is not None:
+            rows = [r for r in rows if r[0] in wanted]
+            if not rows:
+                raise ValueError(f"CUDA_VISIBLE_DEVICES={visible!r}: no GPU visible")
+    if len({(r[1], r[2]) for r in rows}) != 1:
+        raise ValueError(f"the box mixes GPU types {sorted({r[1] for r in rows})}: one session is one kind of card")
+    _, slug, vram_gb, cap = rows[0]
     return CudaSession(gpu_type=slug, vram_gb=vram_gb, n_gpus=len(rows), bf16=cap >= BF16_COMPUTE_CAPABILITY)
 
 
 def detect_cuda_session() -> CudaSession:
+    """The box's session from nvidia-smi, restricted to the cards CUDA_VISIBLE_DEVICES exposes to this process."""
     out = subprocess.check_output(NVIDIA_SMI_QUERY, text=True, stderr=subprocess.DEVNULL, timeout=20)
-    return cuda_session_from_nvidia_smi(out)
+    return cuda_session_from_nvidia_smi(out, visible=os.environ.get("CUDA_VISIBLE_DEVICES"))
 
 
 def entry_params_b(entry: dict, models_cfg: dict | None = None) -> float | None:
@@ -1028,7 +1058,7 @@ def execute(run_id: str, models: Sequence[str] | None = None, platform: str = "k
         if cuda is not None and entry.get("backend") == "vllm" and not is_api(entry):
             # a rented box shards over its cards only when one card is too small (cuda_fit's estimate)
             res["tensor_parallel_size"] = tensor_parallel_for(entry, cuda, models_cfg)
-            cmd = cmd + ["--tensor-parallel-size", str(res["tensor_parallel_size"])]
+            cmd = [*cmd, "--tensor-parallel-size", str(res["tensor_parallel_size"])]
         res["cmd"] = cmd
         print(f"\n[plan ] {run_id} / {name}\n[cmd  ] {shlex.join(cmd)}")
         if gates["present"]:                  # the pre-registration gate: a dry run prints the reason, a real run skips
@@ -1147,7 +1177,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--run", help="run id from run_plan.yaml")
     ap.add_argument("--models", nargs="*", default=None, help="subset of the run's models (default: all)")
     ap.add_argument("--platform", default="kaggle", choices=CL.PLATFORMS)
-    ap.add_argument("--session-hardware", default=None, choices=sorted(k for k in HARDWARE_DEVICES if k != "mixed") + ["cuda"],
+    ap.add_argument("--session-hardware", default=None, choices=[*sorted(k for k in HARDWARE_DEVICES if k != "mixed"), "cuda"],
                     help="the session's accelerator; models configured for other hardware are skipped. `cuda` is a rented box: "
                          "a model runs when its estimated weight size fits (see cuda_fit) and the compute log records the card")
     ap.add_argument("--cuda-session", default=None, metavar="SPEC",
