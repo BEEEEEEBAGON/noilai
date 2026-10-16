@@ -19,7 +19,8 @@ Selection (DESIGN_DECISIONS 4.5, 3.7, 12.32)
 
 Requests are the product item x paraphrase x shots x arm. A request whose rendered prompt is
 byte-identical to the base-arm prompt (C2 on an unaffected item) is skipped and recorded in
-`unchanged.jsonl` (DESIGN_DECISIONS 6.1); an arm that changes no prompt at all fails the run
+`unchanged.jsonl` (DESIGN_DECISIONS 6.1: item_id, arm, prompt_id, paraphrase, identical_to; the paraphrase lets
+scripts/ledger.py count a paraphrase-split unit's expected rows); an arm that changes no prompt at all fails the run
 before any generation. outputs.jsonl is appended after every batch and `--resume` skips
 (item_id, arm, prompt_id) keys already present. manifest.json is written at start (status
 running) and rewritten at the end with the fields of DESIGN_DECISIONS 7.5 (identity, engine,
@@ -868,7 +869,7 @@ def run(backend: Backend, entry: dict, items: list[dict], item_path: Path, opts:
     reqs = plan_requests(selected, opts, kind)
     runnable, unchanged = mark_unchanged(reqs, opts, kind)
     with open(run_dir / "unchanged.jsonl", "w", encoding="utf-8") as f:
-        f.writelines(json.dumps({"item_id": r.item["item_id"], "arm": r.arm, "prompt_id": r.prompt_id,
+        f.writelines(json.dumps({"item_id": r.item["item_id"], "arm": r.arm, "prompt_id": r.prompt_id, "paraphrase": r.paraphrase,
                                  "identical_to": {"arm": P.BASE_ARM, "prompt_id": r.prompt_id}}, ensure_ascii=False) + "\n"
                      for r in unchanged)
     n_changed = {a: sum(1 for r in runnable if r.arm == a) for a in opts.arms if a != P.BASE_ARM}
@@ -949,8 +950,8 @@ def run(backend: Backend, entry: dict, items: list[dict], item_path: Path, opts:
         "outcome": {"n_done": 0, "n_unparseable": None, "n_truncated": None, "n_thinking_chars_total": None,
                     "thinking_allowed": thinking_allowed, "smoke": smoke,
                     "n_hedged": None, "nan_inf_events": 0, "api_model_echo": [], "rate_limit_events": None,
-                    "account_holder": account_holder if account_holder else ("unknown" if backend.is_api else None),
-                    "api_account_holder": account_holder if account_holder else ("unknown" if backend.is_api else None),
+                    "account_holder": account_holder or ("unknown" if backend.is_api else None),
+                    "api_account_holder": account_holder or ("unknown" if backend.is_api else None),
                     "api_account_holder_missing": bool(backend.is_api and not account_holder),
                     "api_privacy_settings": provider_privacy(entry) if backend.is_api else None,
                     "prefill_tok_s": None, "decode_tok_s": None},

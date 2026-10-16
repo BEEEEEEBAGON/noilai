@@ -400,7 +400,7 @@ EXTRACTION_CASES = [
     ("- **Đáp án**: mài kéo", "T1", "mài kéo", "marker"),
     ("Đáp án là: mài kéo", "T1", "mài kéo", "marker"),
     ("Đáp án là mài kéo", "T1", "mài kéo", "marker"),
-    ("Đáp án – mài kéo", "T1", "mài kéo", "marker"),
+    ("Đáp án \u2013 mài kéo", "T1", "mài kéo", "marker"),      # an en dash (written as an escape so both lint sets accept it)
     ("Đáp án: \"mài kéo\".", "T1", "mài kéo", "marker"),
     ("ĐÁP ÁN: MÀI KÉO", "T1", "MÀI KÉO", "marker"),
     (unicodedata.normalize("NFD", "Đáp án: mài kéo"), "T1", "mài kéo", "marker"),
@@ -837,7 +837,7 @@ def test_stratified_sample_per_cell_core_pairs_vulgar_and_seed(build):
     _g, b, _rel = build
     items = [it for it in b["items"] if it["split"] == "test"]
     vul = dict(items[0], item_id="T1-V1-VULGAR", vulgar=True)
-    items = items + [vul]
+    items = [*items, vul]
     s = SM.stratified_sample(items, 60, seed=5)
     quotas = SM.cell_quotas(60, [f"{t}-{v}" for t in SM.CELL_TASKS for v in V.VARIANTS], {f"T3-{v}": 2 for v in V.VARIANTS})
     assert s.per_cell_quota == quotas and sum(quotas.values()) <= 60
@@ -1059,7 +1059,7 @@ def test_api_guard_refuses_noncore_and_drops_vulgar_items(item_file, tmp_path):
               "input_syllables": [syl_dict(S_("mộng")), syl_dict(S_("mơ"))]}
     if vulgar["task"] == "T3":
         vulgar["candidate"] = "mờ mông"
-    run_dir = RN.run(api, entry, core + [vulgar], path, opts, log=lambda *a: None)
+    run_dir = RN.run(api, entry, [*core, vulgar], path, opts, log=lambda *a: None)
     m = RN.read_manifest(run_dir)
     assert m["api_safety"] == {"is_api": True, "n_excluded_vulgar": 1, "n_excluded_validator_flag": 0, "validator_flags": None,
                                "n_noncore": 0, "n_core": len(core),
@@ -1190,7 +1190,7 @@ def test_unchanged_prompts_are_skipped_and_a_dead_arm_fails_before_generation(tm
     assert sorted((o["item_id"], o["arm"]) for o in outs) == [("T1-V1-000002", "nfc"), ("T1-V3-000001", "nfc"),
                                                               ("T1-V3-000001", "placement_new")]
     unchanged = RN.read_unchanged(run_dir)
-    assert unchanged == [{"item_id": "T1-V1-000002", "arm": "placement_new", "prompt_id": "vi-p0-s3-explained-raw",
+    assert unchanged == [{"item_id": "T1-V1-000002", "arm": "placement_new", "prompt_id": "vi-p0-s3-explained-raw", "paraphrase": "p0",
                           "identical_to": {"arm": "nfc", "prompt_id": "vi-p0-s3-explained-raw"}}]
     m = RN.read_manifest(run_dir)
     assert m["data"]["n_changed_prompts"] == {"placement_new": 1} and m["data"]["n_unchanged_prompts"] == {"placement_new": 1}
@@ -1483,7 +1483,7 @@ def test_run_eval_and_score_run_scripts(item_file, tmp_path):
     r = subprocess.run(sample_cmd, cwd=ROOT, text=True, capture_output=True, check=False)
     assert r.returncode != 0 and "smoke/pilot-only" in r.stderr and "sample_items.py" in r.stderr   # DD 4.5 / 12.32
     assert not (tmp_path / "echo-sample").exists()
-    r = subprocess.run(sample_cmd + ["--smoke"], cwd=ROOT, text=True, capture_output=True, check=True)
+    r = subprocess.run([*sample_cmd, "--smoke"], cwd=ROOT, text=True, capture_output=True, check=True)
     m = RN.read_manifest(tmp_path / "echo-sample")
     assert m["selection"]["sample"]["seed"] == 2 and (tmp_path / "echo-sample" / "sample_ids.json").exists()
     assert m["outcome"]["smoke"] is True
@@ -1562,7 +1562,7 @@ def test_t3_logprob_boundary_keeps_the_prefix_property_on_gemma3(item_file):
         assert len(calls) == 2 and out["prefix_property_violation"] is False
         (yes_prompt, yn), (ctx, [cand]) = calls
         assert yes_prompt.endswith(P.marker_for(arm)) and ctx.endswith(P.marker_for(arm))
-        assert all(c.startswith(" ") for c in yn + [cand]) and [c.strip() for c in yn] == \
+        assert all(c.startswith(" ") for c in [*yn, cand]) and [c.strip() for c in yn] == \
             [R.reencode(w, arm) if arm != "nfc" else w for w in ("Có", "Không")]
         for prompt, cont in [(yes_prompt, yn[0]), (yes_prompt, yn[1]), (ctx, cand)]:
             assert _spm_prefix_holds(sp, prompt, cont), (arm, cont)
@@ -1695,7 +1695,7 @@ def test_vllm_backend_tokenizes_once_passes_token_ids_and_asserts_the_prefix_pro
     class _Retok(_FakeLLM):
         def generate(self, prompts, params, use_tqdm=False):
             outs = super().generate(prompts, params, use_tqdm)
-            outs[0].prompt_token_ids = [0] + list(outs[0].prompt_token_ids)      # a re-tokenizing engine: double BOS
+            outs[0].prompt_token_ids = [0, *outs[0].prompt_token_ids]      # a re-tokenizing engine: double BOS
             return outs
     be2 = B.VLLMBackend("m", llm=_Retok(tok), tokenizer=tok, sampling_params_cls=_FakeSP)
     with pytest.raises(B.BackendError, match="re-tokenized"):
@@ -1766,7 +1766,7 @@ def test_revision_pin_is_checked_before_any_weight_is_downloaded(item_file, tmp_
     import run_eval as RE
 
     hf = {"name": "m", "backend": "hf", "hf_id": "org/m", "revision": None}
-    with pytest.raises(RN.RevisionError, match="7.1"):
+    with pytest.raises(RN.RevisionError, match=r"7\.1"):
         RN.check_revision(hf, "hf")
     for kind in ("hf", "vllm", "llama_cpp"):
         with pytest.raises(RN.RevisionError):
