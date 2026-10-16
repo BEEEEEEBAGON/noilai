@@ -115,6 +115,9 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--seed", type=int, default=None)
     ap.add_argument("--system-prompt", default=None)
     ap.add_argument("--n-accelerators", type=int, default=None, help="GPU-hour multiplier override (TPUs)")
+    ap.add_argument("--tensor-parallel-size", type=int, default=None,
+                    help="vllm: shard the weights over this many GPUs (default: the entry's hardware block in models.yaml; "
+                         "a rented box passes its own count through scripts/kaggle_run_plan.py)")
     ap.add_argument("--account-holder", default=None, help="ROLE of the API/compute account holder (never a name)")
     ap.add_argument("--on-long-prompt", default=None, choices=["error", "truncate_left"],
                     help="hf: what to do with a prompt longer than max_model_len - max_new_tokens (default error)")
@@ -139,6 +142,8 @@ def resolve_entry(args) -> dict:
         entry["seed"] = args.seed
     if args.on_long_prompt:
         entry["on_long_prompt"] = args.on_long_prompt
+    if args.tensor_parallel_size is not None:
+        entry["tensor_parallel_size"] = args.tensor_parallel_size
     entry["batch_size"] = args.batch_size
     return entry
 

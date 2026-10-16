@@ -56,7 +56,11 @@ before the first command (hash, header record, canary, counts).
 
 Session guards. `session_hardware` (the notebook's accelerator: t4, 2xt4, tpu, l4, api) skips a
 model whose configured hardware cannot run in the session unless `allow_hardware_mismatch`;
-the compute-log row always records the SESSION's device type and count. `max_session_hours`
+the compute-log row always records the SESSION's device type and count. A rented CUDA box is a
+`CudaSession` instead (`--session-hardware cuda --cuda-session <gpu_type>:<vram_gb>[x<n_gpus>][:nobf16]`,
+or read from nvidia-smi): a model runs when `cuda_fit`'s weight-size estimate fits and its dtype is
+supported, the command carries `--tensor-parallel-size` (every card only when one is too small), and
+the log records the card and count (scripts/cuda_box.py drives a whole plan this way). `max_session_hours`
 stops launching new models past the budget (DD 7.6: <= 9 h of work per 12-h Kaggle session);
 `after_each` (a callable) runs after every executed model, e.g. a dataset push, so that a
 timed-out session keeps what it finished.
@@ -90,6 +94,7 @@ import threading
 import time
 from collections import Counter, defaultdict
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -439,19 +444,146 @@ def device_for(entry: dict) -> tuple[str, int]:
     return (dev or hw, 1 if n is None else n)
 
 
-def session_device(session_hardware: str) -> tuple[str, int]:
+def session_device(session_hardware: str | CudaSession) -> tuple[str, int]:
+    if isinstance(session_hardware, CudaSession):
+        return (session_hardware.gpu_type, session_hardware.n_gpus)
     dev, n = HARDWARE_DEVICES.get(session_hardware, (session_hardware, 1))
     return (dev or session_hardware, 1 if n is None else n)
 
 
-def hardware_compatible(entry: dict, session_hardware: str | None) -> bool:
-    """Can a model configured for `entry['hardware']` run in a session on `session_hardware`?"""
+def hardware_compatible(entry: dict, session_hardware: str | CudaSession | None, models_cfg: dict | None = None) -> bool:
+    """Can a model configured for `entry['hardware']` run in a session on `session_hardware`?
+
+    A Kaggle-style session name is matched by SESSION_COMPATIBLE; a CudaSession (a rented box) is
+    decided by the weight-size estimate and bf16 support of `cuda_fit`."""
     if session_hardware is None:
         return True
+    if isinstance(session_hardware, CudaSession):
+        return cuda_fit(entry, session_hardware, models_cfg)[0]
     hw = entry.get("hardware")
     if is_api(entry):
         return True
     return session_hardware in SESSION_COMPATIBLE.get(hw, {hw})
+
+
+# ------------------------------------------------------------------ a rented CUDA box as a session
+# Kaggle's accelerators are named sessions (t4, 2xt4, tpu); a rented box is described by what matters for
+# fitting a model: the card, its VRAM, how many, and whether it runs bf16 (compute capability >= 8.0). The
+# fit rule is an engineering estimate, not a measurement: weights = params x bytes per parameter, x 1.1 for
+# the runtime's overhead, + 1 GB for the CUDA context, against vLLM's default 90% of the VRAM.
+GPU_MEMORY_UTILIZATION = 0.9      # vLLM's default gpu_memory_utilization (noilai.eval.backends.make_backend)
+WEIGHT_OVERHEAD = 1.1
+CUDA_CONTEXT_GB = 1.0
+BYTES_PER_PARAM = {"float32": 4.0, "fp32": 4.0, "float16": 2.0, "fp16": 2.0, "half": 2.0, "bfloat16": 2.0, "bf16": 2.0}
+BF16_COMPUTE_CAPABILITY = 8.0
+
+
+@dataclass(frozen=True)
+class CudaSession:
+    gpu_type: str
+    vram_gb: float
+    n_gpus: int = 1
+    bf16: bool = True
+
+    @property
+    def usable_gb(self) -> float:
+        return self.vram_gb * self.n_gpus * GPU_MEMORY_UTILIZATION
+
+    @property
+    def usable_per_gpu_gb(self) -> float:
+        return self.vram_gb * GPU_MEMORY_UTILIZATION
+
+    def __str__(self) -> str:
+        return f"cuda {self.gpu_type}:{self.vram_gb:g}x{self.n_gpus}" + ("" if self.bf16 else ":nobf16")
+
+
+def parse_cuda_session(spec: str) -> CudaSession:
+    """`<gpu_type>:<vram_gb>[x<n_gpus>][:nobf16]`, e.g. rtx3090:24, a100-80gb:80, v100-32gb:32x2:nobf16."""
+    parts = spec.split(":")
+    if len(parts) not in (2, 3) or not parts[0]:
+        raise ValueError(f"cuda session spec {spec!r}: expected <gpu_type>:<vram_gb>[x<n_gpus>][:nobf16]")
+    m = re.fullmatch(r"(\d+(?:\.\d+)?)(?:x(\d+))?", parts[1])
+    if not m:
+        raise ValueError(f"cuda session spec {spec!r}: VRAM must be <gb>[x<n_gpus>], got {parts[1]!r}")
+    n_gpus = int(m.group(2) or 1)
+    if n_gpus < 1:
+        raise ValueError(f"cuda session spec {spec!r}: n_gpus must be >= 1")
+    bf16 = True
+    if len(parts) == 3:
+        if parts[2] not in ("bf16", "nobf16"):
+            raise ValueError(f"cuda session spec {spec!r}: the third field is 'bf16' or 'nobf16', got {parts[2]!r}")
+        bf16 = parts[2] == "bf16"
+    return CudaSession(gpu_type=parts[0], vram_gb=float(m.group(1)), n_gpus=n_gpus, bf16=bf16)
+
+
+NVIDIA_SMI_QUERY = ["nvidia-smi", "--query-gpu=name,memory.total,compute_cap", "--format=csv,noheader,nounits"]
+
+
+def cuda_session_from_nvidia_smi(text: str) -> CudaSession:
+    """The session on this box from `nvidia-smi --query-gpu=name,memory.total,compute_cap --format=csv,noheader,nounits`
+    (one line per GPU: `NVIDIA GeForce RTX 3090, 24576, 8.6`). Every GPU must be the same card."""
+    rows = []
+    for ln in text.strip().splitlines():
+        fields = [f.strip() for f in ln.split(",")]
+        if len(fields) != 3:
+            raise ValueError(f"nvidia-smi line {ln!r}: expected name, memory.total, compute_cap")
+        name, mib, cap = fields
+        slug = re.sub(r"^(nvidia|tesla)\s+", "", name.lower()).strip()
+        rows.append((re.sub(r"\s+", "-", slug), float(mib) / 1024.0, float(cap)))
+    if not rows:
+        raise ValueError("nvidia-smi reported no GPU")
+    if len({(r[0], r[1]) for r in rows}) != 1:
+        raise ValueError(f"the box mixes GPU types {sorted({r[0] for r in rows})}: one session is one kind of card")
+    slug, vram_gb, cap = rows[0]
+    return CudaSession(gpu_type=slug, vram_gb=vram_gb, n_gpus=len(rows), bf16=cap >= BF16_COMPUTE_CAPABILITY)
+
+
+def detect_cuda_session() -> CudaSession:
+    out = subprocess.check_output(NVIDIA_SMI_QUERY, text=True, stderr=subprocess.DEVNULL, timeout=20)
+    return cuda_session_from_nvidia_smi(out)
+
+
+def entry_params_b(entry: dict, models_cfg: dict | None = None) -> float | None:
+    """`params_b` of the entry, or of the entry it is a reference run of (the --bf16 / --thinking variants)."""
+    if entry.get("params_b") is not None:
+        return float(entry["params_b"])
+    ref = entry.get("reference_of")
+    if ref and models_cfg and ref in models_cfg.get("by_name", {}):
+        base = models_cfg["by_name"][ref]
+        if base.get("params_b") is not None:
+            return float(base["params_b"])
+    return None
+
+
+def bytes_per_param(entry: dict) -> float | None:
+    q = entry.get("quantization")
+    if isinstance(q, dict) and q.get("bits"):
+        return float(q["bits"]) / 8.0
+    return BYTES_PER_PARAM.get(str(entry.get("dtype") or "").lower())
+
+
+def cuda_fit(entry: dict, session: CudaSession, models_cfg: dict | None = None) -> tuple[bool, float, str]:
+    """(fits, estimated GB needed, reason) for one entry on a CudaSession."""
+    if is_api(entry):
+        return True, 0.0, "API-served: no local weights"
+    params = entry_params_b(entry, models_cfg)
+    bpp = bytes_per_param(entry)
+    if params is None or bpp is None:
+        return False, float("nan"), f"cannot estimate the weight size (params_b {params!r}, dtype {entry.get('dtype')!r})"
+    need = params * bpp * WEIGHT_OVERHEAD + CUDA_CONTEXT_GB
+    if str(entry.get("dtype") or "").lower() in ("bfloat16", "bf16") and not session.bf16:
+        return False, need, f"dtype bfloat16 needs a bf16-capable card (compute capability >= {BF16_COMPUTE_CAPABILITY}); {session} is not"
+    if need > session.usable_gb:
+        return False, need, f"needs ~{need:.1f} GB, {session} has {session.usable_gb:.1f} GB usable"
+    return True, need, f"needs ~{need:.1f} GB of {session.usable_gb:.1f} GB usable"
+
+
+def tensor_parallel_for(entry: dict, session: CudaSession, models_cfg: dict | None = None) -> int:
+    """One GPU unless the estimate exceeds a single card; then every card of the session."""
+    ok, need, _ = cuda_fit(entry, session, models_cfg)
+    if is_api(entry) or (ok and need <= session.usable_per_gpu_gb):
+        return 1
+    return session.n_gpus          # too big for one card (or forced by --allow-hardware-mismatch): every card
 
 
 # ------------------------------------------------------------------ derived item files
@@ -882,8 +1014,9 @@ def execute(run_id: str, models: Sequence[str] | None = None, platform: str = "k
     for name in names:
         entry = models_cfg["by_name"][name]
         out_dir = Path(project_root) / run_dir(plan, run, name)
+        cuda = session_hardware if isinstance(session_hardware, CudaSession) else None
         res = {"run": run_id, "model": name, "cmd": None, "out": str(out_dir), "status": "dry-run",
-               "hardware": entry.get("hardware"), "session_hardware": session_hardware}
+               "hardware": entry.get("hardware"), "session_hardware": str(cuda) if cuda else session_hardware}
         res["census_skipped_arms"] = census_skipped_arms(run, entry)
         try:
             cmd = build_command(run, name, plan, models_cfg, project_root=project_root, python=python, extra=extra)
@@ -892,6 +1025,10 @@ def execute(run_id: str, models: Sequence[str] | None = None, platform: str = "k
             print(f"\n[plan ] {run_id} / {name}\n[refuse] {e}")
             results.append(res)
             continue
+        if cuda is not None and entry.get("backend") == "vllm" and not is_api(entry):
+            # a rented box shards over its cards only when one card is too small (cuda_fit's estimate)
+            res["tensor_parallel_size"] = tensor_parallel_for(entry, cuda, models_cfg)
+            cmd = cmd + ["--tensor-parallel-size", str(res["tensor_parallel_size"])]
         res["cmd"] = cmd
         print(f"\n[plan ] {run_id} / {name}\n[cmd  ] {shlex.join(cmd)}")
         if gates["present"]:                  # the pre-registration gate: a dry run prints the reason, a real run skips
@@ -915,8 +1052,10 @@ def execute(run_id: str, models: Sequence[str] | None = None, platform: str = "k
             res["verify"] = gate
             results.append(res)
             continue
-        if not hardware_compatible(entry, session_hardware):
+        if not hardware_compatible(entry, session_hardware, models_cfg):
             msg = f"hardware {entry.get('hardware')} is not runnable in a {session_hardware} session"
+            if cuda is not None:
+                msg += f" ({cuda_fit(entry, cuda, models_cfg)[2]})"
             if not allow_hardware_mismatch:
                 res["status"] = f"skipped: {msg}"
                 print(f"[skip ] {name}: {msg}")
@@ -1008,8 +1147,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--run", help="run id from run_plan.yaml")
     ap.add_argument("--models", nargs="*", default=None, help="subset of the run's models (default: all)")
     ap.add_argument("--platform", default="kaggle", choices=CL.PLATFORMS)
-    ap.add_argument("--session-hardware", default=None, choices=sorted(k for k in HARDWARE_DEVICES if k != "mixed"),
-                    help="the session's accelerator; models configured for other hardware are skipped")
+    ap.add_argument("--session-hardware", default=None, choices=sorted(k for k in HARDWARE_DEVICES if k != "mixed") + ["cuda"],
+                    help="the session's accelerator; models configured for other hardware are skipped. `cuda` is a rented box: "
+                         "a model runs when its estimated weight size fits (see cuda_fit) and the compute log records the card")
+    ap.add_argument("--cuda-session", default=None, metavar="SPEC",
+                    help="with --session-hardware cuda: <gpu_type>:<vram_gb>[x<n_gpus>][:nobf16], e.g. rtx3090:24, "
+                         "a100-80gb:80, v100-32gb:32x2:nobf16 (default: read from nvidia-smi)")
     ap.add_argument("--allow-hardware-mismatch", action="store_true")
     ap.add_argument("--max-session-hours", type=float, default=None, help="launch no new model past this budget")
     ap.add_argument("--dry-run", action="store_true")
@@ -1051,10 +1194,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         return rc
     if not args.run:
         ap.error("--run, --list, --materialize or --verify is required")
+    session: str | CudaSession | None = args.session_hardware
+    if args.cuda_session is not None and args.session_hardware != "cuda":
+        ap.error("--cuda-session goes with --session-hardware cuda")
+    if args.session_hardware == "cuda":
+        try:
+            session = parse_cuda_session(args.cuda_session) if args.cuda_session else detect_cuda_session()
+        except (ValueError, OSError, subprocess.SubprocessError) as e:
+            ap.error(f"cannot describe the CUDA session ({e!r}); pass --cuda-session <gpu_type>:<vram_gb>[x<n_gpus>][:nobf16] "
+                     f"or make nvidia-smi available")
+        print(f"[session] {session}")
     results = execute(args.run, models=args.models, platform=args.platform, dry_run=args.dry_run,
                       continue_on_error=not args.stop_on_error, extra=shlex.split(args.extra), plan=plan,
                       models_cfg=models_cfg, log_path=args.log, python=args.python,
-                      session_hardware=args.session_hardware, allow_hardware_mismatch=args.allow_hardware_mismatch,
+                      session_hardware=session, allow_hardware_mismatch=args.allow_hardware_mismatch,
                       session_t0=time.time(), max_session_hours=args.max_session_hours, verify=not args.no_verify,
                       allow_unpinned_revision=args.allow_unpinned_revision)
     failed = [r for r in results if str(r["status"]).startswith("failed")]
