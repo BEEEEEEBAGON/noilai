@@ -58,8 +58,9 @@ scripts/
   sample_items.py         seeded sub-samples of a release (DD 4.5): noilai_main.jsonl (4,200, 350 per cell) and noilai_c2.jsonl
   kaggle_run_plan.py      configs/run_plan.yaml -> run_eval.py commands; derives the seeded core subsets (--materialize), gates every
                           run on its item file, runs the commands under the session guards, logs hours, keeps the API request+token ledger
-  cuda_box.py             one command for a rented CUDA box (marketplace GPU, AWS): bootstrap the pinned engine, run the plan's
-                          self-hosted lines in cut order under a VRAM-based session guard, sync the outputs after every model
+  cuda_box.py             one command for a rented CUDA box (marketplace GPU, AWS): bootstrap the pinned engine, run the compute
+                          chunks (--chunks; the run directories are the ledger's units) under a VRAM-based session guard, purge and
+                          prefetch weights per chunk, check_run + Kaggle push after every model, --lanes N schedules the cards
   kaggle_verify_items.py  item-file gate: SHA-256 against run_plan.yaml, the BIG-bench header record, canary on every row, row/cell counts
   kaggle_dataset.py       stage data/runs and push a versioned private Kaggle dataset (kaggle CLI, import guarded)
   kaggle_build_notebooks.py  generates notebooks/*.ipynb from one source; --check refuses hand-edited notebooks
@@ -444,21 +445,37 @@ per the ARR policy on generative assistance.
 ## Running from a private repository
 
 **On a rented CUDA box** (a marketplace GPU or an AWS instance; the free-tier notebooks do not apply) clone
-the repository over SSH or from the bundle below, export `HF_TOKEN` for gated checkpoints, and run
+the repository over SSH or from the bundle below, copy the frozen item files in, export `HF_TOKEN` for the gated
+checkpoints, and run
 
 ```bash
-python scripts/cuda_box.py --bootstrap --session auto --platform rented \
-    --sync-cmd "aws s3 sync data/runs s3://<bucket>/noilai/runs"        # or rclone, or a git push of data/runs
+python scripts/cuda_box.py --bootstrap --session auto --chunks tier0 --dry-run     # preview: every command, nothing runs
+python scripts/cuda_box.py --session auto --chunks tier0 --platform rented \
+    --kaggle-dataset noilai-runs --create-dataset           # tier 0 now; after the gate: --chunks from:c08_gpu_t1 --lanes 2
 ```
 
 `--session auto` reads the card, its VRAM, the count and the bf16 capability from `nvidia-smi` (or pass
-`--session <gpu_type>:<vram_gb>[x<n_gpus>][:nobf16]`, e.g. `rtx3090:24`, `a100-80gb:80`); every self-hosted
-line of the plan then runs in cut order through `kaggle_run_plan.py`'s loop, a model is skipped when its
-estimated weight size does not fit (`cuda_fit`: parameters × bytes per parameter × 1.1 + 1 GB against 90% of
-the VRAM; bf16 entries need compute capability ≥ 8.0), the weights are sharded over the cards only when one
-card is too small, the compute log records the real card under `--platform` (`rented`, `aws`, `local`), and
-`--sync-cmd` runs after every executed model so a box that dies keeps what it finished. `--runs` and `--models`
-narrow the plan (the Gate 1 pilot: `--runs pilot_t1_200 pilot_xcopa_200`); `--dry-run` prints every command.
+`--session <gpu_type>:<vram_gb>[x<n_gpus>][:nobf16]`, e.g. `a800-sxm4-40gb:40x2`, `rtx3090:24`). The driver runs the
+**compute chunks** of `configs/compute_chunks.yaml` (`--chunks all`, the default: every GPU / TPU chunk `c05`–`c31`
+in plan order; `tier0`; `from:<id>`; or explicit ids — the CPU chunks `c01`–`c04` are refused, `c05` is the pilot
+on a box), job by job through `kaggle_run_plan.py`'s loop with each job's tag, so the run directories are exactly
+the ledger's units (`<run>__<model>[__<tag>]`) and `ledger.py ingest` counts them as they are. A model is skipped
+when its estimated weight size does not fit (`cuda_fit`: parameters × bytes per parameter × 1.1 + 1 GB against
+90% of the VRAM; bf16 entries need compute capability ≥ 8.0), the weights are sharded over the cards only when
+one card is too small (`--tensor-parallel-size`), the compute log records the real card under `--platform`
+(`rented`, `aws`, `local`), and every confirmatory chunk stays `skipped: gate: ...` (counted as `gated` in the
+summary) until `experiments/gates.yaml` is filled. After every executed model the driver runs `scripts/check_run.py`
+on the directory (`--no-check` skips it), pushes `data/runs` and `data/compute_log.csv` to the private Kaggle
+dataset (`--kaggle-dataset noilai-runs`, plus `--create-dataset` for the first version; `KAGGLE_USERNAME` /
+`KAGGLE_KEY` in the environment, else one warning and no push; `--sync-cmd "<cmd>"` runs any other copy command the
+same way, in the background) and deletes the model's weights from the hub cache unless a later job of the same
+chunk or the next chunk uses them (`--keep-weights` turns the purge off); the next chunk's weights download in the
+background meanwhile (`--no-prefetch` turns that off): a 200 GB disk never holds the whole panel. `--lanes 2` makes
+the driver schedule the cards itself: tier by tier (the cut order), the one-card chunks run in parallel as child
+processes pinned with `CUDA_VISIBLE_DEVICES=0` / `=1`, then the chunks with a 27B model run on both cards;
+`--max-hours N` launches no new model past N hours; `--dry-run` prints the schedule and every command and runs,
+purges and prefetches nothing. `--runs RUN_ID ...` is the whole-line mode (one directory per plan line; the ledger
+maps a split line's whole directory to its `__p0p1` / `__p2` units). The click steps are `RUNBOOK.md` §6.
 
 The notebooks never clone over HTTPS while the repository is private: they read the code from a
 **git bundle in a private Kaggle dataset** (`BUNDLE_PATH`, the default in every parameters cell) and

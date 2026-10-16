@@ -1,7 +1,9 @@
 # BLOCKED — one list, ordered by the date each item blocks (experiments and validation workstreams)
 
-Updated **2026-10-12**. One entry per thing that waits on a person, ordered by the date it blocks; **PAST DUE** = a
-deadline before 12 October (status unknown to the assistant: nothing has been handed back). Each entry: deadline, who (author / adult collaborator / validators / respondents /
+Updated **2026-10-16**. One entry per thing that waits on a person, ordered by the date it blocks; **PAST DUE** = a
+deadline before 16 October (status unknown to the assistant: nothing has been handed back). The rented box (2x
+A800-SXM4-40GB, about 24 h of credit; `RUNBOOK.md` §6) is the primary route of entries 14 and 19 and, after the gate,
+of entry 33; its own steps live inside those entries, so no number moves. Each entry: deadline, who (author / adult collaborator / validators / respondents /
 assistant), exact steps, what it blocks, and the row of `docs/gate1/DD13_DECISION_MEMO.md` that already answers it
 (the memo is the author's record, not edited here; reply to it with the row numbers you accept). Dates are the
 protocols': invitations 8 Oct, packet 12 Oct, Gate 1 18 Oct, panel freeze 25 Oct, stage-2 commit 8 Nov at the
@@ -18,13 +20,18 @@ latest (25 Oct recommended, memo N13), results freeze 22 Nov, E4 23 Nov–6 Dec.
 2. **[1 Oct → now] PAST DUE — Hugging Face licences and a read token.** Who: the account holder who meets HF's and
    each licence's age terms (entry 10). Steps: accept the licence of every `gated: true` entry in `configs/models.yaml`
    (`RUNBOOK.md` §0.3; Llama's is a form with manual approval, hours to days); Settings → Access Tokens → Read →
-   Kaggle Add-ons → Secrets as `HF_TOKEN` (never in a cell or the repository). Blocks: c01 (entry 5), the pin run and
-   the audits (entry 19), every GPU/TPU chunk. Memo 17.
+   Kaggle Add-ons → Secrets as `HF_TOKEN` (never in a cell or the repository); on the rented box the same token goes
+   into `export HF_TOKEN=...` in the shell only (`RUNBOOK.md` §6 step 3). Blocks: c01 (entry 5), the pin run and
+   the audits (entry 19), every GPU/TPU chunk, the box's tier 0 (entry 14). Memo 17.
 3. **[1 Oct → now] PAST DUE — Kaggle datasets and secrets for the notebooks.** Who: author (the frozen item files
    exist only on the author's machine; here `data/release/v0.3/` holds `manifest.json` alone). Steps: `make bundle` →
    private dataset `noilai-bundle`; the frozen `data/release/v0.3/` tree without `manifest_private.json` and `sealed/`
    → private dataset `noilai-release` (`RUNBOOK.md` §0.4); Secrets `KAGGLE_USERNAME`, `KAGGLE_KEY`; c01 with
-   `CREATE_DATASET = True` creates `noilai-runs`. Blocks: c01 and every chunk; every ingest (`data/runs`). Memo N10.
+   `CREATE_DATASET = True` creates `noilai-runs`. The rented box needs no dataset: the frozen files reach it by
+   `rsync -a --exclude manifest_private.json data/release/v0.3/ <box>:/workspace/release_v0.3/` (`RUNBOOK.md` §6
+   step 2; the private manifest stays home) and its first push with
+   `--kaggle-dataset noilai-runs --create-dataset` creates the runs dataset. Blocks: c01 and every chunk; the box's
+   tier 0 (entry 14); every ingest (`data/runs`). Memo N10.
 4. **[1 Oct → now] PAST DUE — Stage-1 pre-registration commit recorded.** Who: author ("your edit, not mine", memo
    15; the assistant never edits `docs/PREREGISTRATION.md`). Steps: `PREREG_COMMIT_STAGE1` = `62f63ae5a737…` (the
    v0.3 freeze commit of this repository, 2026-10-01 00:40Z; `f94f655…` of the original history, `docs/MIGRATION.md`)
@@ -66,21 +73,21 @@ latest (25 Oct recommended, memo N13), results freeze 22 Nov, E4 23 Nov–6 Dec.
    the ticked consent form. Validators and respondents are different people. Blocks: Gate 1, the packet (entry 11),
    the α row of Table 1, the generator-bug fixes before Gate 2. Memo 7 (3 validators; 2 supported at 6.9 h each
    instead of 5.4 h), N1, N2 (30–45 min stated in the consent text).
-10. **[12 Oct] Minimum-age clauses and the account-holder role.** Who: author. Steps: read and record the minimum
+10. **[12 Oct] PAST DUE — Minimum-age clauses and the account-holder role.** Who: author. Steps: read and record the minimum
     age in the terms of Kaggle, Google (Colab, AI Studio, Forms), Hugging Face, Groq, OpenRouter →
     `configs/models.yaml` `providers.*.terms.minimum_age` (groq and openrouter are `null  # [UNCERTAIN: verify]`)
     and `docs/RISKS.md`; decide the `ACCOUNT_HOLDER_ROLE` string ("author" or "adult collaborator", never a name;
     `RUNBOOK.md` §0.1); a service whose clause the author does not meet runs on the adult collaborator's own
     account (DD 11.2); no account is opened with a misstated age. Blocks: the `ACCOUNT_HOLDER_ROLE` parameter of
     every chunk (so entry 5 in practice), every manifest's `account_holder`, the key holders (entries 20, 32). Memo 17, 8.
-11. **[12 Oct] Build and send the validation packet.** Who: author (needs the private v0.3 item files). Steps:
+11. **[12 Oct] PAST DUE — Build and send the validation packet.** Who: author (needs the private v0.3 item files). Steps:
     `pip install -r requirements.txt` (openpyxl, krippendorff); `make validation VALIDATORS="A B C"` (or `"A B"`)
     → `data/validation/validation_<V>.xlsx` per validator, CSV copies, the author's keys (never sent); check
     `data/validation/validation_manifest.json` (`sizes.n_sample` 360, `n_controls` 48, hours per validator); upload
     each workbook to Drive → open as a Google Sheet → share with its validator only. Every command that reads
     `data/validation/` runs in a plain terminal, never inside an AI session. Blocks: calibration (entry 13), Gate 1.
     Memo N1 (30 + 4 planted controls per cell, 2 coders per row, 60 by all three), 7.
-12. **[12 Oct] Recruit about 20 human-baseline respondents (not validators).** Who: author. Steps: message (b),
+12. **[12 Oct] PAST DUE — Recruit about 20 human-baseline respondents (not validators).** Who: author. Steps: message (b),
     personal invitations, adults only, nobody in a dependency relation; tell them the window 2–8 Nov; form numbers
     01–20 in the private key (off the repository); reserve volunteers for unreturned forms (HBP §9 decision 3).
     Blocks: the human lane (entry 26), the mean-human band of Table 2. Memo 7 (a third rater only > 20 volunteers), N2.
@@ -100,6 +107,22 @@ latest (25 Oct recommended, memo N13), results freeze 22 Nov, E4 23 Nov–6 Dec.
     claims). `c05` runs only if the CPU route will not finish by 18 Oct; it needs its three models pinned (entry 19);
     the ledger marks the unused route `cut`. Blocks: Gate 1, the pilot constants of stage 2, the E3 scope decision.
     Memo N11 (a), N4 (forced choice exploratory), N10.
+    **[now; the credit is bought] Rented box: tier 0 run — the primary route of this pilot.** `c05_gpu_t0` runs on
+    the box instead of `c02`–`c04` (the ledger counts `c05` `alternative` until it is launched and marks the unused
+    route `cut`, memo N11). Who: author at a terminal (laptop + SSH to the box; no Kaggle UI); the assistant ingests.
+    Steps (`RUNBOOK.md` §6 (1)–(5)): rent the 2x A800-SXM4-40GB listing (Ubuntu/CUDA image, SSH key); on the laptop
+    `rsync -a --exclude manifest_private.json data/release/v0.3/ <box>:/workspace/release_v0.3/`; on the box clone at
+    the pinned commit, copy the files
+    into `data/release/v0.3`, `export HF_HOME=/workspace/hf` and `export HF_TOKEN=...` (optional `KAGGLE_USERNAME` /
+    `KAGGLE_KEY` for the push); preview with `python scripts/cuda_box.py --bootstrap --session auto --chunks tier0
+    --dry-run`, run the four printed install commands, pin with `python scripts/pin_panel.py --apply --partial --out
+    experiments/panel_pins.json` (copy `configs/models.yaml` and the JSON home, commit together), the audits
+    `python scripts/kaggle_cpu_jobs.py audit-tokenizers audit-items`; then, in `tmux`, `python scripts/cuda_box.py
+    --session auto --chunks tier0 --platform rented [--kaggle-dataset noilai-runs --create-dataset]`: c05 (the pilot on
+    3 models), c06 (smoke on 14 models), c07 (smoke on the TPU trio, the 27B models on both cards), about 2–3 h, most
+    of it the ~280 GB of downloads; hand-back `RUNBOOK.md` §6 (7) (`rsync` of `data/runs`, `scp` of `compute_log.csv`, then §5 steps
+    1–8; the directories are the chunk units). Blocks: Gate 1 evidence by the GPU route, the smoke week's CPU-vs-GPU
+    comparison rows (entry 19), the pin (entries 19, 22). Memo N11, N10, 9.
 15. **[18 Oct] The C2 placement corpus count.** Who: author or adult collaborator, any machine with internet (a
     laptop or a Kaggle CPU session; no GPU). Steps: `bash scripts/corpus_count_kit.sh` streams the first 2M lines of
     the Vietnamese Wikipedia dump and of CC-100 vi, counts both conventions, writes
@@ -136,7 +159,13 @@ latest (25 Oct recommended, memo N13), results freeze 22 Nov, E4 23 Nov–6 Dec.
     is allowed); compare its CPU-model rows with c01's row by row (a disagreement is reported, not averaged away);
     record tokens/s per family (DD 8.5 re-pricing) and whether `max_model_len` 2048 fits (memo N3); read the 2xT4
     quota accounting during this session (entry 1); (iii) `c07_tpu_t0`: the TPU trio, 20 dev items (6–22 min
-    vLLM-TPU start-ups). `compute_log.py` after each session. Blocks: the panel freeze (entry 22), every E1/E3 run,
+    vLLM-TPU start-ups). `compute_log.py` after each session. On the rented box (the primary route now; `RUNBOOK.md`
+    §6 steps 4–5): the pin runs on the box itself (`python scripts/pin_panel.py --apply --partial --out
+    experiments/panel_pins.json`, no Kaggle CPU session needed) with the audits (`python scripts/kaggle_cpu_jobs.py
+    audit-tokenizers audit-items`), and `c06` / `c07` run in the same `--chunks tier0` call as `c05`, the two 27B
+    models of `c07` on both cards (tensor parallel 2) instead of a TPU; the CPU-vs-GPU comparison rows then come
+    from `c01`'s `__cpu` directories against the box's; the x1/x2 quota reading (entry 1) still needs a Kaggle 2xT4
+    session. Blocks: the panel freeze (entry 22), every E1/E3 run,
     the census column, the H1 floor, E2's item audits, the tier-5 re-pack. Memo 9 (a), 11, N3, N8, N11.
 20. **[25 Oct] Gemini route decided and recorded.** Who: author (+ an adult holding a Google AI Studio key if (b)).
     Steps: (a) drop Gemini (panel of 19; the paper names the drop) or (b) dev-only on the dev-derived API set with an
@@ -229,7 +258,11 @@ latest (25 Oct recommended, memo N13), results freeze 22 Nov, E4 23 Nov–6 Dec.
     chunk of a tier if measured hours differ; quota out → the pre-registered cut order decides what is dropped,
     every cut model named (GPU 83.3 h, TPU 28.3 h at the high estimate, COMPUTE_PLAN §4). The PhoGPT bf16
     reference stays unscheduled: drop it from the bf16 appendix and say so (the author edits `configs/run_plan.yaml`
-    `bf16_drift_200.fallback`). Blocks: Gate 3. Memo 11, N9 (a), N13, Q-C1..Q-C4.
+    `bf16_drift_200.fallback`). The rented box runs the same chunks through `RUNBOOK.md` §6 (6) once the gate is
+    open: `python scripts/cuda_box.py --session auto --chunks from:c08_gpu_t1 --lanes 2 --platform rented
+    --kaggle-dataset noilai-runs` (tier by tier; the one-card chunks on the two cards in parallel, the 27B chunks
+    `c16`, `c20`, `c21`, `c26`, `c31` on both cards; `--max-hours` caps the launches at the remaining credit, and the
+    cut order decides what is left when it runs out). Blocks: Gate 3. Memo 11, N9 (a), N13, Q-C1..Q-C4.
 34. **[before the first confirmatory ingest; hard by 22 Nov] Analysis code the DD names "to write".** Who:
     assistant (after the pilot). Built 2026-10-12 (`STATUS.md` log): `noilai/stats/pooling.py` (the
     model-in-tokenizer-family pool, REML + Hartung–Knapp with the family bootstrap beside it, k of N, TOST),
