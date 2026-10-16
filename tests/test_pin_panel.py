@@ -566,12 +566,12 @@ def _project(tmp_path, spm=True, items=("noilai_main", "noilai_core", "noilai_de
     """A project root with placeholder inputs: the two SentencePiece files and the named release files."""
     root = tmp_path / "proj"
     (root / "data" / "external").mkdir(parents=True)
-    (root / "data" / "release" / "v0.3").mkdir(parents=True)
+    (root / "data" / "release" / "v0.4").mkdir(parents=True)
     if spm:
         for fname, _ in KCJ.SPM_FILES:
             (root / "data" / "external" / fname).write_bytes(b"spm")
     for key in items:
-        (root / "data" / "release" / "v0.3" / f"{key}.jsonl").write_text("{}\n")
+        (root / "data" / "release" / "v0.4" / f"{key}.jsonl").write_text("{}\n")
     return root
 
 
@@ -588,14 +588,14 @@ def test_cpu_jobs_plan_covers_every_distinct_tokenizer_and_item_key(cfg, tmp_pat
     assert all(c.skip_reason is None for c in toks)
     assert toks[0].argv == ["py", str(ROOT / "scripts" / "audit_tokenizers.py"), "--spm",
                             f"{root / 'data' / 'external' / 'gemma3_tokenizer.model'}:gemma3", "--out", str(root / "data" / "audit"),
-                            "--items", str(root / "data" / "release" / "v0.3" / "noilai_main.jsonl")]
+                            "--items", str(root / "data" / "release" / "v0.4" / "noilai_main.jsonl")]
     assert toks[2].argv[2:4] == ["--hf", "google/gemma-3-1b-it"]
     assert toks[2].outputs == [root / "data" / "audit" / "google__gemma-3-1b-it.json", root / "data" / "audit" / "google__gemma-3-1b-it_rows.csv"]
     items = [c for c in cmds if c.job == "audit-items"]
     assert len(items) == len(toks) * 3 and all(c.skip_reason is None for c in items)
     first = items[0]
     assert first.argv == ["py", str(ROOT / "scripts" / "audit_items.py"), "--items",
-                          str(root / "data" / "release" / "v0.3" / "noilai_main.jsonl"), "--spm",
+                          str(root / "data" / "release" / "v0.4" / "noilai_main.jsonl"), "--spm",
                           f"{root / 'data' / 'external' / 'gemma3_tokenizer.model'}:gemma3", "--out",
                           str(root / "data" / "audit" / "items_gemma3__noilai_main.jsonl")]
     assert {c.name for c in items} == {f"{t.name}__{k}" for t in toks for k in KCJ.DEFAULT_ITEMS_KEYS}

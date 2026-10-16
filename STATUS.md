@@ -10,8 +10,8 @@ and is never edited by hand. Blockers, in deadline order, are in `BLOCKED.md`; t
   box and ran `scripts/box/laptop_start_nogit.sh`; the frozen item files were on no machine the author could reach,
   so the box ran only what needs none, and the rental ended before the hand-back ran: nothing came back (no result,
   no pin, no audit). The frozen v0.3 release and its private manifest (seed, canary GUID) could not be found anywhere;
-  the history's pre-redaction seed (`20261004`) does not reproduce v0.3's content hash at the freeze commit, so the
-  freeze had drawn its own seed. Rebuilt as **v0.4** (DEVIATIONS row 2026-10-16): same generator and arguments, a new
+  the history's pre-redaction seed (the September Makefile's default) does not reproduce v0.3's content hash at the
+  freeze commit, so the freeze had drawn its own seed. Rebuilt as **v0.4** (DEVIATIONS row 2026-10-16): same generator and arguments, a new
   private seed, 10,000 items / 2,500 base pairs / the same core counts; `configs/run_plan.yaml` `release` → v0.4 with
   every item-file hash re-recorded (six base files, five derived files; `pilot_xcopa_200` unchanged);
   `data/release/v0.4/manifest.json` committed; the eight files sent to the author (two private copies to keep;

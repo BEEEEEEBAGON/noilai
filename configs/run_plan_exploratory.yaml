@@ -40,7 +40,7 @@ run_eval_cli: scripts/run_eval.py
 run_eval_out_style: run_id_root      # as configs/run_plan.yaml: "--run-id <id>__<name> --out-root <runs_root>"
 runs_root: data/runs
 compute_log: data/compute_log.csv    # the same log as the pre-registered plan: one campaign, one ledger of hours
-release: data/release/v0.3           # as configs/run_plan.yaml (DD 12.30); bump both keys together
+release: data/release/v0.4           # as configs/run_plan.yaml (DD 12.30); bump both keys together
 release_manifest: "{release}/manifest.json"
 
 api:
@@ -51,7 +51,7 @@ item_files:
   # ---- the two public sources (verbatim from configs/run_plan.yaml): the only files a line here may read whole
   noilai_dev:
     path: "{release}/noilai_dev.jsonl"
-    sha256: f0052e688d43407c5ee6e116b3bca195d35a7cb6281da7be7573d1f00bd03cc7
+    sha256: 762d21ff404be7529277c640360bc8a761cb3196dc402d470e6fcb7df22050ef
     description: "public dev split (CC BY 4.0); prompt development, smoke tests and the pilot"
     canary_required: false
   xcopa_vi_test:
@@ -63,7 +63,7 @@ item_files:
   # ---- the Gate 1 pilot files (verbatim from configs/run_plan.yaml: same derive blocks, same seeds, same hashes)
   pilot_t1_200:
     path: "{release}/pilot_t1_200.jsonl"
-    sha256: 4d44c98958c4a724b45493e60cced56e7049bb6173b297980e215676ddb02e87
+    sha256: 63667119857e569c85bb7beedae12721f189160a4f7c6436d55d551cc9a8b04e   # v0.4 (16 Oct 2026)
     description: "Gate 1 pilot (DD 8.5): 200 dev items, 50 per T1 variant; its go/no-go criterion lives in docs/PREREGISTRATION.md section 10"
     canary_required: false
     derive: {source: noilai_dev, seed: 20261009, tasks: [T1], per_cell: {T1: 50}}
