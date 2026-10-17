@@ -534,6 +534,7 @@ models:
       - "[UNCERTAIN: verify] gated access granted; 4-bit load path"
     notes:
       - "T4 at 4-bit (plan 2.5)."
+      - "Access requested on Hugging Face 16 Oct 2026, pending with the owner (manual approval); the runs proceed without this entry (the pin leaves it unpinned, the driver skips or fails it and goes on). Author's decision of 17 Oct 2026 (DEVIATIONS 2026-10-17): if still pending at the panel freeze (25 Oct), this entry and vistral-7b-chat--bf16 are dropped from the panel under DD 7.1; the authors' own ungated f16 GGUF (uonlp/Vistral-7B-Chat-gguf, the DD 7.3 llama.cpp engine arm) is the only way back."
 
   # ---- legacy baseline -------------------------------------------------------------------
   - name: llama-3.1-8b-instruct
