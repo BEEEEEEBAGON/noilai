@@ -6,6 +6,13 @@ and is never edited by hand. Blockers, in deadline order, are in `BLOCKED.md`; t
 
 ## Session log (newest first)
 
+- **2026-10-17 (Vistral: proceed without it).** Hugging Face access as of 17 Oct: Gemma accepted, Llama 3.1 pending
+  with Meta (the plan loads the ungated AWQ checkpoint, so nothing waits on it), `Viet-Mistral/Vistral-7B-Chat` pending
+  with the owner (manual, no date). The author decided to proceed without Vistral (DEVIATIONS 2026-10-17; the
+  `vistral-7b-chat` note in `configs/models.yaml`; `BLOCKED.md` 2, 22): the pin leaves it unpinned, the driver skips
+  or fails it and goes on; dropped from the panel at the freeze (25 Oct) if still pending; the analysis then has six
+  tokenizer families (above every floor). No run code changed. The v0.4 release and the box kit were re-sent to the
+  author as two zips. Still no model run.
 - **2026-10-16, later (the release rebuilt as v0.4; the first paid run lost).** The author rented 2 h on the 2x A800
   box and ran `scripts/box/laptop_start_nogit.sh`; the frozen item files were on no machine the author could reach,
   so the box ran only what needs none, and the rental ended before the hand-back ran: nothing came back (no result,

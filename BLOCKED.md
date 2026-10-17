@@ -21,8 +21,13 @@ latest (25 Oct recommended, memo N13), results freeze 22 Nov, E4 23 Nov–6 Dec.
    each licence's age terms (entry 10). Steps: accept the licence of every `gated: true` entry in `configs/models.yaml`
    (`RUNBOOK.md` §0.3; Llama's is a form with manual approval, hours to days); Settings → Access Tokens → Read →
    Kaggle Add-ons → Secrets as `HF_TOKEN` (never in a cell or the repository); on the rented box the same token goes
-   into `export HF_TOKEN=...` in the shell only (`RUNBOOK.md` §6 step 3). Blocks: c01 (entry 5), the pin run and
-   the audits (entry 19), every GPU/TPU chunk, the box's tier 0 (entry 14). Memo 17.
+   into `export HF_TOKEN=...` in the shell only (`RUNBOOK.md` §6 step 3). **Status 17 Oct:** Google's Gemma family
+   ACCEPTED (the Gate 1 pilot needs nothing else); Meta's Llama 3.1 PENDING (Meta's review; the plan loads the ungated
+   AWQ checkpoint `hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4`, so the runs do not wait on it);
+   `Viet-Mistral/Vistral-7B-Chat` PENDING with the owner, manual, no date: the author decided to proceed without it
+   (DEVIATIONS 2026-10-17; the entry and its `--bf16` twin are dropped at the panel freeze, entry 22, if still pending;
+   granted later → run its chunks' jobs with `--models vistral-7b-chat` and re-pin). Blocks: c01 (entry 5), the pin
+   run and the audits (entry 19), every GPU/TPU chunk, the box's tier 0 (entry 14). Memo 17.
 3. **[1 Oct → now] PAST DUE — Kaggle datasets and secrets for the notebooks.** Who: author. **16 Oct: the v0.3
    files were lost and the release was rebuilt as v0.4** (DEVIATIONS 2026-10-16): the eight files were sent to the
    author in the chat; save them as `…/release/v0.4/` on the Mac AND on a drive (`manifest_private.json` never leaves
@@ -189,7 +194,10 @@ latest (25 Oct recommended, memo N13), results freeze 22 Nov, E4 23 Nov–6 Dec.
     free-tier limits read from the providers' consoles (entries 20, 32), (e) tokenizer SHA-256s (a tokenizer-fixed
     control pair needs byte-identical files, else the control claim is dropped); the 27B control pair is a case
     study, no new model is added; settle COMPUTE_PLAN Q-C2 (one `family` line + `plan_chunks.py --write`), Q-C3,
-    Q-C4. Blocks: every E1/E3 run; stage 2 (panel, families); no model enters the main tables after it. Memo 9, 11.
+    Q-C4; (f) Vistral: if `Viet-Mistral/Vistral-7B-Chat` is still pending (entry 2), drop `vistral-7b-chat` and its
+    `--bf16` twin from the panel as decided on 17 Oct (DEVIATIONS 2026-10-17) and re-pack (`plan_chunks.py --write`,
+    `ledger.py init --force`); the analysis then has six tokenizer families. Blocks: every E1/E3 run; stage 2 (panel,
+    families); no model enters the main tables after it. Memo 9, 11.
 23. **[25 Oct] Co-author outreach checkpoint (sent in week 1, 5–11 Oct).** Who: author. Steps: e-mail 5–10 PhD
     students/postdocs (`docs/CONTRIBUTOR_OUTREACH.md`; attach the tokenizer-audit result and the plan's abstract);
     offer E2 and E4 as the open sections; no reply by 25 Oct → widen (ACL mentorship Slack, SEACrowd, Cohere Labs)
