@@ -41,7 +41,12 @@ python -m pip install -q vllm==0.30.0 || { echo "[box] vLLM install FAILED"; exi
 python -m pip install -q -e ".[eval,dev]" || { echo "[box] project install FAILED"; exit 3; }
 python scripts/fetch_resources.py || { echo "[box] fetch_resources FAILED"; exit 3; }
 python scripts/kaggle_run_plan.py --materialize || echo "[box] materialize: some derived files were skipped (a missing source)"
-nvidia-smi --query-gpu=index,name,memory.total,compute_cap --format=csv
+GPUS=$(nvidia-smi --query-gpu=index,name,memory.total,compute_cap --format=csv); echo "$GPUS"
+# consumer cards without NVLink can hang on NCCL peer-to-peer transfers when a model spans several cards
+if echo "$GPUS" | grep -q GeForce; then
+  export NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1
+  echo "[box] GeForce cards: NCCL P2P and IB disabled for the multi-card models"
+fi
 df -h "$BOXDIR" | tail -1
 
 # the whole-panel pin against the real hub (a mirror may not answer the API); needs HF_TOKEN for the gated entries
