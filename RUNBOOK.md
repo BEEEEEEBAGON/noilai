@@ -344,14 +344,18 @@ says `python`.
 
 **The scripted route (`scripts/box/`).** The three scripts do steps 2–5 and 7 for you: on the laptop, inside the
 repository folder that holds the frozen files, `bash scripts/box/laptop_start.sh <minutes of rental left>` (with
-`HF_TOKEN=...` and, for a provider's hub mirror, `HF_ENDPOINT=...` in front of it; the box address is at the top
-of the script) copies the code of `origin/main`, the frozen files and `box_run.sh` to the box and starts the run in
+`HF_TOKEN=...` and, for a provider's hub mirror, `HF_ENDPOINT=...` in front of it, or the token in the file
+`~/.noilai_hf_token`, one line, `chmod 600`, which the script reads when `HF_TOKEN` is not set; the box address is
+`BOX=root@<host> PORT=<port>` in front when the provider shows new ones) copies the code of `origin/main`, the
+frozen files and `box_run.sh` to the box and starts the run in
 the background (`box_run.sh`: Python 3.12 through `uv` when the image's is older, vLLM 0.30.0, resources,
 `--materialize`, the pin with `--partial`, the audits on the CPU, then `--chunks c05_gpu_t0 c06_gpu_t0 c07_tpu_t0`
 with `--max-hours` set from the minutes left, a rehearsal of the pilot on any model the pin could not resolve,
 and the ingest on the box); `bash scripts/box/laptop_finish.sh` copies the outputs to `~/noilai-runs-<date>/`
 (never committed) and pushes the aggregates, ledger, pins, audits, compute log and the driver logs on a branch
-`box-run-<date>`. Step 8 (the wipe) stays by hand.
+`box-run-<date>`. The `*_nogit.sh` pair does the same from a folder that holds `noilai.bundle` and no clone
+(the hand-back is then `~/noilai-handback-<date>.zip` for the assistant). Both pairs take `BOX=`/`PORT=` in front.
+Step 8 (the wipe) stays by hand.
 
 **What the box can and cannot do today**
 

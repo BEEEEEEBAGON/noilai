@@ -3,10 +3,13 @@
 #   bash laptop_start.sh <minutes of rental left>         (HF_TOKEN=hf_... in front of it if you have one)
 # Copies the code of origin/main, the frozen item files and box_run.sh to the rented box, then starts
 # box_run.sh there in the background. The box address lives in the three lines below.
+# The box address: BOX=root@<host> PORT=<port> in front when the provider shows new ones. The token: HF_TOKEN=hf_...
+# in front, or the file ~/.noilai_hf_token (one line, chmod 600); it is read here and never printed anywhere.
 set -euo pipefail
 BOX="${BOX:-root@js4.blockelite.cn}"
 PORT="${PORT:-14024}"
 MINUTES_LEFT="${1:-90}"
+HF_TOKEN="${HF_TOKEN:-$( [ -f "$HOME/.noilai_hf_token" ] && tr -d '[:space:]' < "$HOME/.noilai_hf_token" || true )}"   # the token file, when HF_TOKEN is not set
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SSH="ssh -p $PORT -o StrictHostKeyChecking=accept-new"
 cd "$(git rev-parse --show-toplevel)"
@@ -17,7 +20,7 @@ BOXDIR=$($SSH "$BOX" 'for d in /workspace /data /root; do if [ -d "$d" ] && [ -w
 echo "box work directory: $BOXDIR"
 $SSH "$BOX" "df -h $BOXDIR | tail -1; mkdir -p $BOXDIR/noilai $BOXDIR/release"
 git archive --format=tar origin/main | $SSH "$BOX" "tar -x -C $BOXDIR/noilai"
-rsync -a -e "ssh -p $PORT" --exclude manifest_private.json "$REL/" "$BOX:$BOXDIR/release/"
+rsync -a --rsh="ssh -p $PORT" --exclude manifest_private.json "$REL/" "$BOX:$BOXDIR/release/"
 scp -P "$PORT" "$HERE/box_run.sh" "$BOX:$BOXDIR/box_run.sh"
 $SSH "$BOX" "cd $BOXDIR && HF_TOKEN='${HF_TOKEN:-}' HF_ENDPOINT='${HF_ENDPOINT:-}' BOXDIR=$BOXDIR nohup setsid bash $BOXDIR/box_run.sh $MINUTES_LEFT > $BOXDIR/box_run.log 2>&1 < /dev/null & sleep 2; head -3 $BOXDIR/box_run.log"
 echo

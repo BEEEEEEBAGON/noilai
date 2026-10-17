@@ -3,10 +3,13 @@
 #   bash laptop_start_nogit.sh <minutes of rental left>      (HF_TOKEN=hf_... and HF_ENDPOINT=... in front if you have them)
 # No repository clone is needed on the laptop: the box clones the bundle. The frozen item files are found with
 # Spotlight (or given as RELEASE_DIR=/path/to/release/v0.4); without them the box runs only what needs none.
+# The box address: BOX=root@<host> PORT=<port> in front when the provider shows new ones. The token: HF_TOKEN=hf_...
+# in front, or the file ~/.noilai_hf_token (one line, chmod 600); it is read here and never printed anywhere.
 set -euo pipefail
 BOX="${BOX:-root@js4.blockelite.cn}"
 PORT="${PORT:-14024}"
 MINUTES_LEFT="${1:-90}"
+HF_TOKEN="${HF_TOKEN:-$( [ -f "$HOME/.noilai_hf_token" ] && tr -d '[:space:]' < "$HOME/.noilai_hf_token" || true )}"   # the token file, when HF_TOKEN is not set
 BRANCH="${BRANCH:-claude/adoring-planck-t3b4wb}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUNDLE="$HERE/noilai.bundle"
@@ -24,7 +27,7 @@ if [ -z "$REL" ] && command -v mdfind >/dev/null 2>&1; then
 fi
 if [ -n "$REL" ] && [ -f "$REL/noilai_dev.jsonl" ]; then
   echo "frozen item files: $REL"
-  rsync -a -e "ssh -p $PORT" --exclude manifest_private.json "$REL/" "$BOX:$BOXDIR/release/"
+  rsync -a --rsh="ssh -p $PORT" --exclude manifest_private.json "$REL/" "$BOX:$BOXDIR/release/"
 else
   echo "NO frozen item files found on this Mac: the box runs what needs none (the XCOPA pilot, the pin, the tokenizer audits)."
   echo "If you know where the release/v0.4/ folder is, run again with RELEASE_DIR=/that/path in front."
