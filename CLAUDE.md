@@ -32,7 +32,8 @@ ledger (`experiments/ledger.csv`), one runbook (`RUNBOOK.md`).
    §1): the CPU chunks `c01`–`c04` first (`c01` = the first real run, `c02`–`c04` the Gate 1 pilot;
    memo N10, N11), then `c06` / `c07` (the smoke week), then, after the stage-2 commit and with every
    gate recorded, `c08`–`c31` in chunk order; `c05` is the T4 alternative to `c02`–`c04`. On the rented box the
-   same chunks run through `scripts/cuda_box.py --chunks` (`RUNBOOK.md` §6); the directories are the ledger's
+   same chunks run through `scripts/cuda_box.py --chunks` (`RUNBOOK.md` §6), and the CPU chunks `c01`–`c04` run
+   on the author's own Mac through `scripts/box/mac_run.sh` (same section); the directories are the ledger's
    units. On Kaggle only
    the account-holder settings of the parameters cell are edited (`ACCOUNT_HOLDER_ROLE`, `REPO_REF`,
    `CREATE_DATASET`, the `PUSH_*` settings); `JOBS`, `MODE`, `MODELS`, `RUN_ID(S)`, `RUN_LABEL`,

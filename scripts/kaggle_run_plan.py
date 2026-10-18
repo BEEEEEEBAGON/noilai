@@ -1190,6 +1190,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--allow-unpinned-revision", action="store_true",
                     help="run a self-hosted model whose `revision` is not pinned (rehearsals only; DD 7.1)")
     ap.add_argument("--stop-on-error", action="store_true")
+    ap.add_argument("--chunk-tag", default=None, metavar="TAG",
+                    help="suffix of the run directory, data/runs/<run>__<model>__<TAG> (the CPU route's `cpu`; narrow_run)")
     ap.add_argument("--extra", default="", help="extra run_eval.py args, one shell-quoted string")
     ap.add_argument("--python", default=sys.executable)
     ap.add_argument("--log", type=Path, default=None, help="compute log path (default from the plan)")
@@ -1239,7 +1241,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                       models_cfg=models_cfg, log_path=args.log, python=args.python,
                       session_hardware=session, allow_hardware_mismatch=args.allow_hardware_mismatch,
                       session_t0=time.time(), max_session_hours=args.max_session_hours, verify=not args.no_verify,
-                      allow_unpinned_revision=args.allow_unpinned_revision)
+                      allow_unpinned_revision=args.allow_unpinned_revision, chunk_tag=args.chunk_tag)
     failed = [r for r in results if str(r["status"]).startswith("failed")]
     parked = [r for r in results if str(r["status"]).startswith(PARKED)]
     refused = [r for r in results if str(r["status"]).startswith(REFUSED)]
