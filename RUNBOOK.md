@@ -357,6 +357,18 @@ and the ingest on the box); `bash scripts/box/laptop_finish.sh` copies the outpu
 (the hand-back is then `~/noilai-handback-<date>.zip` for the assistant). Both pairs take `BOX=`/`PORT=` in front.
 Step 8 (the wipe) stays by hand.
 
+**The laptop as the box (the CPU chunks, no GPU at all).** `scripts/box/mac_run.sh`, run on the author's own Mac
+from the folder that holds `noilai.bundle` (`caffeinate -dims bash scripts/box/mac_run.sh`, so the Mac stays awake),
+runs the CPU chunks `c01`–`c04` the way `notebooks/kaggle_cpu_pilot.ipynb` runs them on a Kaggle CPU session: the
+Hugging Face backend in float32 on the CPU (`--backend hf --device cpu --dtype float32`, the documented hardware
+mismatch, `--chunk-tag cpu`, compute-log platform `local` with device `cpu` x 0), the smoke line first, then the
+pilot lines with the chunk's forced choice, `check_run.py --verify` after each, the ingest and `~/noilai-handback-<date>.zip`
+at the end; raw outputs stay in `~/noilai-mac/noilai/data/runs`. Memory decides the models (float32 weights, about
+4 GB per billion parameters): 8 GB runs `gemma-3-1b-it` only, 16 GB adds `qwen3.5-2b`, 24 GB and more runs all three
+(`MODELS="gemma-3-1b-it qwen3.5-2b phogpt-4b-chat"`); a model that does not fit is reported and skipped. The token
+file and `RELEASE_DIR=` work as for the `*_nogit.sh` pair; `MAC_HOURS=` starts no new line past that many hours, and
+a second run resumes.
+
 **What the box can and cannot do today**
 
 | line | on the box? | why |

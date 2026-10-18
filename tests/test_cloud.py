@@ -931,6 +931,13 @@ def test_run_plan_cli_lists_materializes_verifies_and_dry_runs(capsys, tmp_path)
     assert "--language en" in out and "E1_abl_english__gemma-3-1b-it" in out
     assert KRP.main(["--run", "tpu_main", "--models", "qwen3.8-27b", "--dry-run", "--session-hardware", "2xt4"]) == 0
     assert "hardware tpu is not runnable in a 2xt4 session" in capsys.readouterr().out
+    # the CPU route from the command line (scripts/box/mac_run.sh): the tag names the directory the ledger maps to the
+    # `__cpu` units, the mismatch flag lets a t4 entry run on a session with no accelerator (platform local, device cpu)
+    assert KRP.main(["--run", "smoke_20", "--models", "gemma-3-1b-it", "--dry-run", "--platform", "local",
+                     "--session-hardware", "cpu", "--allow-hardware-mismatch", "--allow-unpinned-revision",
+                     "--chunk-tag", "cpu", "--extra", "--backend hf --device cpu --dtype float32"]) == 0
+    out = capsys.readouterr().out
+    assert "smoke_20__gemma-3-1b-it__cpu" in out and "--device cpu" in out
 
 
 # ------------------------------------------------------------------ compute log
