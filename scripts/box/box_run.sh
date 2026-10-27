@@ -11,6 +11,10 @@ START=$(date +%s)
 export HF_HOME="$BOXDIR/hf"
 export HF_ENDPOINT="${HF_ENDPOINT:-https://huggingface.co}"
 export TOKENIZERS_PARALLELISM=false
+# vLLM 0.30's FlashInfer sampler compiles itself with nvcc on first use, which a provider image may not ship
+# (box run of 2026-10-27: "Could not find nvcc"); the built-in sampler is used instead. Every eval line
+# decodes greedily (noilai.eval.backends: temperature 0), so the sampler kernel cannot change an output.
+export VLLM_USE_FLASHINFER_SAMPLER=0
 cd "$BOXDIR/noilai" || { echo "[box] $BOXDIR/noilai is missing: run laptop_start.sh first"; exit 2; }
 echo "[box] $(date -u +%FT%TZ) start; $MINUTES_LEFT min of rental left; hub endpoint $HF_ENDPOINT; token $([ -n "${HF_TOKEN:-}" ] && echo set || echo NOT set)"
 
