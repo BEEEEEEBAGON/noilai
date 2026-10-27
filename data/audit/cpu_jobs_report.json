@@ -1,0 +1,2691 @@
+{
+ "started_utc": "2026-10-27T01:12:01+00:00",
+ "finished_utc": "2026-10-27T01:35:56+00:00",
+ "dry_run": false,
+ "python": "/root/venv/bin/python",
+ "root": "/root/noilai",
+ "models_config": "configs/models.yaml",
+ "plan": "configs/run_plan.yaml",
+ "git_commit": null,
+ "jobs": {
+  "audit-tokenizers": {
+   "n_commands": 21,
+   "planned": 0,
+   "ok": 19,
+   "failed": 2,
+   "skipped": 0,
+   "ran": true
+  },
+  "audit-items": {
+   "n_commands": 63,
+   "planned": 0,
+   "ok": 57,
+   "failed": 6,
+   "skipped": 0,
+   "ran": true
+  }
+ },
+ "commands": [
+  {
+   "job": "audit-tokenizers",
+   "name": "gemma3",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --spm /root/noilai/data/external/gemma3_tokenizer.model:gemma3 --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_tokenizers.py",
+    "--spm",
+    "/root/noilai/data/external/gemma3_tokenizer.model:gemma3",
+    "--out",
+    "/root/noilai/data/audit",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 1.413,
+   "outputs": [
+    "data/audit/gemma3.json",
+    "data/audit/gemma3_rows.csv"
+   ],
+   "produced": {
+    "data/audit/gemma3.json": {
+     "sha256": "de44b55b7f3b18260114092e7b587cbdc5297e2670aa27cd754116e47609fb4b",
+     "bytes": 2286
+    },
+    "data/audit/gemma3_rows.csv": {
+     "sha256": "879087650520a77300bda8e0a453aa4df0f60e87c4501e5ff7dbbbec7a30cf29",
+     "bytes": 744896
+    }
+   },
+   "stdout_tail": ": \"gemma3\",\n \"nfc\": {\n  \"n\": 6595,\n  \"tokens_per_syllable_mean\": 1.782562547384382,\n  \"single_token_frac\": 0.29461713419257013,\n  \"boundary_alignment_mean\": 0.9414455395501643,\n  \"boundary_alignment_among_split_mean\": 0.9169891086271138,\n  \"n_split\": 4652,\n  \"onset_rime_split_frac\": 0.5152388172858225,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 1943,\n   \"2\": 4145,\n   \"3\": 505,\n   \"4\": 2\n  }\n },\n \"nfd\": {\n  \"n\": 6595,\n  \"tokens_per_syllable_mean\": 2.830780894617134,\n  \"single_token_frac\": 0.07050796057619409,\n  \"boundary_alignment_mean\": 0.2701516300227445,\n  \"boundary_alignment_among_split_mean\": 0.21478792822185971,\n  \"n_split\": 6130,\n  \"onset_rime_split_frac\": 0.06823351023502654,\n  \"tone_isolated_frac\": 0.41637604245640636,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 465,\n   \"2\": 2022,\n   \"3\": 2668,\n   \"4\": 1093,\n   \"5\": 300,\n   \"6\": 45,\n   \"7\": 2\n  }\n },\n \"census\": {\n  \"n_samples\": 1000,\n  \"forms\": [\n   \"nfd\",\n   \"pc\"\n  ],\n  \"nfd_same_ids_frac\": 0.012,\n  \"nfd_longer_frac\": 0.903,\n  \"nfd_byte_fallback_frac\": 0.0,\n  \"nfd_roundtrip_ok_frac\": 1.0,\n  \"nfd_roundtrip_failures\": [],\n  \"verdict_nfd\": \"passes_through\",\n  \"pc_same_ids_frac\": 0.061,\n  \"pc_longer_frac\": 0.766,\n  \"pc_byte_fallback_frac\": 0.0,\n  \"pc_roundtrip_ok_frac\": 1.0,\n  \"pc_roundtrip_failures\": [],\n  \"verdict_pc\": \"passes_through\",\n  \"normalizes_nfd\": false,\n  \"verdict\": \"passes_through\",\n  \"roundtrip_rule\": \"NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)\",\n  \"type\": \"sentencepiece\",\n  \"model_type\": \"BPE\",\n  \"vocab_size\": 262144,\n  \"normalizer\": \"identity\",\n  \"byte_fallback\": true,\n  \"add_dummy_prefix\": false,\n  \"remove_extra_whitespaces\": false,\n  \"split_by_unicode_script\": true,\n  \"probe_set\": {\n   \"n\": 1000,\n   \"n_words\": 500,\n   \"n_items\": 500,\n   \"items_file\": \"data/release/v0.4/noilai_main.jsonl\",\n   \"seed\": 0,\n   \"rule\": \"500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)\"\n  }\n }\n}\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-tokenizers",
+   "name": "gemma2",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --spm /root/noilai/data/external/gemma2_tokenizer.model:gemma2 --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_tokenizers.py",
+    "--spm",
+    "/root/noilai/data/external/gemma2_tokenizer.model:gemma2",
+    "--out",
+    "/root/noilai/data/audit",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 1.359,
+   "outputs": [
+    "data/audit/gemma2.json",
+    "data/audit/gemma2_rows.csv"
+   ],
+   "produced": {
+    "data/audit/gemma2.json": {
+     "sha256": "2416776de0b83812d4fa3361dcadead0c373fe2828167f8840d88f9aa919be74",
+     "bytes": 2266
+    },
+    "data/audit/gemma2_rows.csv": {
+     "sha256": "170609cfa593c075cba2d21a3dac78c7263ca885a1f9d7104362efeb231d78e1",
+     "bytes": 748549
+    }
+   },
+   "stdout_tail": "{\n \"tokenizer\": \"gemma2\",\n \"nfc\": {\n  \"n\": 6595,\n  \"tokens_per_syllable_mean\": 1.771948445792267,\n  \"single_token_frac\": 0.2988627748294162,\n  \"boundary_alignment_mean\": 0.938640384129391,\n  \"boundary_alignment_among_split_mean\": 0.9124855824682814,\n  \"n_split\": 4624,\n  \"onset_rime_split_frac\": 0.506899166034875,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 1971,\n   \"2\": 4159,\n   \"3\": 463,\n   \"4\": 2\n  }\n },\n \"nfd\": {\n  \"n\": 6595,\n  \"tokens_per_syllable_mean\": 2.898559514783927,\n  \"single_token_frac\": 0.07278241091736164,\n  \"boundary_alignment_mean\": 0.28983320697498105,\n  \"boundary_alignment_among_split_mean\": 0.23408830744071954,\n  \"n_split\": 6115,\n  \"onset_rime_split_frac\": 0.043669446550416983,\n  \"tone_isolated_frac\": 0.5041698256254739,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 480,\n   \"2\": 1775,\n   \"3\": 2676,\n   \"4\": 1318,\n   \"5\": 290,\n   \"6\": 56\n  }\n },\n \"census\": {\n  \"n_samples\": 1000,\n  \"forms\": [\n   \"nfd\",\n   \"pc\"\n  ],\n  \"nfd_same_ids_frac\": 0.012,\n  \"nfd_longer_frac\": 0.919,\n  \"nfd_byte_fallback_frac\": 0.0,\n  \"nfd_roundtrip_ok_frac\": 1.0,\n  \"nfd_roundtrip_failures\": [],\n  \"verdict_nfd\": \"passes_through\",\n  \"pc_same_ids_frac\": 0.061,\n  \"pc_longer_frac\": 0.8,\n  \"pc_byte_fallback_frac\": 0.0,\n  \"pc_roundtrip_ok_frac\": 1.0,\n  \"pc_roundtrip_failures\": [],\n  \"verdict_pc\": \"passes_through\",\n  \"normalizes_nfd\": false,\n  \"verdict\": \"passes_through\",\n  \"roundtrip_rule\": \"NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)\",\n  \"type\": \"sentencepiece\",\n  \"model_type\": \"BPE\",\n  \"vocab_size\": 256000,\n  \"normalizer\": \"identity\",\n  \"byte_fallback\": true,\n  \"add_dummy_prefix\": false,\n  \"remove_extra_whitespaces\": false,\n  \"split_by_unicode_script\": true,\n  \"probe_set\": {\n   \"n\": 1000,\n   \"n_words\": 500,\n   \"n_items\": 500,\n   \"items_file\": \"data/release/v0.4/noilai_main.jsonl\",\n   \"seed\": 0,\n   \"rule\": \"500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)\"\n  }\n }\n}\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-tokenizers",
+   "name": "google__gemma-3-1b-it",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf google/gemma-3-1b-it --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_tokenizers.py",
+    "--hf",
+    "google/gemma-3-1b-it",
+    "--out",
+    "/root/noilai/data/audit",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 11.313,
+   "outputs": [
+    "data/audit/google__gemma-3-1b-it.json",
+    "data/audit/google__gemma-3-1b-it_rows.csv"
+   ],
+   "produced": {
+    "data/audit/google__gemma-3-1b-it.json": {
+     "sha256": "1532455d7f36268b9e7c8a6e7b0283d9ae2c62e7c3ba1125e6e6670d0b55ca09",
+     "bytes": 2456
+    },
+    "data/audit/google__gemma-3-1b-it_rows.csv": {
+     "sha256": "879087650520a77300bda8e0a453aa4df0f60e87c4501e5ff7dbbbec7a30cf29",
+     "bytes": 744896
+    }
+   },
+   "stdout_tail": "19257013,\n  \"boundary_alignment_mean\": 0.9414455395501643,\n  \"boundary_alignment_among_split_mean\": 0.9169891086271138,\n  \"n_split\": 4652,\n  \"onset_rime_split_frac\": 0.5152388172858225,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 1943,\n   \"2\": 4145,\n   \"3\": 505,\n   \"4\": 2\n  }\n },\n \"nfd\": {\n  \"n\": 6595,\n  \"tokens_per_syllable_mean\": 2.830780894617134,\n  \"single_token_frac\": 0.07050796057619409,\n  \"boundary_alignment_mean\": 0.2701516300227445,\n  \"boundary_alignment_among_split_mean\": 0.21478792822185971,\n  \"n_split\": 6130,\n  \"onset_rime_split_frac\": 0.06823351023502654,\n  \"tone_isolated_frac\": 0.41637604245640636,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 465,\n   \"2\": 2022,\n   \"3\": 2668,\n   \"4\": 1093,\n   \"5\": 300,\n   \"6\": 45,\n   \"7\": 2\n  }\n },\n \"census\": {\n  \"n_samples\": 1000,\n  \"forms\": [\n   \"nfd\",\n   \"pc\"\n  ],\n  \"nfd_same_ids_frac\": 0.012,\n  \"nfd_longer_frac\": 0.903,\n  \"nfd_byte_fallback_frac\": 0.0,\n  \"nfd_roundtrip_ok_frac\": 1.0,\n  \"nfd_roundtrip_failures\": [],\n  \"verdict_nfd\": \"passes_through\",\n  \"pc_same_ids_frac\": 0.061,\n  \"pc_longer_frac\": 0.766,\n  \"pc_byte_fallback_frac\": 0.0,\n  \"pc_roundtrip_ok_frac\": 1.0,\n  \"pc_roundtrip_failures\": [],\n  \"verdict_pc\": \"passes_through\",\n  \"normalizes_nfd\": false,\n  \"verdict\": \"passes_through\",\n  \"roundtrip_rule\": \"NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)\",\n  \"type\": \"huggingface\",\n  \"class\": \"GemmaTokenizer\",\n  \"vocab_size\": 262145,\n  \"normalizer\": {\n   \"type\": \"Replace\",\n   \"pattern\": {\n    \"String\": \" \"\n   },\n   \"content\": \"▁\"\n  },\n  \"pre_tokenizer\": {\n   \"type\": \"Split\",\n   \"pattern\": {\n    \"String\": \" \"\n   },\n   \"behavior\": \"MergedWithPrevious\",\n   \"invert\": false\n  },\n  \"model_type\": \"BPE\",\n  \"probe_set\": {\n   \"n\": 1000,\n   \"n_words\": 500,\n   \"n_items\": 500,\n   \"items_file\": \"data/release/v0.4/noilai_main.jsonl\",\n   \"seed\": 0,\n   \"rule\": \"500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)\"\n  }\n }\n}\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-tokenizers",
+   "name": "google__gemma-3-4b-it",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf google/gemma-3-4b-it --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_tokenizers.py",
+    "--hf",
+    "google/gemma-3-4b-it",
+    "--out",
+    "/root/noilai/data/audit",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 15.131,
+   "outputs": [
+    "data/audit/google__gemma-3-4b-it.json",
+    "data/audit/google__gemma-3-4b-it_rows.csv"
+   ],
+   "produced": {
+    "data/audit/google__gemma-3-4b-it.json": {
+     "sha256": "f1108871fe75cc5f071b5d1e65c3338e49743dd998b640a1eaa89740a4673eed",
+     "bytes": 2456
+    },
+    "data/audit/google__gemma-3-4b-it_rows.csv": {
+     "sha256": "879087650520a77300bda8e0a453aa4df0f60e87c4501e5ff7dbbbec7a30cf29",
+     "bytes": 744896
+    }
+   },
+   "stdout_tail": "19257013,\n  \"boundary_alignment_mean\": 0.9414455395501643,\n  \"boundary_alignment_among_split_mean\": 0.9169891086271138,\n  \"n_split\": 4652,\n  \"onset_rime_split_frac\": 0.5152388172858225,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 1943,\n   \"2\": 4145,\n   \"3\": 505,\n   \"4\": 2\n  }\n },\n \"nfd\": {\n  \"n\": 6595,\n  \"tokens_per_syllable_mean\": 2.830780894617134,\n  \"single_token_frac\": 0.07050796057619409,\n  \"boundary_alignment_mean\": 0.2701516300227445,\n  \"boundary_alignment_among_split_mean\": 0.21478792822185971,\n  \"n_split\": 6130,\n  \"onset_rime_split_frac\": 0.06823351023502654,\n  \"tone_isolated_frac\": 0.41637604245640636,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 465,\n   \"2\": 2022,\n   \"3\": 2668,\n   \"4\": 1093,\n   \"5\": 300,\n   \"6\": 45,\n   \"7\": 2\n  }\n },\n \"census\": {\n  \"n_samples\": 1000,\n  \"forms\": [\n   \"nfd\",\n   \"pc\"\n  ],\n  \"nfd_same_ids_frac\": 0.012,\n  \"nfd_longer_frac\": 0.903,\n  \"nfd_byte_fallback_frac\": 0.0,\n  \"nfd_roundtrip_ok_frac\": 1.0,\n  \"nfd_roundtrip_failures\": [],\n  \"verdict_nfd\": \"passes_through\",\n  \"pc_same_ids_frac\": 0.061,\n  \"pc_longer_frac\": 0.766,\n  \"pc_byte_fallback_frac\": 0.0,\n  \"pc_roundtrip_ok_frac\": 1.0,\n  \"pc_roundtrip_failures\": [],\n  \"verdict_pc\": \"passes_through\",\n  \"normalizes_nfd\": false,\n  \"verdict\": \"passes_through\",\n  \"roundtrip_rule\": \"NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)\",\n  \"type\": \"huggingface\",\n  \"class\": \"GemmaTokenizer\",\n  \"vocab_size\": 262145,\n  \"normalizer\": {\n   \"type\": \"Replace\",\n   \"pattern\": {\n    \"String\": \" \"\n   },\n   \"content\": \"▁\"\n  },\n  \"pre_tokenizer\": {\n   \"type\": \"Split\",\n   \"pattern\": {\n    \"String\": \" \"\n   },\n   \"behavior\": \"MergedWithPrevious\",\n   \"invert\": false\n  },\n  \"model_type\": \"BPE\",\n  \"probe_set\": {\n   \"n\": 1000,\n   \"n_words\": 500,\n   \"n_items\": 500,\n   \"items_file\": \"data/release/v0.4/noilai_main.jsonl\",\n   \"seed\": 0,\n   \"rule\": \"500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)\"\n  }\n }\n}\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-tokenizers",
+   "name": "google__gemma-3-12b-it",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf google/gemma-3-12b-it --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_tokenizers.py",
+    "--hf",
+    "google/gemma-3-12b-it",
+    "--out",
+    "/root/noilai/data/audit",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 17.828,
+   "outputs": [
+    "data/audit/google__gemma-3-12b-it.json",
+    "data/audit/google__gemma-3-12b-it_rows.csv"
+   ],
+   "produced": {
+    "data/audit/google__gemma-3-12b-it.json": {
+     "sha256": "c58ab58cb608b4160fa3f285d61258496b92b98a6193eafd8bd24c92f0a88a1e",
+     "bytes": 2457
+    },
+    "data/audit/google__gemma-3-12b-it_rows.csv": {
+     "sha256": "879087650520a77300bda8e0a453aa4df0f60e87c4501e5ff7dbbbec7a30cf29",
+     "bytes": 744896
+    }
+   },
+   "stdout_tail": "19257013,\n  \"boundary_alignment_mean\": 0.9414455395501643,\n  \"boundary_alignment_among_split_mean\": 0.9169891086271138,\n  \"n_split\": 4652,\n  \"onset_rime_split_frac\": 0.5152388172858225,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 1943,\n   \"2\": 4145,\n   \"3\": 505,\n   \"4\": 2\n  }\n },\n \"nfd\": {\n  \"n\": 6595,\n  \"tokens_per_syllable_mean\": 2.830780894617134,\n  \"single_token_frac\": 0.07050796057619409,\n  \"boundary_alignment_mean\": 0.2701516300227445,\n  \"boundary_alignment_among_split_mean\": 0.21478792822185971,\n  \"n_split\": 6130,\n  \"onset_rime_split_frac\": 0.06823351023502654,\n  \"tone_isolated_frac\": 0.41637604245640636,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 465,\n   \"2\": 2022,\n   \"3\": 2668,\n   \"4\": 1093,\n   \"5\": 300,\n   \"6\": 45,\n   \"7\": 2\n  }\n },\n \"census\": {\n  \"n_samples\": 1000,\n  \"forms\": [\n   \"nfd\",\n   \"pc\"\n  ],\n  \"nfd_same_ids_frac\": 0.012,\n  \"nfd_longer_frac\": 0.903,\n  \"nfd_byte_fallback_frac\": 0.0,\n  \"nfd_roundtrip_ok_frac\": 1.0,\n  \"nfd_roundtrip_failures\": [],\n  \"verdict_nfd\": \"passes_through\",\n  \"pc_same_ids_frac\": 0.061,\n  \"pc_longer_frac\": 0.766,\n  \"pc_byte_fallback_frac\": 0.0,\n  \"pc_roundtrip_ok_frac\": 1.0,\n  \"pc_roundtrip_failures\": [],\n  \"verdict_pc\": \"passes_through\",\n  \"normalizes_nfd\": false,\n  \"verdict\": \"passes_through\",\n  \"roundtrip_rule\": \"NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)\",\n  \"type\": \"huggingface\",\n  \"class\": \"GemmaTokenizer\",\n  \"vocab_size\": 262145,\n  \"normalizer\": {\n   \"type\": \"Replace\",\n   \"pattern\": {\n    \"String\": \" \"\n   },\n   \"content\": \"▁\"\n  },\n  \"pre_tokenizer\": {\n   \"type\": \"Split\",\n   \"pattern\": {\n    \"String\": \" \"\n   },\n   \"behavior\": \"MergedWithPrevious\",\n   \"invert\": false\n  },\n  \"model_type\": \"BPE\",\n  \"probe_set\": {\n   \"n\": 1000,\n   \"n_words\": 500,\n   \"n_items\": 500,\n   \"items_file\": \"data/release/v0.4/noilai_main.jsonl\",\n   \"seed\": 0,\n   \"rule\": \"500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)\"\n  }\n }\n}\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-tokenizers",
+   "name": "Qwen__Qwen3.5-0.8B",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf Qwen/Qwen3.5-0.8B --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_tokenizers.py",
+    "--hf",
+    "Qwen/Qwen3.5-0.8B",
+    "--out",
+    "/root/noilai/data/audit",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 9.474,
+   "outputs": [
+    "data/audit/Qwen__Qwen3.5-0.8B.json",
+    "data/audit/Qwen__Qwen3.5-0.8B_rows.csv"
+   ],
+   "produced": {
+    "data/audit/Qwen__Qwen3.5-0.8B.json": {
+     "sha256": "48ef1d2d14fa8af817a4438eba8c7b618875a715bd11cc04af1be9f025036960",
+     "bytes": 2630
+    },
+    "data/audit/Qwen__Qwen3.5-0.8B_rows.csv": {
+     "sha256": "3675076af869e64d5d1f9cb00e341cc49eeee9b06649ee7debf1c07fcf0ab9d2",
+     "bytes": 698409
+    }
+   },
+   "stdout_tail": "ac\": 0.4351781652767248,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 2724,\n   \"2\": 3618,\n   \"3\": 253\n  }\n },\n \"nfd\": {\n  \"n\": 6595,\n  \"tokens_per_syllable_mean\": 1.625322213798332,\n  \"single_token_frac\": 0.4130401819560273,\n  \"boundary_alignment_mean\": 0.9582259287338893,\n  \"boundary_alignment_among_split_mean\": 0.9288297597520021,\n  \"n_split\": 3871,\n  \"onset_rime_split_frac\": 0.4351781652767248,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 2724,\n   \"2\": 3618,\n   \"3\": 253\n  }\n },\n \"census\": {\n  \"n_samples\": 1000,\n  \"forms\": [\n   \"nfd\",\n   \"pc\"\n  ],\n  \"nfd_same_ids_frac\": 1.0,\n  \"nfd_longer_frac\": 0.0,\n  \"nfd_byte_fallback_frac\": 0.0,\n  \"nfd_roundtrip_ok_frac\": 1.0,\n  \"nfd_roundtrip_failures\": [],\n  \"verdict_nfd\": \"normalizes\",\n  \"pc_same_ids_frac\": 1.0,\n  \"pc_longer_frac\": 0.0,\n  \"pc_byte_fallback_frac\": 0.0,\n  \"pc_roundtrip_ok_frac\": 1.0,\n  \"pc_roundtrip_failures\": [],\n  \"verdict_pc\": \"normalizes\",\n  \"normalizes_nfd\": true,\n  \"verdict\": \"normalizes\",\n  \"roundtrip_rule\": \"NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)\",\n  \"type\": \"huggingface\",\n  \"class\": \"Qwen3_5Tokenizer\",\n  \"vocab_size\": 248077,\n  \"normalizer\": {\n   \"type\": \"NFC\"\n  },\n  \"pre_tokenizer\": {\n   \"type\": \"Sequence\",\n   \"pretokenizers\": [\n    {\n     \"type\": \"Split\",\n     \"pattern\": {\n      \"Regex\": \"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\\\r\\\\n\\\\p{L}\\\\p{N}]?[\\\\p{L}\\\\p{M}]+|\\\\p{N}| ?[^\\\\s\\\\p{L}\\\\p{M}\\\\p{N}]+[\\\\r\\\\n]*|\\\\s*[\\\\r\\\\n]+|\\\\s+(?!\\\\S)|\\\\s+\"\n     },\n     \"behavior\": \"Isolated\",\n     \"invert\": false\n    },\n    {\n     \"type\": \"ByteLevel\",\n     \"add_prefix_space\": false,\n     \"trim_offsets\": true,\n     \"use_regex\": false\n    }\n   ]\n  },\n  \"model_type\": \"BPE\",\n  \"probe_set\": {\n   \"n\": 1000,\n   \"n_words\": 500,\n   \"n_items\": 500,\n   \"items_file\": \"data/release/v0.4/noilai_main.jsonl\",\n   \"seed\": 0,\n   \"rule\": \"500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)\"\n  }\n }\n}\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-tokenizers",
+   "name": "Qwen__Qwen3.5-2B",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf Qwen/Qwen3.5-2B --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_tokenizers.py",
+    "--hf",
+    "Qwen/Qwen3.5-2B",
+    "--out",
+    "/root/noilai/data/audit",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 15.289,
+   "outputs": [
+    "data/audit/Qwen__Qwen3.5-2B.json",
+    "data/audit/Qwen__Qwen3.5-2B_rows.csv"
+   ],
+   "produced": {
+    "data/audit/Qwen__Qwen3.5-2B.json": {
+     "sha256": "d4aac1b503e10514b9d71a622af4379b3d907c7a50564f480d43bc6e82eb0181",
+     "bytes": 2628
+    },
+    "data/audit/Qwen__Qwen3.5-2B_rows.csv": {
+     "sha256": "3675076af869e64d5d1f9cb00e341cc49eeee9b06649ee7debf1c07fcf0ab9d2",
+     "bytes": 698409
+    }
+   },
+   "stdout_tail": "ac\": 0.4351781652767248,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 2724,\n   \"2\": 3618,\n   \"3\": 253\n  }\n },\n \"nfd\": {\n  \"n\": 6595,\n  \"tokens_per_syllable_mean\": 1.625322213798332,\n  \"single_token_frac\": 0.4130401819560273,\n  \"boundary_alignment_mean\": 0.9582259287338893,\n  \"boundary_alignment_among_split_mean\": 0.9288297597520021,\n  \"n_split\": 3871,\n  \"onset_rime_split_frac\": 0.4351781652767248,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 2724,\n   \"2\": 3618,\n   \"3\": 253\n  }\n },\n \"census\": {\n  \"n_samples\": 1000,\n  \"forms\": [\n   \"nfd\",\n   \"pc\"\n  ],\n  \"nfd_same_ids_frac\": 1.0,\n  \"nfd_longer_frac\": 0.0,\n  \"nfd_byte_fallback_frac\": 0.0,\n  \"nfd_roundtrip_ok_frac\": 1.0,\n  \"nfd_roundtrip_failures\": [],\n  \"verdict_nfd\": \"normalizes\",\n  \"pc_same_ids_frac\": 1.0,\n  \"pc_longer_frac\": 0.0,\n  \"pc_byte_fallback_frac\": 0.0,\n  \"pc_roundtrip_ok_frac\": 1.0,\n  \"pc_roundtrip_failures\": [],\n  \"verdict_pc\": \"normalizes\",\n  \"normalizes_nfd\": true,\n  \"verdict\": \"normalizes\",\n  \"roundtrip_rule\": \"NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)\",\n  \"type\": \"huggingface\",\n  \"class\": \"Qwen3_5Tokenizer\",\n  \"vocab_size\": 248077,\n  \"normalizer\": {\n   \"type\": \"NFC\"\n  },\n  \"pre_tokenizer\": {\n   \"type\": \"Sequence\",\n   \"pretokenizers\": [\n    {\n     \"type\": \"Split\",\n     \"pattern\": {\n      \"Regex\": \"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\\\r\\\\n\\\\p{L}\\\\p{N}]?[\\\\p{L}\\\\p{M}]+|\\\\p{N}| ?[^\\\\s\\\\p{L}\\\\p{M}\\\\p{N}]+[\\\\r\\\\n]*|\\\\s*[\\\\r\\\\n]+|\\\\s+(?!\\\\S)|\\\\s+\"\n     },\n     \"behavior\": \"Isolated\",\n     \"invert\": false\n    },\n    {\n     \"type\": \"ByteLevel\",\n     \"add_prefix_space\": false,\n     \"trim_offsets\": true,\n     \"use_regex\": false\n    }\n   ]\n  },\n  \"model_type\": \"BPE\",\n  \"probe_set\": {\n   \"n\": 1000,\n   \"n_words\": 500,\n   \"n_items\": 500,\n   \"items_file\": \"data/release/v0.4/noilai_main.jsonl\",\n   \"seed\": 0,\n   \"rule\": \"500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)\"\n  }\n }\n}\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-tokenizers",
+   "name": "Qwen__Qwen3.5-4B",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf Qwen/Qwen3.5-4B --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_tokenizers.py",
+    "--hf",
+    "Qwen/Qwen3.5-4B",
+    "--out",
+    "/root/noilai/data/audit",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 9.965,
+   "outputs": [
+    "data/audit/Qwen__Qwen3.5-4B.json",
+    "data/audit/Qwen__Qwen3.5-4B_rows.csv"
+   ],
+   "produced": {
+    "data/audit/Qwen__Qwen3.5-4B.json": {
+     "sha256": "f8cc64b42f65eb2a3b0f2417559347b7ab5b234284ff0c12d87b55c0d2c47c59",
+     "bytes": 2628
+    },
+    "data/audit/Qwen__Qwen3.5-4B_rows.csv": {
+     "sha256": "3675076af869e64d5d1f9cb00e341cc49eeee9b06649ee7debf1c07fcf0ab9d2",
+     "bytes": 698409
+    }
+   },
+   "stdout_tail": "ac\": 0.4351781652767248,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 2724,\n   \"2\": 3618,\n   \"3\": 253\n  }\n },\n \"nfd\": {\n  \"n\": 6595,\n  \"tokens_per_syllable_mean\": 1.625322213798332,\n  \"single_token_frac\": 0.4130401819560273,\n  \"boundary_alignment_mean\": 0.9582259287338893,\n  \"boundary_alignment_among_split_mean\": 0.9288297597520021,\n  \"n_split\": 3871,\n  \"onset_rime_split_frac\": 0.4351781652767248,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 2724,\n   \"2\": 3618,\n   \"3\": 253\n  }\n },\n \"census\": {\n  \"n_samples\": 1000,\n  \"forms\": [\n   \"nfd\",\n   \"pc\"\n  ],\n  \"nfd_same_ids_frac\": 1.0,\n  \"nfd_longer_frac\": 0.0,\n  \"nfd_byte_fallback_frac\": 0.0,\n  \"nfd_roundtrip_ok_frac\": 1.0,\n  \"nfd_roundtrip_failures\": [],\n  \"verdict_nfd\": \"normalizes\",\n  \"pc_same_ids_frac\": 1.0,\n  \"pc_longer_frac\": 0.0,\n  \"pc_byte_fallback_frac\": 0.0,\n  \"pc_roundtrip_ok_frac\": 1.0,\n  \"pc_roundtrip_failures\": [],\n  \"verdict_pc\": \"normalizes\",\n  \"normalizes_nfd\": true,\n  \"verdict\": \"normalizes\",\n  \"roundtrip_rule\": \"NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)\",\n  \"type\": \"huggingface\",\n  \"class\": \"Qwen3_5Tokenizer\",\n  \"vocab_size\": 248077,\n  \"normalizer\": {\n   \"type\": \"NFC\"\n  },\n  \"pre_tokenizer\": {\n   \"type\": \"Sequence\",\n   \"pretokenizers\": [\n    {\n     \"type\": \"Split\",\n     \"pattern\": {\n      \"Regex\": \"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\\\r\\\\n\\\\p{L}\\\\p{N}]?[\\\\p{L}\\\\p{M}]+|\\\\p{N}| ?[^\\\\s\\\\p{L}\\\\p{M}\\\\p{N}]+[\\\\r\\\\n]*|\\\\s*[\\\\r\\\\n]+|\\\\s+(?!\\\\S)|\\\\s+\"\n     },\n     \"behavior\": \"Isolated\",\n     \"invert\": false\n    },\n    {\n     \"type\": \"ByteLevel\",\n     \"add_prefix_space\": false,\n     \"trim_offsets\": true,\n     \"use_regex\": false\n    }\n   ]\n  },\n  \"model_type\": \"BPE\",\n  \"probe_set\": {\n   \"n\": 1000,\n   \"n_words\": 500,\n   \"n_items\": 500,\n   \"items_file\": \"data/release/v0.4/noilai_main.jsonl\",\n   \"seed\": 0,\n   \"rule\": \"500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)\"\n  }\n }\n}\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-tokenizers",
+   "name": "Qwen__Qwen3.5-9B",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf Qwen/Qwen3.5-9B --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_tokenizers.py",
+    "--hf",
+    "Qwen/Qwen3.5-9B",
+    "--out",
+    "/root/noilai/data/audit",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 22.009,
+   "outputs": [
+    "data/audit/Qwen__Qwen3.5-9B.json",
+    "data/audit/Qwen__Qwen3.5-9B_rows.csv"
+   ],
+   "produced": {
+    "data/audit/Qwen__Qwen3.5-9B.json": {
+     "sha256": "526dc217351df697c718ca359d0d6e17a3586ffb0a0caf8d33d92bbfb3a2ac3a",
+     "bytes": 2628
+    },
+    "data/audit/Qwen__Qwen3.5-9B_rows.csv": {
+     "sha256": "3675076af869e64d5d1f9cb00e341cc49eeee9b06649ee7debf1c07fcf0ab9d2",
+     "bytes": 698409
+    }
+   },
+   "stdout_tail": "ac\": 0.4351781652767248,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 2724,\n   \"2\": 3618,\n   \"3\": 253\n  }\n },\n \"nfd\": {\n  \"n\": 6595,\n  \"tokens_per_syllable_mean\": 1.625322213798332,\n  \"single_token_frac\": 0.4130401819560273,\n  \"boundary_alignment_mean\": 0.9582259287338893,\n  \"boundary_alignment_among_split_mean\": 0.9288297597520021,\n  \"n_split\": 3871,\n  \"onset_rime_split_frac\": 0.4351781652767248,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 2724,\n   \"2\": 3618,\n   \"3\": 253\n  }\n },\n \"census\": {\n  \"n_samples\": 1000,\n  \"forms\": [\n   \"nfd\",\n   \"pc\"\n  ],\n  \"nfd_same_ids_frac\": 1.0,\n  \"nfd_longer_frac\": 0.0,\n  \"nfd_byte_fallback_frac\": 0.0,\n  \"nfd_roundtrip_ok_frac\": 1.0,\n  \"nfd_roundtrip_failures\": [],\n  \"verdict_nfd\": \"normalizes\",\n  \"pc_same_ids_frac\": 1.0,\n  \"pc_longer_frac\": 0.0,\n  \"pc_byte_fallback_frac\": 0.0,\n  \"pc_roundtrip_ok_frac\": 1.0,\n  \"pc_roundtrip_failures\": [],\n  \"verdict_pc\": \"normalizes\",\n  \"normalizes_nfd\": true,\n  \"verdict\": \"normalizes\",\n  \"roundtrip_rule\": \"NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)\",\n  \"type\": \"huggingface\",\n  \"class\": \"Qwen3_5Tokenizer\",\n  \"vocab_size\": 248077,\n  \"normalizer\": {\n   \"type\": \"NFC\"\n  },\n  \"pre_tokenizer\": {\n   \"type\": \"Sequence\",\n   \"pretokenizers\": [\n    {\n     \"type\": \"Split\",\n     \"pattern\": {\n      \"Regex\": \"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\\\r\\\\n\\\\p{L}\\\\p{N}]?[\\\\p{L}\\\\p{M}]+|\\\\p{N}| ?[^\\\\s\\\\p{L}\\\\p{M}\\\\p{N}]+[\\\\r\\\\n]*|\\\\s*[\\\\r\\\\n]+|\\\\s+(?!\\\\S)|\\\\s+\"\n     },\n     \"behavior\": \"Isolated\",\n     \"invert\": false\n    },\n    {\n     \"type\": \"ByteLevel\",\n     \"add_prefix_space\": false,\n     \"trim_offsets\": true,\n     \"use_regex\": false\n    }\n   ]\n  },\n  \"model_type\": \"BPE\",\n  \"probe_set\": {\n   \"n\": 1000,\n   \"n_words\": 500,\n   \"n_items\": 500,\n   \"items_file\": \"data/release/v0.4/noilai_main.jsonl\",\n   \"seed\": 0,\n   \"rule\": \"500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)\"\n  }\n }\n}\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-tokenizers",
+   "name": "google__gemma-4-e2b-it",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf google/gemma-4-e2b-it --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_tokenizers.py",
+    "--hf",
+    "google/gemma-4-e2b-it",
+    "--out",
+    "/root/noilai/data/audit",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 21.656,
+   "outputs": [
+    "data/audit/google__gemma-4-e2b-it.json",
+    "data/audit/google__gemma-4-e2b-it_rows.csv"
+   ],
+   "produced": {
+    "data/audit/google__gemma-4-e2b-it.json": {
+     "sha256": "26ce9f20c9571a0359a3fc487b0d06b9d5d3d76189c88a9d37cae166c258da70",
+     "bytes": 2457
+    },
+    "data/audit/google__gemma-4-e2b-it_rows.csv": {
+     "sha256": "879087650520a77300bda8e0a453aa4df0f60e87c4501e5ff7dbbbec7a30cf29",
+     "bytes": 744896
+    }
+   },
+   "stdout_tail": "19257013,\n  \"boundary_alignment_mean\": 0.9414455395501643,\n  \"boundary_alignment_among_split_mean\": 0.9169891086271138,\n  \"n_split\": 4652,\n  \"onset_rime_split_frac\": 0.5152388172858225,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 1943,\n   \"2\": 4145,\n   \"3\": 505,\n   \"4\": 2\n  }\n },\n \"nfd\": {\n  \"n\": 6595,\n  \"tokens_per_syllable_mean\": 2.830780894617134,\n  \"single_token_frac\": 0.07050796057619409,\n  \"boundary_alignment_mean\": 0.2701516300227445,\n  \"boundary_alignment_among_split_mean\": 0.21478792822185971,\n  \"n_split\": 6130,\n  \"onset_rime_split_frac\": 0.06823351023502654,\n  \"tone_isolated_frac\": 0.41637604245640636,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 465,\n   \"2\": 2022,\n   \"3\": 2668,\n   \"4\": 1093,\n   \"5\": 300,\n   \"6\": 45,\n   \"7\": 2\n  }\n },\n \"census\": {\n  \"n_samples\": 1000,\n  \"forms\": [\n   \"nfd\",\n   \"pc\"\n  ],\n  \"nfd_same_ids_frac\": 0.012,\n  \"nfd_longer_frac\": 0.903,\n  \"nfd_byte_fallback_frac\": 0.0,\n  \"nfd_roundtrip_ok_frac\": 1.0,\n  \"nfd_roundtrip_failures\": [],\n  \"verdict_nfd\": \"passes_through\",\n  \"pc_same_ids_frac\": 0.061,\n  \"pc_longer_frac\": 0.766,\n  \"pc_byte_fallback_frac\": 0.0,\n  \"pc_roundtrip_ok_frac\": 1.0,\n  \"pc_roundtrip_failures\": [],\n  \"verdict_pc\": \"passes_through\",\n  \"normalizes_nfd\": false,\n  \"verdict\": \"passes_through\",\n  \"roundtrip_rule\": \"NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)\",\n  \"type\": \"huggingface\",\n  \"class\": \"GemmaTokenizer\",\n  \"vocab_size\": 262144,\n  \"normalizer\": {\n   \"type\": \"Replace\",\n   \"pattern\": {\n    \"String\": \" \"\n   },\n   \"content\": \"▁\"\n  },\n  \"pre_tokenizer\": {\n   \"type\": \"Split\",\n   \"pattern\": {\n    \"String\": \" \"\n   },\n   \"behavior\": \"MergedWithPrevious\",\n   \"invert\": false\n  },\n  \"model_type\": \"BPE\",\n  \"probe_set\": {\n   \"n\": 1000,\n   \"n_words\": 500,\n   \"n_items\": 500,\n   \"items_file\": \"data/release/v0.4/noilai_main.jsonl\",\n   \"seed\": 0,\n   \"rule\": \"500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)\"\n  }\n }\n}\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-tokenizers",
+   "name": "google__gemma-4-e4b-it",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf google/gemma-4-e4b-it --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_tokenizers.py",
+    "--hf",
+    "google/gemma-4-e4b-it",
+    "--out",
+    "/root/noilai/data/audit",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 21.722,
+   "outputs": [
+    "data/audit/google__gemma-4-e4b-it.json",
+    "data/audit/google__gemma-4-e4b-it_rows.csv"
+   ],
+   "produced": {
+    "data/audit/google__gemma-4-e4b-it.json": {
+     "sha256": "b772d83240eeba6a97d07a1a9ff19fc7ad32b83561e4a9128c25a21a7dd8cfbd",
+     "bytes": 2457
+    },
+    "data/audit/google__gemma-4-e4b-it_rows.csv": {
+     "sha256": "879087650520a77300bda8e0a453aa4df0f60e87c4501e5ff7dbbbec7a30cf29",
+     "bytes": 744896
+    }
+   },
+   "stdout_tail": "19257013,\n  \"boundary_alignment_mean\": 0.9414455395501643,\n  \"boundary_alignment_among_split_mean\": 0.9169891086271138,\n  \"n_split\": 4652,\n  \"onset_rime_split_frac\": 0.5152388172858225,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 1943,\n   \"2\": 4145,\n   \"3\": 505,\n   \"4\": 2\n  }\n },\n \"nfd\": {\n  \"n\": 6595,\n  \"tokens_per_syllable_mean\": 2.830780894617134,\n  \"single_token_frac\": 0.07050796057619409,\n  \"boundary_alignment_mean\": 0.2701516300227445,\n  \"boundary_alignment_among_split_mean\": 0.21478792822185971,\n  \"n_split\": 6130,\n  \"onset_rime_split_frac\": 0.06823351023502654,\n  \"tone_isolated_frac\": 0.41637604245640636,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 465,\n   \"2\": 2022,\n   \"3\": 2668,\n   \"4\": 1093,\n   \"5\": 300,\n   \"6\": 45,\n   \"7\": 2\n  }\n },\n \"census\": {\n  \"n_samples\": 1000,\n  \"forms\": [\n   \"nfd\",\n   \"pc\"\n  ],\n  \"nfd_same_ids_frac\": 0.012,\n  \"nfd_longer_frac\": 0.903,\n  \"nfd_byte_fallback_frac\": 0.0,\n  \"nfd_roundtrip_ok_frac\": 1.0,\n  \"nfd_roundtrip_failures\": [],\n  \"verdict_nfd\": \"passes_through\",\n  \"pc_same_ids_frac\": 0.061,\n  \"pc_longer_frac\": 0.766,\n  \"pc_byte_fallback_frac\": 0.0,\n  \"pc_roundtrip_ok_frac\": 1.0,\n  \"pc_roundtrip_failures\": [],\n  \"verdict_pc\": \"passes_through\",\n  \"normalizes_nfd\": false,\n  \"verdict\": \"passes_through\",\n  \"roundtrip_rule\": \"NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)\",\n  \"type\": \"huggingface\",\n  \"class\": \"GemmaTokenizer\",\n  \"vocab_size\": 262144,\n  \"normalizer\": {\n   \"type\": \"Replace\",\n   \"pattern\": {\n    \"String\": \" \"\n   },\n   \"content\": \"▁\"\n  },\n  \"pre_tokenizer\": {\n   \"type\": \"Split\",\n   \"pattern\": {\n    \"String\": \" \"\n   },\n   \"behavior\": \"MergedWithPrevious\",\n   \"invert\": false\n  },\n  \"model_type\": \"BPE\",\n  \"probe_set\": {\n   \"n\": 1000,\n   \"n_words\": 500,\n   \"n_items\": 500,\n   \"items_file\": \"data/release/v0.4/noilai_main.jsonl\",\n   \"seed\": 0,\n   \"rule\": \"500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)\"\n  }\n }\n}\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-tokenizers",
+   "name": "google__gemma-4-12b-it",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf google/gemma-4-12b-it --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_tokenizers.py",
+    "--hf",
+    "google/gemma-4-12b-it",
+    "--out",
+    "/root/noilai/data/audit",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 20.267,
+   "outputs": [
+    "data/audit/google__gemma-4-12b-it.json",
+    "data/audit/google__gemma-4-12b-it_rows.csv"
+   ],
+   "produced": {
+    "data/audit/google__gemma-4-12b-it.json": {
+     "sha256": "ad02ef34ff369c269fa566c6e035f0d2767b9418a651d98981b197468555aa71",
+     "bytes": 2457
+    },
+    "data/audit/google__gemma-4-12b-it_rows.csv": {
+     "sha256": "879087650520a77300bda8e0a453aa4df0f60e87c4501e5ff7dbbbec7a30cf29",
+     "bytes": 744896
+    }
+   },
+   "stdout_tail": "19257013,\n  \"boundary_alignment_mean\": 0.9414455395501643,\n  \"boundary_alignment_among_split_mean\": 0.9169891086271138,\n  \"n_split\": 4652,\n  \"onset_rime_split_frac\": 0.5152388172858225,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 1943,\n   \"2\": 4145,\n   \"3\": 505,\n   \"4\": 2\n  }\n },\n \"nfd\": {\n  \"n\": 6595,\n  \"tokens_per_syllable_mean\": 2.830780894617134,\n  \"single_token_frac\": 0.07050796057619409,\n  \"boundary_alignment_mean\": 0.2701516300227445,\n  \"boundary_alignment_among_split_mean\": 0.21478792822185971,\n  \"n_split\": 6130,\n  \"onset_rime_split_frac\": 0.06823351023502654,\n  \"tone_isolated_frac\": 0.41637604245640636,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 465,\n   \"2\": 2022,\n   \"3\": 2668,\n   \"4\": 1093,\n   \"5\": 300,\n   \"6\": 45,\n   \"7\": 2\n  }\n },\n \"census\": {\n  \"n_samples\": 1000,\n  \"forms\": [\n   \"nfd\",\n   \"pc\"\n  ],\n  \"nfd_same_ids_frac\": 0.012,\n  \"nfd_longer_frac\": 0.903,\n  \"nfd_byte_fallback_frac\": 0.0,\n  \"nfd_roundtrip_ok_frac\": 1.0,\n  \"nfd_roundtrip_failures\": [],\n  \"verdict_nfd\": \"passes_through\",\n  \"pc_same_ids_frac\": 0.061,\n  \"pc_longer_frac\": 0.766,\n  \"pc_byte_fallback_frac\": 0.0,\n  \"pc_roundtrip_ok_frac\": 1.0,\n  \"pc_roundtrip_failures\": [],\n  \"verdict_pc\": \"passes_through\",\n  \"normalizes_nfd\": false,\n  \"verdict\": \"passes_through\",\n  \"roundtrip_rule\": \"NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)\",\n  \"type\": \"huggingface\",\n  \"class\": \"GemmaTokenizer\",\n  \"vocab_size\": 262144,\n  \"normalizer\": {\n   \"type\": \"Replace\",\n   \"pattern\": {\n    \"String\": \" \"\n   },\n   \"content\": \"▁\"\n  },\n  \"pre_tokenizer\": {\n   \"type\": \"Split\",\n   \"pattern\": {\n    \"String\": \" \"\n   },\n   \"behavior\": \"MergedWithPrevious\",\n   \"invert\": false\n  },\n  \"model_type\": \"BPE\",\n  \"probe_set\": {\n   \"n\": 1000,\n   \"n_words\": 500,\n   \"n_items\": 500,\n   \"items_file\": \"data/release/v0.4/noilai_main.jsonl\",\n   \"seed\": 0,\n   \"rule\": \"500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)\"\n  }\n }\n}\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-tokenizers",
+   "name": "aisingapore__Gemma-SEA-LION-v4.5-E2B-IT",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf aisingapore/Gemma-SEA-LION-v4.5-E2B-IT --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_tokenizers.py",
+    "--hf",
+    "aisingapore/Gemma-SEA-LION-v4.5-E2B-IT",
+    "--out",
+    "/root/noilai/data/audit",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 17.296,
+   "outputs": [
+    "data/audit/aisingapore__Gemma-SEA-LION-v4.5-E2B-IT.json",
+    "data/audit/aisingapore__Gemma-SEA-LION-v4.5-E2B-IT_rows.csv"
+   ],
+   "produced": {
+    "data/audit/aisingapore__Gemma-SEA-LION-v4.5-E2B-IT.json": {
+     "sha256": "c6faaf370d65c3abeee839cbd8f8747b11b69de7c6afe64ee2cadc8b0af37562",
+     "bytes": 2474
+    },
+    "data/audit/aisingapore__Gemma-SEA-LION-v4.5-E2B-IT_rows.csv": {
+     "sha256": "879087650520a77300bda8e0a453aa4df0f60e87c4501e5ff7dbbbec7a30cf29",
+     "bytes": 744896
+    }
+   },
+   "stdout_tail": "19257013,\n  \"boundary_alignment_mean\": 0.9414455395501643,\n  \"boundary_alignment_among_split_mean\": 0.9169891086271138,\n  \"n_split\": 4652,\n  \"onset_rime_split_frac\": 0.5152388172858225,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 1943,\n   \"2\": 4145,\n   \"3\": 505,\n   \"4\": 2\n  }\n },\n \"nfd\": {\n  \"n\": 6595,\n  \"tokens_per_syllable_mean\": 2.830780894617134,\n  \"single_token_frac\": 0.07050796057619409,\n  \"boundary_alignment_mean\": 0.2701516300227445,\n  \"boundary_alignment_among_split_mean\": 0.21478792822185971,\n  \"n_split\": 6130,\n  \"onset_rime_split_frac\": 0.06823351023502654,\n  \"tone_isolated_frac\": 0.41637604245640636,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 465,\n   \"2\": 2022,\n   \"3\": 2668,\n   \"4\": 1093,\n   \"5\": 300,\n   \"6\": 45,\n   \"7\": 2\n  }\n },\n \"census\": {\n  \"n_samples\": 1000,\n  \"forms\": [\n   \"nfd\",\n   \"pc\"\n  ],\n  \"nfd_same_ids_frac\": 0.012,\n  \"nfd_longer_frac\": 0.903,\n  \"nfd_byte_fallback_frac\": 0.0,\n  \"nfd_roundtrip_ok_frac\": 1.0,\n  \"nfd_roundtrip_failures\": [],\n  \"verdict_nfd\": \"passes_through\",\n  \"pc_same_ids_frac\": 0.061,\n  \"pc_longer_frac\": 0.766,\n  \"pc_byte_fallback_frac\": 0.0,\n  \"pc_roundtrip_ok_frac\": 1.0,\n  \"pc_roundtrip_failures\": [],\n  \"verdict_pc\": \"passes_through\",\n  \"normalizes_nfd\": false,\n  \"verdict\": \"passes_through\",\n  \"roundtrip_rule\": \"NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)\",\n  \"type\": \"huggingface\",\n  \"class\": \"GemmaTokenizer\",\n  \"vocab_size\": 262144,\n  \"normalizer\": {\n   \"type\": \"Replace\",\n   \"pattern\": {\n    \"String\": \" \"\n   },\n   \"content\": \"▁\"\n  },\n  \"pre_tokenizer\": {\n   \"type\": \"Split\",\n   \"pattern\": {\n    \"String\": \" \"\n   },\n   \"behavior\": \"MergedWithPrevious\",\n   \"invert\": false\n  },\n  \"model_type\": \"BPE\",\n  \"probe_set\": {\n   \"n\": 1000,\n   \"n_words\": 500,\n   \"n_items\": 500,\n   \"items_file\": \"data/release/v0.4/noilai_main.jsonl\",\n   \"seed\": 0,\n   \"rule\": \"500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)\"\n  }\n }\n}\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-tokenizers",
+   "name": "sail__Sailor2-8B-Chat",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf sail/Sailor2-8B-Chat --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_tokenizers.py",
+    "--hf",
+    "sail/Sailor2-8B-Chat",
+    "--out",
+    "/root/noilai/data/audit",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 12.523,
+   "outputs": [
+    "data/audit/sail__Sailor2-8B-Chat.json",
+    "data/audit/sail__Sailor2-8B-Chat_rows.csv"
+   ],
+   "produced": {
+    "data/audit/sail__Sailor2-8B-Chat.json": {
+     "sha256": "4e5ed8d93a0f4a19f84f606ac37bd07142a10112429e40f573d568cbec89fff1",
+     "bytes": 2653
+    },
+    "data/audit/sail__Sailor2-8B-Chat_rows.csv": {
+     "sha256": "8128ac623eed8514658603d466ee77934f7d27e2562be9707b34d3dfd1942e5c",
+     "bytes": 709131
+    }
+   },
+   "stdout_tail": "53297952994693,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 1544,\n   \"2\": 3946,\n   \"3\": 1100,\n   \"4\": 5\n  }\n },\n \"nfd\": {\n  \"n\": 6595,\n  \"tokens_per_syllable_mean\": 1.9341925701288856,\n  \"single_token_frac\": 0.23411675511751326,\n  \"boundary_alignment_mean\": 0.9372757139246904,\n  \"boundary_alignment_among_split_mean\": 0.9181020260014519,\n  \"n_split\": 5051,\n  \"onset_rime_split_frac\": 0.553297952994693,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 1544,\n   \"2\": 3946,\n   \"3\": 1100,\n   \"4\": 5\n  }\n },\n \"census\": {\n  \"n_samples\": 1000,\n  \"forms\": [\n   \"nfd\",\n   \"pc\"\n  ],\n  \"nfd_same_ids_frac\": 1.0,\n  \"nfd_longer_frac\": 0.0,\n  \"nfd_byte_fallback_frac\": 0.0,\n  \"nfd_roundtrip_ok_frac\": 1.0,\n  \"nfd_roundtrip_failures\": [],\n  \"verdict_nfd\": \"normalizes\",\n  \"pc_same_ids_frac\": 1.0,\n  \"pc_longer_frac\": 0.0,\n  \"pc_byte_fallback_frac\": 0.0,\n  \"pc_roundtrip_ok_frac\": 1.0,\n  \"pc_roundtrip_failures\": [],\n  \"verdict_pc\": \"normalizes\",\n  \"normalizes_nfd\": true,\n  \"verdict\": \"normalizes\",\n  \"roundtrip_rule\": \"NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)\",\n  \"type\": \"huggingface\",\n  \"class\": \"Qwen2Tokenizer\",\n  \"vocab_size\": 151665,\n  \"normalizer\": {\n   \"type\": \"NFC\"\n  },\n  \"pre_tokenizer\": {\n   \"type\": \"Sequence\",\n   \"pretokenizers\": [\n    {\n     \"type\": \"Split\",\n     \"pattern\": {\n      \"Regex\": \"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\\\r\\\\n\\\\p{L}\\\\p{N}]?\\\\p{L}+|\\\\p{N}| ?[^\\\\s\\\\p{L}\\\\p{N}]+[\\\\r\\\\n]*|\\\\s*[\\\\r\\\\n]+|\\\\s+(?!\\\\S)|\\\\s+\"\n     },\n     \"behavior\": \"Isolated\",\n     \"invert\": false\n    },\n    {\n     \"type\": \"ByteLevel\",\n     \"add_prefix_space\": false,\n     \"trim_offsets\": true,\n     \"use_regex\": false\n    }\n   ]\n  },\n  \"model_type\": \"BPE\",\n  \"probe_set\": {\n   \"n\": 1000,\n   \"n_words\": 500,\n   \"n_items\": 500,\n   \"items_file\": \"data/release/v0.4/noilai_main.jsonl\",\n   \"seed\": 0,\n   \"rule\": \"500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)\"\n  }\n }\n}\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-tokenizers",
+   "name": "vinai__PhoGPT-4B-Chat",
+   "status": "failed",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf vinai/PhoGPT-4B-Chat --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_tokenizers.py",
+    "--hf",
+    "vinai/PhoGPT-4B-Chat",
+    "--out",
+    "/root/noilai/data/audit",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 1,
+   "wall_s": 17.829,
+   "outputs": [
+    "data/audit/vinai__PhoGPT-4B-Chat.json",
+    "data/audit/vinai__PhoGPT-4B-Chat_rows.csv"
+   ],
+   "produced": {},
+   "stdout_tail": "",
+   "stderr_tail": "^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/models/auto/tokenization_auto.py\", line 805, in from_pretrained\n    config = AutoConfig.from_pretrained(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/models/auto/configuration_auto.py\", line 448, in from_pretrained\n    return config_class.from_dict(config_dict, **unused_kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 1085, in from_dict\n    config = cls(**config_dict)\n             ^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/huggingface_hub/dataclasses.py\", line 275, in init_with_validate\n    initial_init(self, *args, **kwargs)  # type: ignore [call-arg]\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 174, in __init__\n    self.__post_init__(**additional_kwargs)\n  File \"/root/venv/lib/python3.12/site-packages/transformers/models/mpt/configuration_mpt.py\", line 146, in __post_init__\n    self.attn_config = MptAttentionConfig(**self.attn_config)\n                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/huggingface_hub/dataclasses.py\", line 275, in init_with_validate\n    initial_init(self, *args, **kwargs)  # type: ignore [call-arg]\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 159, in __init__\n    setattr(self, f.name, standard_kwargs[f.name])\n  File \"/root/venv/lib/python3.12/site-packages/huggingface_hub/dataclasses.py\", line 146, in __strict_setattr__\n    raise StrictDataclassFieldValidationError(field=name, cause=e) from e\nhuggingface_hub.errors.StrictDataclassFieldValidationError: Validation error for field 'attn_pdrop':\n    TypeError: Field 'attn_pdrop' expected int, got float (value: 0.0)\n"
+  },
+  {
+   "job": "audit-tokenizers",
+   "name": "Viet-Mistral__Vistral-7B-Chat",
+   "status": "failed",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf Viet-Mistral/Vistral-7B-Chat --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_tokenizers.py",
+    "--hf",
+    "Viet-Mistral/Vistral-7B-Chat",
+    "--out",
+    "/root/noilai/data/audit",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 1,
+   "wall_s": 5.214,
+   "outputs": [
+    "data/audit/Viet-Mistral__Vistral-7B-Chat.json",
+    "data/audit/Viet-Mistral__Vistral-7B-Chat_rows.csv"
+   ],
+   "produced": {},
+   "stdout_tail": "",
+   "stderr_tail": "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/models/auto/tokenization_auto.py\", line 809, in from_pretrained\n    config = PreTrainedConfig.from_pretrained(pretrained_model_name_or_path, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 879, in from_pretrained\n    config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)\n                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 929, in get_config_dict\n    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)\n                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 981, in _get_config_dict\n    resolved_config_file = cached_file(\n                           ^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/utils/hub.py\", line 370, in cached_file\n    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/utils/hub.py\", line 610, in cached_files\n    raise OSError(\nOSError: You are trying to access a gated repo.\nMake sure to have access to it at https://huggingface.co/Viet-Mistral/Vistral-7B-Chat.\n403 Client Error. (Request ID: Root=1-6adffb3d-4b011e06751898497534b99b;a396b473-f332-4bc0-92d1-c5b5a09f6922)\n\nCannot access gated repo for url https://huggingface.co/Viet-Mistral/Vistral-7B-Chat/resolve/d331b64e61b935cc43c2b3010ae9fb4fde599b45/config.json.\nYour request to access model Viet-Mistral/Vistral-7B-Chat is awaiting a review from the repo authors.\n"
+  },
+  {
+   "job": "audit-tokenizers",
+   "name": "meta-llama__Llama-3.1-8B-Instruct",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf meta-llama/Llama-3.1-8B-Instruct --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_tokenizers.py",
+    "--hf",
+    "meta-llama/Llama-3.1-8B-Instruct",
+    "--out",
+    "/root/noilai/data/audit",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 10.4,
+   "outputs": [
+    "data/audit/meta-llama__Llama-3.1-8B-Instruct.json",
+    "data/audit/meta-llama__Llama-3.1-8B-Instruct_rows.csv"
+   ],
+   "produced": {
+    "data/audit/meta-llama__Llama-3.1-8B-Instruct.json": {
+     "sha256": "0dfc3e83a4adb0454d1223a913f872d769c23c5e8b67d992e2b4a22049e04a9d",
+     "bytes": 2779
+    },
+    "data/audit/meta-llama__Llama-3.1-8B-Instruct_rows.csv": {
+     "sha256": "c703fa4a80dde03eca74ace4257d60501b8802ca9ed3d5f60082a58274064ff6",
+     "bytes": 788729
+    }
+   },
+   "stdout_tail": " \"1\": 1547,\n   \"2\": 4157,\n   \"3\": 870,\n   \"4\": 21\n  }\n },\n \"nfd\": {\n  \"n\": 6595,\n  \"tokens_per_syllable_mean\": 3.4288097043214556,\n  \"single_token_frac\": 0.05731614859742229,\n  \"boundary_alignment_mean\": 0.3813621430376548,\n  \"boundary_alignment_among_split_mean\": 0.3437483244866227,\n  \"n_split\": 6217,\n  \"onset_rime_split_frac\": 0.10735405610310841,\n  \"tone_isolated_frac\": 0.7592115238817286,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 378,\n   \"2\": 997,\n   \"3\": 2350,\n   \"4\": 1817,\n   \"5\": 798,\n   \"6\": 46,\n   \"7\": 33,\n   \"8\": 158,\n   \"9\": 18\n  }\n },\n \"census\": {\n  \"n_samples\": 1000,\n  \"forms\": [\n   \"nfd\",\n   \"pc\"\n  ],\n  \"nfd_same_ids_frac\": 0.012,\n  \"nfd_longer_frac\": 0.949,\n  \"nfd_byte_fallback_frac\": 0.0,\n  \"nfd_roundtrip_ok_frac\": 1.0,\n  \"nfd_roundtrip_failures\": [],\n  \"verdict_nfd\": \"passes_through\",\n  \"pc_same_ids_frac\": 0.061,\n  \"pc_longer_frac\": 0.878,\n  \"pc_byte_fallback_frac\": 0.0,\n  \"pc_roundtrip_ok_frac\": 1.0,\n  \"pc_roundtrip_failures\": [],\n  \"verdict_pc\": \"passes_through\",\n  \"normalizes_nfd\": false,\n  \"verdict\": \"passes_through\",\n  \"roundtrip_rule\": \"NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)\",\n  \"type\": \"huggingface\",\n  \"class\": \"TokenizersBackend\",\n  \"vocab_size\": 128256,\n  \"normalizer\": null,\n  \"pre_tokenizer\": {\n   \"type\": \"Sequence\",\n   \"pretokenizers\": [\n    {\n     \"type\": \"Split\",\n     \"pattern\": {\n      \"Regex\": \"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\\\r\\\\n\\\\p{L}\\\\p{N}]?\\\\p{L}+|\\\\p{N}{1,3}| ?[^\\\\s\\\\p{L}\\\\p{N}]+[\\\\r\\\\n]*|\\\\s*[\\\\r\\\\n]+|\\\\s+(?!\\\\S)|\\\\s+\"\n     },\n     \"behavior\": \"Isolated\",\n     \"invert\": false\n    },\n    {\n     \"type\": \"ByteLevel\",\n     \"add_prefix_space\": false,\n     \"trim_offsets\": true,\n     \"use_regex\": false\n    }\n   ]\n  },\n  \"model_type\": \"BPE\",\n  \"probe_set\": {\n   \"n\": 1000,\n   \"n_words\": 500,\n   \"n_items\": 500,\n   \"items_file\": \"data/release/v0.4/noilai_main.jsonl\",\n   \"seed\": 0,\n   \"rule\": \"500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)\"\n  }\n }\n}\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-tokenizers",
+   "name": "Qwen__Qwen3.8-27B",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf Qwen/Qwen3.8-27B --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_tokenizers.py",
+    "--hf",
+    "Qwen/Qwen3.8-27B",
+    "--out",
+    "/root/noilai/data/audit",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 9.764,
+   "outputs": [
+    "data/audit/Qwen__Qwen3.8-27B.json",
+    "data/audit/Qwen__Qwen3.8-27B_rows.csv"
+   ],
+   "produced": {
+    "data/audit/Qwen__Qwen3.8-27B.json": {
+     "sha256": "44be645679729309c97fc401dadc09e282a373ad4b8d7c06096943d734c38b10",
+     "bytes": 2629
+    },
+    "data/audit/Qwen__Qwen3.8-27B_rows.csv": {
+     "sha256": "3675076af869e64d5d1f9cb00e341cc49eeee9b06649ee7debf1c07fcf0ab9d2",
+     "bytes": 698409
+    }
+   },
+   "stdout_tail": "ac\": 0.4351781652767248,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 2724,\n   \"2\": 3618,\n   \"3\": 253\n  }\n },\n \"nfd\": {\n  \"n\": 6595,\n  \"tokens_per_syllable_mean\": 1.625322213798332,\n  \"single_token_frac\": 0.4130401819560273,\n  \"boundary_alignment_mean\": 0.9582259287338893,\n  \"boundary_alignment_among_split_mean\": 0.9288297597520021,\n  \"n_split\": 3871,\n  \"onset_rime_split_frac\": 0.4351781652767248,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 2724,\n   \"2\": 3618,\n   \"3\": 253\n  }\n },\n \"census\": {\n  \"n_samples\": 1000,\n  \"forms\": [\n   \"nfd\",\n   \"pc\"\n  ],\n  \"nfd_same_ids_frac\": 1.0,\n  \"nfd_longer_frac\": 0.0,\n  \"nfd_byte_fallback_frac\": 0.0,\n  \"nfd_roundtrip_ok_frac\": 1.0,\n  \"nfd_roundtrip_failures\": [],\n  \"verdict_nfd\": \"normalizes\",\n  \"pc_same_ids_frac\": 1.0,\n  \"pc_longer_frac\": 0.0,\n  \"pc_byte_fallback_frac\": 0.0,\n  \"pc_roundtrip_ok_frac\": 1.0,\n  \"pc_roundtrip_failures\": [],\n  \"verdict_pc\": \"normalizes\",\n  \"normalizes_nfd\": true,\n  \"verdict\": \"normalizes\",\n  \"roundtrip_rule\": \"NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)\",\n  \"type\": \"huggingface\",\n  \"class\": \"Qwen3_5Tokenizer\",\n  \"vocab_size\": 248077,\n  \"normalizer\": {\n   \"type\": \"NFC\"\n  },\n  \"pre_tokenizer\": {\n   \"type\": \"Sequence\",\n   \"pretokenizers\": [\n    {\n     \"type\": \"Split\",\n     \"pattern\": {\n      \"Regex\": \"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\\\r\\\\n\\\\p{L}\\\\p{N}]?[\\\\p{L}\\\\p{M}]+|\\\\p{N}| ?[^\\\\s\\\\p{L}\\\\p{M}\\\\p{N}]+[\\\\r\\\\n]*|\\\\s*[\\\\r\\\\n]+|\\\\s+(?!\\\\S)|\\\\s+\"\n     },\n     \"behavior\": \"Isolated\",\n     \"invert\": false\n    },\n    {\n     \"type\": \"ByteLevel\",\n     \"add_prefix_space\": false,\n     \"trim_offsets\": true,\n     \"use_regex\": false\n    }\n   ]\n  },\n  \"model_type\": \"BPE\",\n  \"probe_set\": {\n   \"n\": 1000,\n   \"n_words\": 500,\n   \"n_items\": 500,\n   \"items_file\": \"data/release/v0.4/noilai_main.jsonl\",\n   \"seed\": 0,\n   \"rule\": \"500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)\"\n  }\n }\n}\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-tokenizers",
+   "name": "aisingapore__Qwen-SEA-LION-v4.5-27B-IT",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf aisingapore/Qwen-SEA-LION-v4.5-27B-IT --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_tokenizers.py",
+    "--hf",
+    "aisingapore/Qwen-SEA-LION-v4.5-27B-IT",
+    "--out",
+    "/root/noilai/data/audit",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 23.197,
+   "outputs": [
+    "data/audit/aisingapore__Qwen-SEA-LION-v4.5-27B-IT.json",
+    "data/audit/aisingapore__Qwen-SEA-LION-v4.5-27B-IT_rows.csv"
+   ],
+   "produced": {
+    "data/audit/aisingapore__Qwen-SEA-LION-v4.5-27B-IT.json": {
+     "sha256": "dee4678f81c1cebd730bf97d476d36e130d152e2dfd98ba59a2e13c313dfc474",
+     "bytes": 2650
+    },
+    "data/audit/aisingapore__Qwen-SEA-LION-v4.5-27B-IT_rows.csv": {
+     "sha256": "3675076af869e64d5d1f9cb00e341cc49eeee9b06649ee7debf1c07fcf0ab9d2",
+     "bytes": 698409
+    }
+   },
+   "stdout_tail": "ac\": 0.4351781652767248,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 2724,\n   \"2\": 3618,\n   \"3\": 253\n  }\n },\n \"nfd\": {\n  \"n\": 6595,\n  \"tokens_per_syllable_mean\": 1.625322213798332,\n  \"single_token_frac\": 0.4130401819560273,\n  \"boundary_alignment_mean\": 0.9582259287338893,\n  \"boundary_alignment_among_split_mean\": 0.9288297597520021,\n  \"n_split\": 3871,\n  \"onset_rime_split_frac\": 0.4351781652767248,\n  \"tone_isolated_frac\": 0,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 2724,\n   \"2\": 3618,\n   \"3\": 253\n  }\n },\n \"census\": {\n  \"n_samples\": 1000,\n  \"forms\": [\n   \"nfd\",\n   \"pc\"\n  ],\n  \"nfd_same_ids_frac\": 1.0,\n  \"nfd_longer_frac\": 0.0,\n  \"nfd_byte_fallback_frac\": 0.0,\n  \"nfd_roundtrip_ok_frac\": 1.0,\n  \"nfd_roundtrip_failures\": [],\n  \"verdict_nfd\": \"normalizes\",\n  \"pc_same_ids_frac\": 1.0,\n  \"pc_longer_frac\": 0.0,\n  \"pc_byte_fallback_frac\": 0.0,\n  \"pc_roundtrip_ok_frac\": 1.0,\n  \"pc_roundtrip_failures\": [],\n  \"verdict_pc\": \"normalizes\",\n  \"normalizes_nfd\": true,\n  \"verdict\": \"normalizes\",\n  \"roundtrip_rule\": \"NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)\",\n  \"type\": \"huggingface\",\n  \"class\": \"Qwen3_5Tokenizer\",\n  \"vocab_size\": 248077,\n  \"normalizer\": {\n   \"type\": \"NFC\"\n  },\n  \"pre_tokenizer\": {\n   \"type\": \"Sequence\",\n   \"pretokenizers\": [\n    {\n     \"type\": \"Split\",\n     \"pattern\": {\n      \"Regex\": \"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\\\r\\\\n\\\\p{L}\\\\p{N}]?[\\\\p{L}\\\\p{M}]+|\\\\p{N}| ?[^\\\\s\\\\p{L}\\\\p{M}\\\\p{N}]+[\\\\r\\\\n]*|\\\\s*[\\\\r\\\\n]+|\\\\s+(?!\\\\S)|\\\\s+\"\n     },\n     \"behavior\": \"Isolated\",\n     \"invert\": false\n    },\n    {\n     \"type\": \"ByteLevel\",\n     \"add_prefix_space\": false,\n     \"trim_offsets\": true,\n     \"use_regex\": false\n    }\n   ]\n  },\n  \"model_type\": \"BPE\",\n  \"probe_set\": {\n   \"n\": 1000,\n   \"n_words\": 500,\n   \"n_items\": 500,\n   \"items_file\": \"data/release/v0.4/noilai_main.jsonl\",\n   \"seed\": 0,\n   \"rule\": \"500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)\"\n  }\n }\n}\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-tokenizers",
+   "name": "openai__gpt-oss-120b",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf openai/gpt-oss-120b --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_tokenizers.py",
+    "--hf",
+    "openai/gpt-oss-120b",
+    "--out",
+    "/root/noilai/data/audit",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 56.346,
+   "outputs": [
+    "data/audit/openai__gpt-oss-120b.json",
+    "data/audit/openai__gpt-oss-120b_rows.csv"
+   ],
+   "produced": {
+    "data/audit/openai__gpt-oss-120b.json": {
+     "sha256": "89e2372b15d706147a82cc718b6443ff8236490ae973b93545207768b7341d65",
+     "bytes": 2942
+    },
+    "data/audit/openai__gpt-oss-120b_rows.csv": {
+     "sha256": "9b8b83ec18ff27e3e53dcc02b1c23fe419977ceff93e07c333fb820a0a2d1e82",
+     "bytes": 787775
+    }
+   },
+   "stdout_tail": "undary_alignment_mean\": 0.40444781400050545,\n  \"boundary_alignment_among_split_mean\": 0.3616663957960886,\n  \"n_split\": 6153,\n  \"onset_rime_split_frac\": 0.0843062926459439,\n  \"tone_isolated_frac\": 0.7751326762699015,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 442,\n   \"2\": 825,\n   \"3\": 2680,\n   \"4\": 1813,\n   \"5\": 596,\n   \"6\": 23,\n   \"7\": 43,\n   \"8\": 157,\n   \"9\": 16\n  }\n },\n \"census\": {\n  \"n_samples\": 1000,\n  \"forms\": [\n   \"nfd\",\n   \"pc\"\n  ],\n  \"nfd_same_ids_frac\": 0.012,\n  \"nfd_longer_frac\": 0.946,\n  \"nfd_byte_fallback_frac\": 0.0,\n  \"nfd_roundtrip_ok_frac\": 1.0,\n  \"nfd_roundtrip_failures\": [],\n  \"verdict_nfd\": \"passes_through\",\n  \"pc_same_ids_frac\": 0.061,\n  \"pc_longer_frac\": 0.864,\n  \"pc_byte_fallback_frac\": 0.0,\n  \"pc_roundtrip_ok_frac\": 1.0,\n  \"pc_roundtrip_failures\": [],\n  \"verdict_pc\": \"passes_through\",\n  \"normalizes_nfd\": false,\n  \"verdict\": \"passes_through\",\n  \"roundtrip_rule\": \"NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)\",\n  \"type\": \"huggingface\",\n  \"class\": \"TokenizersBackend\",\n  \"vocab_size\": 200019,\n  \"normalizer\": null,\n  \"pre_tokenizer\": {\n   \"type\": \"Sequence\",\n   \"pretokenizers\": [\n    {\n     \"type\": \"Split\",\n     \"pattern\": {\n      \"Regex\": \"[^\\\\r\\\\n\\\\p{L}\\\\p{N}]?[\\\\p{Lu}\\\\p{Lt}\\\\p{Lm}\\\\p{Lo}\\\\p{M}]*[\\\\p{Ll}\\\\p{Lm}\\\\p{Lo}\\\\p{M}]+(?i:'s|'t|'re|'ve|'m|'ll|'d)?|[^\\\\r\\\\n\\\\p{L}\\\\p{N}]?[\\\\p{Lu}\\\\p{Lt}\\\\p{Lm}\\\\p{Lo}\\\\p{M}]+[\\\\p{Ll}\\\\p{Lm}\\\\p{Lo}\\\\p{M}]*(?i:'s|'t|'re|'ve|'m|'ll|'d)?|\\\\p{N}{1,3}| ?[^\\\\s\\\\p{L}\\\\p{N}]+[\\\\r\\\\n/]*|\\\\s*[\\\\r\\\\n]+|\\\\s+(?!\\\\S)|\\\\s+\"\n     },\n     \"behavior\": \"Isolated\",\n     \"invert\": false\n    },\n    {\n     \"type\": \"ByteLevel\",\n     \"add_prefix_space\": false,\n     \"trim_offsets\": true,\n     \"use_regex\": false\n    }\n   ]\n  },\n  \"model_type\": \"BPE\",\n  \"probe_set\": {\n   \"n\": 1000,\n   \"n_words\": 500,\n   \"n_items\": 500,\n   \"items_file\": \"data/release/v0.4/noilai_main.jsonl\",\n   \"seed\": 0,\n   \"rule\": \"500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)\"\n  }\n }\n}\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-tokenizers",
+   "name": "openai__gpt-oss-20b",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf openai/gpt-oss-20b --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_tokenizers.py",
+    "--hf",
+    "openai/gpt-oss-20b",
+    "--out",
+    "/root/noilai/data/audit",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 15.033,
+   "outputs": [
+    "data/audit/openai__gpt-oss-20b.json",
+    "data/audit/openai__gpt-oss-20b_rows.csv"
+   ],
+   "produced": {
+    "data/audit/openai__gpt-oss-20b.json": {
+     "sha256": "d51ed4ffa9451cd179f1ceb5f1b5facf802f18319194301ca664a49e952113b0",
+     "bytes": 2941
+    },
+    "data/audit/openai__gpt-oss-20b_rows.csv": {
+     "sha256": "9b8b83ec18ff27e3e53dcc02b1c23fe419977ceff93e07c333fb820a0a2d1e82",
+     "bytes": 787775
+    }
+   },
+   "stdout_tail": "undary_alignment_mean\": 0.40444781400050545,\n  \"boundary_alignment_among_split_mean\": 0.3616663957960886,\n  \"n_split\": 6153,\n  \"onset_rime_split_frac\": 0.0843062926459439,\n  \"tone_isolated_frac\": 0.7751326762699015,\n  \"byte_fallback_frac\": 0,\n  \"n_tokens_hist\": {\n   \"1\": 442,\n   \"2\": 825,\n   \"3\": 2680,\n   \"4\": 1813,\n   \"5\": 596,\n   \"6\": 23,\n   \"7\": 43,\n   \"8\": 157,\n   \"9\": 16\n  }\n },\n \"census\": {\n  \"n_samples\": 1000,\n  \"forms\": [\n   \"nfd\",\n   \"pc\"\n  ],\n  \"nfd_same_ids_frac\": 0.012,\n  \"nfd_longer_frac\": 0.946,\n  \"nfd_byte_fallback_frac\": 0.0,\n  \"nfd_roundtrip_ok_frac\": 1.0,\n  \"nfd_roundtrip_failures\": [],\n  \"verdict_nfd\": \"passes_through\",\n  \"pc_same_ids_frac\": 0.061,\n  \"pc_longer_frac\": 0.864,\n  \"pc_byte_fallback_frac\": 0.0,\n  \"pc_roundtrip_ok_frac\": 1.0,\n  \"pc_roundtrip_failures\": [],\n  \"verdict_pc\": \"passes_through\",\n  \"normalizes_nfd\": false,\n  \"verdict\": \"passes_through\",\n  \"roundtrip_rule\": \"NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)\",\n  \"type\": \"huggingface\",\n  \"class\": \"TokenizersBackend\",\n  \"vocab_size\": 200019,\n  \"normalizer\": null,\n  \"pre_tokenizer\": {\n   \"type\": \"Sequence\",\n   \"pretokenizers\": [\n    {\n     \"type\": \"Split\",\n     \"pattern\": {\n      \"Regex\": \"[^\\\\r\\\\n\\\\p{L}\\\\p{N}]?[\\\\p{Lu}\\\\p{Lt}\\\\p{Lm}\\\\p{Lo}\\\\p{M}]*[\\\\p{Ll}\\\\p{Lm}\\\\p{Lo}\\\\p{M}]+(?i:'s|'t|'re|'ve|'m|'ll|'d)?|[^\\\\r\\\\n\\\\p{L}\\\\p{N}]?[\\\\p{Lu}\\\\p{Lt}\\\\p{Lm}\\\\p{Lo}\\\\p{M}]+[\\\\p{Ll}\\\\p{Lm}\\\\p{Lo}\\\\p{M}]*(?i:'s|'t|'re|'ve|'m|'ll|'d)?|\\\\p{N}{1,3}| ?[^\\\\s\\\\p{L}\\\\p{N}]+[\\\\r\\\\n/]*|\\\\s*[\\\\r\\\\n]+|\\\\s+(?!\\\\S)|\\\\s+\"\n     },\n     \"behavior\": \"Isolated\",\n     \"invert\": false\n    },\n    {\n     \"type\": \"ByteLevel\",\n     \"add_prefix_space\": false,\n     \"trim_offsets\": true,\n     \"use_regex\": false\n    }\n   ]\n  },\n  \"model_type\": \"BPE\",\n  \"probe_set\": {\n   \"n\": 1000,\n   \"n_words\": 500,\n   \"n_items\": 500,\n   \"items_file\": \"data/release/v0.4/noilai_main.jsonl\",\n   \"seed\": 0,\n   \"rule\": \"500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)\"\n  }\n }\n}\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "gemma3__noilai_main",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --spm /root/noilai/data/external/gemma3_tokenizer.model:gemma3 --out /root/noilai/data/audit/items_gemma3__noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl",
+    "--spm",
+    "/root/noilai/data/external/gemma3_tokenizer.model:gemma3",
+    "--out",
+    "/root/noilai/data/audit/items_gemma3__noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 2.547,
+   "outputs": [
+    "data/audit/items_gemma3__noilai_main.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_gemma3__noilai_main.jsonl": {
+     "sha256": "cd54064593e2dde3309e558edb718b4200d412d8707d63e3e4df9881d77bb2f3",
+     "bytes": 5335265
+    }
+   },
+   "stdout_tail": "wrote 8400 rows for 4200 items with tokenizer gemma3 -> /root/noilai/data/audit/items_gemma3__noilai_main.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "gemma2__noilai_main",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --spm /root/noilai/data/external/gemma2_tokenizer.model:gemma2 --out /root/noilai/data/audit/items_gemma2__noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl",
+    "--spm",
+    "/root/noilai/data/external/gemma2_tokenizer.model:gemma2",
+    "--out",
+    "/root/noilai/data/audit/items_gemma2__noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 2.709,
+   "outputs": [
+    "data/audit/items_gemma2__noilai_main.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_gemma2__noilai_main.jsonl": {
+     "sha256": "c092e7ffa4ed7587e5593470da84b259928b5138b7f8589edae29f175a9a114d",
+     "bytes": 5343125
+    }
+   },
+   "stdout_tail": "wrote 8400 rows for 4200 items with tokenizer gemma2 -> /root/noilai/data/audit/items_gemma2__noilai_main.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "google__gemma-3-1b-it__noilai_main",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf google/gemma-3-1b-it --out /root/noilai/data/audit/items_google__gemma-3-1b-it__noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl",
+    "--hf",
+    "google/gemma-3-1b-it",
+    "--out",
+    "/root/noilai/data/audit/items_google__gemma-3-1b-it__noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 9.808,
+   "outputs": [
+    "data/audit/items_google__gemma-3-1b-it__noilai_main.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_google__gemma-3-1b-it__noilai_main.jsonl": {
+     "sha256": "15321b29bbce0b3f9a41eae0b24d8516d3cf21f995d23e763fc41c7974744334",
+     "bytes": 5461265
+    }
+   },
+   "stdout_tail": "wrote 8400 rows for 4200 items with tokenizer google__gemma-3-1b-it -> /root/noilai/data/audit/items_google__gemma-3-1b-it__noilai_main.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "google__gemma-3-4b-it__noilai_main",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf google/gemma-3-4b-it --out /root/noilai/data/audit/items_google__gemma-3-4b-it__noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl",
+    "--hf",
+    "google/gemma-3-4b-it",
+    "--out",
+    "/root/noilai/data/audit/items_google__gemma-3-4b-it__noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 12.075,
+   "outputs": [
+    "data/audit/items_google__gemma-3-4b-it__noilai_main.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_google__gemma-3-4b-it__noilai_main.jsonl": {
+     "sha256": "de650198cd69a66870a1c4e7e4169ee5b43032a41a560e1245bc6e294d6b509d",
+     "bytes": 5461265
+    }
+   },
+   "stdout_tail": "wrote 8400 rows for 4200 items with tokenizer google__gemma-3-4b-it -> /root/noilai/data/audit/items_google__gemma-3-4b-it__noilai_main.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "google__gemma-3-12b-it__noilai_main",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf google/gemma-3-12b-it --out /root/noilai/data/audit/items_google__gemma-3-12b-it__noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl",
+    "--hf",
+    "google/gemma-3-12b-it",
+    "--out",
+    "/root/noilai/data/audit/items_google__gemma-3-12b-it__noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 145.068,
+   "outputs": [
+    "data/audit/items_google__gemma-3-12b-it__noilai_main.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_google__gemma-3-12b-it__noilai_main.jsonl": {
+     "sha256": "247f4348efd3bb52b9a6be0e6d8bd8a6f87e355fe1b842b5202d30af81c968a4",
+     "bytes": 5469665
+    }
+   },
+   "stdout_tail": "wrote 8400 rows for 4200 items with tokenizer google__gemma-3-12b-it -> /root/noilai/data/audit/items_google__gemma-3-12b-it__noilai_main.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "Qwen__Qwen3.5-0.8B__noilai_main",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf Qwen/Qwen3.5-0.8B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-0.8B__noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl",
+    "--hf",
+    "Qwen/Qwen3.5-0.8B",
+    "--out",
+    "/root/noilai/data/audit/items_Qwen__Qwen3.5-0.8B__noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 10.943,
+   "outputs": [
+    "data/audit/items_Qwen__Qwen3.5-0.8B__noilai_main.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_Qwen__Qwen3.5-0.8B__noilai_main.jsonl": {
+     "sha256": "6d7a66156f50558cad989bbe006f43d469545bf6dd4eab9a70c8f822f0bea1a4",
+     "bytes": 5341814
+    }
+   },
+   "stdout_tail": "wrote 8400 rows for 4200 items with tokenizer Qwen__Qwen3.5-0.8B -> /root/noilai/data/audit/items_Qwen__Qwen3.5-0.8B__noilai_main.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "Qwen__Qwen3.5-2B__noilai_main",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf Qwen/Qwen3.5-2B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-2B__noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl",
+    "--hf",
+    "Qwen/Qwen3.5-2B",
+    "--out",
+    "/root/noilai/data/audit/items_Qwen__Qwen3.5-2B__noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 11.246,
+   "outputs": [
+    "data/audit/items_Qwen__Qwen3.5-2B__noilai_main.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_Qwen__Qwen3.5-2B__noilai_main.jsonl": {
+     "sha256": "c0983b65670d1d863b48f64fee75d6969d172e581db1fbccc0d1aa255cea70a1",
+     "bytes": 5325014
+    }
+   },
+   "stdout_tail": "wrote 8400 rows for 4200 items with tokenizer Qwen__Qwen3.5-2B -> /root/noilai/data/audit/items_Qwen__Qwen3.5-2B__noilai_main.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "Qwen__Qwen3.5-4B__noilai_main",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf Qwen/Qwen3.5-4B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-4B__noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl",
+    "--hf",
+    "Qwen/Qwen3.5-4B",
+    "--out",
+    "/root/noilai/data/audit/items_Qwen__Qwen3.5-4B__noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 14.104,
+   "outputs": [
+    "data/audit/items_Qwen__Qwen3.5-4B__noilai_main.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_Qwen__Qwen3.5-4B__noilai_main.jsonl": {
+     "sha256": "792b25b5eef433a0407b7878d6bae1773addaa27d2244f01992a92cf5ee356ab",
+     "bytes": 5325014
+    }
+   },
+   "stdout_tail": "wrote 8400 rows for 4200 items with tokenizer Qwen__Qwen3.5-4B -> /root/noilai/data/audit/items_Qwen__Qwen3.5-4B__noilai_main.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "Qwen__Qwen3.5-9B__noilai_main",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf Qwen/Qwen3.5-9B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-9B__noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl",
+    "--hf",
+    "Qwen/Qwen3.5-9B",
+    "--out",
+    "/root/noilai/data/audit/items_Qwen__Qwen3.5-9B__noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 8.641,
+   "outputs": [
+    "data/audit/items_Qwen__Qwen3.5-9B__noilai_main.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_Qwen__Qwen3.5-9B__noilai_main.jsonl": {
+     "sha256": "6b3d1bb05570f3a1fc20a35a20e63694d79484e1c35f84acb1d3122eadf8b8b5",
+     "bytes": 5325014
+    }
+   },
+   "stdout_tail": "wrote 8400 rows for 4200 items with tokenizer Qwen__Qwen3.5-9B -> /root/noilai/data/audit/items_Qwen__Qwen3.5-9B__noilai_main.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "google__gemma-4-e2b-it__noilai_main",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf google/gemma-4-e2b-it --out /root/noilai/data/audit/items_google__gemma-4-e2b-it__noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl",
+    "--hf",
+    "google/gemma-4-e2b-it",
+    "--out",
+    "/root/noilai/data/audit/items_google__gemma-4-e2b-it__noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 16.997,
+   "outputs": [
+    "data/audit/items_google__gemma-4-e2b-it__noilai_main.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_google__gemma-4-e2b-it__noilai_main.jsonl": {
+     "sha256": "dbfa32edc1bf33146cca4b5d63697e8f4fed0089ec4812f85c64bc0c2364cec7",
+     "bytes": 5469665
+    }
+   },
+   "stdout_tail": "wrote 8400 rows for 4200 items with tokenizer google__gemma-4-e2b-it -> /root/noilai/data/audit/items_google__gemma-4-e2b-it__noilai_main.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "google__gemma-4-e4b-it__noilai_main",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf google/gemma-4-e4b-it --out /root/noilai/data/audit/items_google__gemma-4-e4b-it__noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl",
+    "--hf",
+    "google/gemma-4-e4b-it",
+    "--out",
+    "/root/noilai/data/audit/items_google__gemma-4-e4b-it__noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 16.626,
+   "outputs": [
+    "data/audit/items_google__gemma-4-e4b-it__noilai_main.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_google__gemma-4-e4b-it__noilai_main.jsonl": {
+     "sha256": "39f99b23a87a4a1de04f741d20e43e4d849716b3189bd62d9ee9276472172527",
+     "bytes": 5469665
+    }
+   },
+   "stdout_tail": "wrote 8400 rows for 4200 items with tokenizer google__gemma-4-e4b-it -> /root/noilai/data/audit/items_google__gemma-4-e4b-it__noilai_main.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "google__gemma-4-12b-it__noilai_main",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf google/gemma-4-12b-it --out /root/noilai/data/audit/items_google__gemma-4-12b-it__noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl",
+    "--hf",
+    "google/gemma-4-12b-it",
+    "--out",
+    "/root/noilai/data/audit/items_google__gemma-4-12b-it__noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 15.068,
+   "outputs": [
+    "data/audit/items_google__gemma-4-12b-it__noilai_main.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_google__gemma-4-12b-it__noilai_main.jsonl": {
+     "sha256": "e872371a8be893117a8227a9c655b992340cc496a8be3685b782a0da5852b297",
+     "bytes": 5469665
+    }
+   },
+   "stdout_tail": "wrote 8400 rows for 4200 items with tokenizer google__gemma-4-12b-it -> /root/noilai/data/audit/items_google__gemma-4-12b-it__noilai_main.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_main",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf aisingapore/Gemma-SEA-LION-v4.5-E2B-IT --out /root/noilai/data/audit/items_aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl",
+    "--hf",
+    "aisingapore/Gemma-SEA-LION-v4.5-E2B-IT",
+    "--out",
+    "/root/noilai/data/audit/items_aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 13.622,
+   "outputs": [
+    "data/audit/items_aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_main.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_main.jsonl": {
+     "sha256": "124cd744e239e0df4ab66465b418ee96349ceec93c0b6a0991f93ea3b52826b8",
+     "bytes": 5612465
+    }
+   },
+   "stdout_tail": "wrote 8400 rows for 4200 items with tokenizer aisingapore__Gemma-SEA-LION-v4.5-E2B-IT -> /root/noilai/data/audit/items_aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_main.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "sail__Sailor2-8B-Chat__noilai_main",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf sail/Sailor2-8B-Chat --out /root/noilai/data/audit/items_sail__Sailor2-8B-Chat__noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl",
+    "--hf",
+    "sail/Sailor2-8B-Chat",
+    "--out",
+    "/root/noilai/data/audit/items_sail__Sailor2-8B-Chat__noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 10.718,
+   "outputs": [
+    "data/audit/items_sail__Sailor2-8B-Chat__noilai_main.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_sail__Sailor2-8B-Chat__noilai_main.jsonl": {
+     "sha256": "5957e0cff03ddc953fc1d4683a954ba37f21836ddec51904bb87ecb546897000",
+     "bytes": 5371564
+    }
+   },
+   "stdout_tail": "wrote 8400 rows for 4200 items with tokenizer sail__Sailor2-8B-Chat -> /root/noilai/data/audit/items_sail__Sailor2-8B-Chat__noilai_main.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "vinai__PhoGPT-4B-Chat__noilai_main",
+   "status": "failed",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf vinai/PhoGPT-4B-Chat --out /root/noilai/data/audit/items_vinai__PhoGPT-4B-Chat__noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl",
+    "--hf",
+    "vinai/PhoGPT-4B-Chat",
+    "--out",
+    "/root/noilai/data/audit/items_vinai__PhoGPT-4B-Chat__noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 1,
+   "wall_s": 4.292,
+   "outputs": [
+    "data/audit/items_vinai__PhoGPT-4B-Chat__noilai_main.jsonl"
+   ],
+   "produced": {},
+   "stdout_tail": "",
+   "stderr_tail": "^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/models/auto/tokenization_auto.py\", line 805, in from_pretrained\n    config = AutoConfig.from_pretrained(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/models/auto/configuration_auto.py\", line 448, in from_pretrained\n    return config_class.from_dict(config_dict, **unused_kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 1085, in from_dict\n    config = cls(**config_dict)\n             ^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/huggingface_hub/dataclasses.py\", line 275, in init_with_validate\n    initial_init(self, *args, **kwargs)  # type: ignore [call-arg]\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 174, in __init__\n    self.__post_init__(**additional_kwargs)\n  File \"/root/venv/lib/python3.12/site-packages/transformers/models/mpt/configuration_mpt.py\", line 146, in __post_init__\n    self.attn_config = MptAttentionConfig(**self.attn_config)\n                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/huggingface_hub/dataclasses.py\", line 275, in init_with_validate\n    initial_init(self, *args, **kwargs)  # type: ignore [call-arg]\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 159, in __init__\n    setattr(self, f.name, standard_kwargs[f.name])\n  File \"/root/venv/lib/python3.12/site-packages/huggingface_hub/dataclasses.py\", line 146, in __strict_setattr__\n    raise StrictDataclassFieldValidationError(field=name, cause=e) from e\nhuggingface_hub.errors.StrictDataclassFieldValidationError: Validation error for field 'attn_pdrop':\n    TypeError: Field 'attn_pdrop' expected int, got float (value: 0.0)\n"
+  },
+  {
+   "job": "audit-items",
+   "name": "Viet-Mistral__Vistral-7B-Chat__noilai_main",
+   "status": "failed",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf Viet-Mistral/Vistral-7B-Chat --out /root/noilai/data/audit/items_Viet-Mistral__Vistral-7B-Chat__noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl",
+    "--hf",
+    "Viet-Mistral/Vistral-7B-Chat",
+    "--out",
+    "/root/noilai/data/audit/items_Viet-Mistral__Vistral-7B-Chat__noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 1,
+   "wall_s": 137.277,
+   "outputs": [
+    "data/audit/items_Viet-Mistral__Vistral-7B-Chat__noilai_main.jsonl"
+   ],
+   "produced": {},
+   "stdout_tail": "",
+   "stderr_tail": "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/models/auto/tokenization_auto.py\", line 809, in from_pretrained\n    config = PreTrainedConfig.from_pretrained(pretrained_model_name_or_path, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 879, in from_pretrained\n    config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)\n                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 929, in get_config_dict\n    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)\n                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 981, in _get_config_dict\n    resolved_config_file = cached_file(\n                           ^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/utils/hub.py\", line 370, in cached_file\n    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/utils/hub.py\", line 610, in cached_files\n    raise OSError(\nOSError: You are trying to access a gated repo.\nMake sure to have access to it at https://huggingface.co/Viet-Mistral/Vistral-7B-Chat.\n403 Client Error. (Request ID: Root=1-6adffd60-7365a480188de191373ae43f;cf438b23-d1db-4814-ac14-eb7a6db67914)\n\nCannot access gated repo for url https://huggingface.co/Viet-Mistral/Vistral-7B-Chat/resolve/d331b64e61b935cc43c2b3010ae9fb4fde599b45/config.json.\nYour request to access model Viet-Mistral/Vistral-7B-Chat is awaiting a review from the repo authors.\n"
+  },
+  {
+   "job": "audit-items",
+   "name": "meta-llama__Llama-3.1-8B-Instruct__noilai_main",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf meta-llama/Llama-3.1-8B-Instruct --out /root/noilai/data/audit/items_meta-llama__Llama-3.1-8B-Instruct__noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl",
+    "--hf",
+    "meta-llama/Llama-3.1-8B-Instruct",
+    "--out",
+    "/root/noilai/data/audit/items_meta-llama__Llama-3.1-8B-Instruct__noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 9.907,
+   "outputs": [
+    "data/audit/items_meta-llama__Llama-3.1-8B-Instruct__noilai_main.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_meta-llama__Llama-3.1-8B-Instruct__noilai_main.jsonl": {
+     "sha256": "33ffcac03e4da9f420485a3419f11c62d568143c180e01595825da3cedddbf21",
+     "bytes": 5623016
+    }
+   },
+   "stdout_tail": "wrote 8400 rows for 4200 items with tokenizer meta-llama__Llama-3.1-8B-Instruct -> /root/noilai/data/audit/items_meta-llama__Llama-3.1-8B-Instruct__noilai_main.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "Qwen__Qwen3.8-27B__noilai_main",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf Qwen/Qwen3.8-27B --out /root/noilai/data/audit/items_Qwen__Qwen3.8-27B__noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl",
+    "--hf",
+    "Qwen/Qwen3.8-27B",
+    "--out",
+    "/root/noilai/data/audit/items_Qwen__Qwen3.8-27B__noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 10.826,
+   "outputs": [
+    "data/audit/items_Qwen__Qwen3.8-27B__noilai_main.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_Qwen__Qwen3.8-27B__noilai_main.jsonl": {
+     "sha256": "ae838d7343666c4e104b852887d756cec967dbd92716c1142a593984dd4324b1",
+     "bytes": 5333414
+    }
+   },
+   "stdout_tail": "wrote 8400 rows for 4200 items with tokenizer Qwen__Qwen3.8-27B -> /root/noilai/data/audit/items_Qwen__Qwen3.8-27B__noilai_main.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_main",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf aisingapore/Qwen-SEA-LION-v4.5-27B-IT --out /root/noilai/data/audit/items_aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl",
+    "--hf",
+    "aisingapore/Qwen-SEA-LION-v4.5-27B-IT",
+    "--out",
+    "/root/noilai/data/audit/items_aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 17.901,
+   "outputs": [
+    "data/audit/items_aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_main.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_main.jsonl": {
+     "sha256": "95663d03e96ce377ccf64345b2e724dc4c6fd345029b285f8c1fba646d80ab45",
+     "bytes": 5509814
+    }
+   },
+   "stdout_tail": "wrote 8400 rows for 4200 items with tokenizer aisingapore__Qwen-SEA-LION-v4.5-27B-IT -> /root/noilai/data/audit/items_aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_main.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "openai__gpt-oss-120b__noilai_main",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf openai/gpt-oss-120b --out /root/noilai/data/audit/items_openai__gpt-oss-120b__noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl",
+    "--hf",
+    "openai/gpt-oss-120b",
+    "--out",
+    "/root/noilai/data/audit/items_openai__gpt-oss-120b__noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 16.326,
+   "outputs": [
+    "data/audit/items_openai__gpt-oss-120b__noilai_main.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_openai__gpt-oss-120b__noilai_main.jsonl": {
+     "sha256": "1612e1069c0dc2de725180237c758f583df2bb2f410a871eaa07af3498861f05",
+     "bytes": 5510296
+    }
+   },
+   "stdout_tail": "wrote 8400 rows for 4200 items with tokenizer openai__gpt-oss-120b -> /root/noilai/data/audit/items_openai__gpt-oss-120b__noilai_main.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "openai__gpt-oss-20b__noilai_main",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf openai/gpt-oss-20b --out /root/noilai/data/audit/items_openai__gpt-oss-20b__noilai_main.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_main.jsonl",
+    "--hf",
+    "openai/gpt-oss-20b",
+    "--out",
+    "/root/noilai/data/audit/items_openai__gpt-oss-20b__noilai_main.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 12.999,
+   "outputs": [
+    "data/audit/items_openai__gpt-oss-20b__noilai_main.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_openai__gpt-oss-20b__noilai_main.jsonl": {
+     "sha256": "bdab90bbc71b4440ad533d28f874fc117a84e1b9bee5f158be60189a61539904",
+     "bytes": 5501896
+    }
+   },
+   "stdout_tail": "wrote 8400 rows for 4200 items with tokenizer openai__gpt-oss-20b -> /root/noilai/data/audit/items_openai__gpt-oss-20b__noilai_main.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "gemma3__noilai_core",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --spm /root/noilai/data/external/gemma3_tokenizer.model:gemma3 --out /root/noilai/data/audit/items_gemma3__noilai_core.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_core.jsonl",
+    "--spm",
+    "/root/noilai/data/external/gemma3_tokenizer.model:gemma3",
+    "--out",
+    "/root/noilai/data/audit/items_gemma3__noilai_core.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 1.013,
+   "outputs": [
+    "data/audit/items_gemma3__noilai_core.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_gemma3__noilai_core.jsonl": {
+     "sha256": "65e2ae17b47a4bec1dd827af97f127d24c7af763ac187f075eb0328752e63767",
+     "bytes": 1899980
+    }
+   },
+   "stdout_tail": "wrote 2992 rows for 1496 items with tokenizer gemma3 -> /root/noilai/data/audit/items_gemma3__noilai_core.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "gemma2__noilai_core",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --spm /root/noilai/data/external/gemma2_tokenizer.model:gemma2 --out /root/noilai/data/audit/items_gemma2__noilai_core.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_core.jsonl",
+    "--spm",
+    "/root/noilai/data/external/gemma2_tokenizer.model:gemma2",
+    "--out",
+    "/root/noilai/data/audit/items_gemma2__noilai_core.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 1.003,
+   "outputs": [
+    "data/audit/items_gemma2__noilai_core.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_gemma2__noilai_core.jsonl": {
+     "sha256": "1e10ebb297291cd6ec45f129b967b3b1ae4cb9418688686895c19c6198391f74",
+     "bytes": 1903170
+    }
+   },
+   "stdout_tail": "wrote 2992 rows for 1496 items with tokenizer gemma2 -> /root/noilai/data/audit/items_gemma2__noilai_core.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "google__gemma-3-1b-it__noilai_core",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf google/gemma-3-1b-it --out /root/noilai/data/audit/items_google__gemma-3-1b-it__noilai_core.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_core.jsonl",
+    "--hf",
+    "google/gemma-3-1b-it",
+    "--out",
+    "/root/noilai/data/audit/items_google__gemma-3-1b-it__noilai_core.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 23.977,
+   "outputs": [
+    "data/audit/items_google__gemma-3-1b-it__noilai_core.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_google__gemma-3-1b-it__noilai_core.jsonl": {
+     "sha256": "52022c0611563dce9984eca8491976528a33e097f4b8aee3e90a7f420f197531",
+     "bytes": 1944860
+    }
+   },
+   "stdout_tail": "wrote 2992 rows for 1496 items with tokenizer google__gemma-3-1b-it -> /root/noilai/data/audit/items_google__gemma-3-1b-it__noilai_core.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "google__gemma-3-4b-it__noilai_core",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf google/gemma-3-4b-it --out /root/noilai/data/audit/items_google__gemma-3-4b-it__noilai_core.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_core.jsonl",
+    "--hf",
+    "google/gemma-3-4b-it",
+    "--out",
+    "/root/noilai/data/audit/items_google__gemma-3-4b-it__noilai_core.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 48.566,
+   "outputs": [
+    "data/audit/items_google__gemma-3-4b-it__noilai_core.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_google__gemma-3-4b-it__noilai_core.jsonl": {
+     "sha256": "cfcf2ed2d8915e8c200a75d8e0a6994e72b29593fb13b48605bc0f335aa5eac5",
+     "bytes": 1944860
+    }
+   },
+   "stdout_tail": "wrote 2992 rows for 1496 items with tokenizer google__gemma-3-4b-it -> /root/noilai/data/audit/items_google__gemma-3-4b-it__noilai_core.jsonl\n",
+   "stderr_tail": "Could not reach the Hub (Server disconnected without sending a response.). Using cached commit hash for 'google/gemma-3-4b-it'.\n"
+  },
+  {
+   "job": "audit-items",
+   "name": "google__gemma-3-12b-it__noilai_core",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf google/gemma-3-12b-it --out /root/noilai/data/audit/items_google__gemma-3-12b-it__noilai_core.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_core.jsonl",
+    "--hf",
+    "google/gemma-3-12b-it",
+    "--out",
+    "/root/noilai/data/audit/items_google__gemma-3-12b-it__noilai_core.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 9.402,
+   "outputs": [
+    "data/audit/items_google__gemma-3-12b-it__noilai_core.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_google__gemma-3-12b-it__noilai_core.jsonl": {
+     "sha256": "e5d97aaac31a3724e14d1ad111243b9178b0baa3b57aea10dc79750341b9ea05",
+     "bytes": 1947852
+    }
+   },
+   "stdout_tail": "wrote 2992 rows for 1496 items with tokenizer google__gemma-3-12b-it -> /root/noilai/data/audit/items_google__gemma-3-12b-it__noilai_core.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "Qwen__Qwen3.5-0.8B__noilai_core",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf Qwen/Qwen3.5-0.8B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-0.8B__noilai_core.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_core.jsonl",
+    "--hf",
+    "Qwen/Qwen3.5-0.8B",
+    "--out",
+    "/root/noilai/data/audit/items_Qwen__Qwen3.5-0.8B__noilai_core.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 9.872,
+   "outputs": [
+    "data/audit/items_Qwen__Qwen3.5-0.8B__noilai_core.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_Qwen__Qwen3.5-0.8B__noilai_core.jsonl": {
+     "sha256": "c76a82d9878aaad9cdb4c05bc7040539bf0d461bfc32819cd246b04d155e50d5",
+     "bytes": 1901700
+    }
+   },
+   "stdout_tail": "wrote 2992 rows for 1496 items with tokenizer Qwen__Qwen3.5-0.8B -> /root/noilai/data/audit/items_Qwen__Qwen3.5-0.8B__noilai_core.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "Qwen__Qwen3.5-2B__noilai_core",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf Qwen/Qwen3.5-2B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-2B__noilai_core.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_core.jsonl",
+    "--hf",
+    "Qwen/Qwen3.5-2B",
+    "--out",
+    "/root/noilai/data/audit/items_Qwen__Qwen3.5-2B__noilai_core.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 7.187,
+   "outputs": [
+    "data/audit/items_Qwen__Qwen3.5-2B__noilai_core.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_Qwen__Qwen3.5-2B__noilai_core.jsonl": {
+     "sha256": "6452ba4e60b4a79479f4c566fd89b42c08f21b01bff5102f6c37c06a390fb51d",
+     "bytes": 1895716
+    }
+   },
+   "stdout_tail": "wrote 2992 rows for 1496 items with tokenizer Qwen__Qwen3.5-2B -> /root/noilai/data/audit/items_Qwen__Qwen3.5-2B__noilai_core.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "Qwen__Qwen3.5-4B__noilai_core",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf Qwen/Qwen3.5-4B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-4B__noilai_core.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_core.jsonl",
+    "--hf",
+    "Qwen/Qwen3.5-4B",
+    "--out",
+    "/root/noilai/data/audit/items_Qwen__Qwen3.5-4B__noilai_core.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 7.033,
+   "outputs": [
+    "data/audit/items_Qwen__Qwen3.5-4B__noilai_core.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_Qwen__Qwen3.5-4B__noilai_core.jsonl": {
+     "sha256": "7aabdac802e181ffba2db0fe7c3a94eb048f679a03b555cf577eebc4d2c6e742",
+     "bytes": 1895716
+    }
+   },
+   "stdout_tail": "wrote 2992 rows for 1496 items with tokenizer Qwen__Qwen3.5-4B -> /root/noilai/data/audit/items_Qwen__Qwen3.5-4B__noilai_core.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "Qwen__Qwen3.5-9B__noilai_core",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf Qwen/Qwen3.5-9B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-9B__noilai_core.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_core.jsonl",
+    "--hf",
+    "Qwen/Qwen3.5-9B",
+    "--out",
+    "/root/noilai/data/audit/items_Qwen__Qwen3.5-9B__noilai_core.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 13.017,
+   "outputs": [
+    "data/audit/items_Qwen__Qwen3.5-9B__noilai_core.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_Qwen__Qwen3.5-9B__noilai_core.jsonl": {
+     "sha256": "47f03ccd4c67226a44001f12a7e92bd6ac14e36836490e14be4235a96a06fbf6",
+     "bytes": 1895716
+    }
+   },
+   "stdout_tail": "wrote 2992 rows for 1496 items with tokenizer Qwen__Qwen3.5-9B -> /root/noilai/data/audit/items_Qwen__Qwen3.5-9B__noilai_core.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "google__gemma-4-e2b-it__noilai_core",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf google/gemma-4-e2b-it --out /root/noilai/data/audit/items_google__gemma-4-e2b-it__noilai_core.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_core.jsonl",
+    "--hf",
+    "google/gemma-4-e2b-it",
+    "--out",
+    "/root/noilai/data/audit/items_google__gemma-4-e2b-it__noilai_core.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 14.544,
+   "outputs": [
+    "data/audit/items_google__gemma-4-e2b-it__noilai_core.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_google__gemma-4-e2b-it__noilai_core.jsonl": {
+     "sha256": "a68af6b5f7178732e4fe03a79f62cf80d0fa9436110bc536d990313134339f41",
+     "bytes": 1947852
+    }
+   },
+   "stdout_tail": "wrote 2992 rows for 1496 items with tokenizer google__gemma-4-e2b-it -> /root/noilai/data/audit/items_google__gemma-4-e2b-it__noilai_core.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "google__gemma-4-e4b-it__noilai_core",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf google/gemma-4-e4b-it --out /root/noilai/data/audit/items_google__gemma-4-e4b-it__noilai_core.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_core.jsonl",
+    "--hf",
+    "google/gemma-4-e4b-it",
+    "--out",
+    "/root/noilai/data/audit/items_google__gemma-4-e4b-it__noilai_core.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 10.75,
+   "outputs": [
+    "data/audit/items_google__gemma-4-e4b-it__noilai_core.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_google__gemma-4-e4b-it__noilai_core.jsonl": {
+     "sha256": "ee62959b49d011925b56757eedc6660fea6ae7521d63e3bbc0bbc469f864be5f",
+     "bytes": 1947852
+    }
+   },
+   "stdout_tail": "wrote 2992 rows for 1496 items with tokenizer google__gemma-4-e4b-it -> /root/noilai/data/audit/items_google__gemma-4-e4b-it__noilai_core.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "google__gemma-4-12b-it__noilai_core",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf google/gemma-4-12b-it --out /root/noilai/data/audit/items_google__gemma-4-12b-it__noilai_core.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_core.jsonl",
+    "--hf",
+    "google/gemma-4-12b-it",
+    "--out",
+    "/root/noilai/data/audit/items_google__gemma-4-12b-it__noilai_core.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 8.652,
+   "outputs": [
+    "data/audit/items_google__gemma-4-12b-it__noilai_core.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_google__gemma-4-12b-it__noilai_core.jsonl": {
+     "sha256": "365992ee3a3f5b447a71502f38501b45402b3151c7ac84fd40e0849ceccca83b",
+     "bytes": 1947852
+    }
+   },
+   "stdout_tail": "wrote 2992 rows for 1496 items with tokenizer google__gemma-4-12b-it -> /root/noilai/data/audit/items_google__gemma-4-12b-it__noilai_core.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_core",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf aisingapore/Gemma-SEA-LION-v4.5-E2B-IT --out /root/noilai/data/audit/items_aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_core.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_core.jsonl",
+    "--hf",
+    "aisingapore/Gemma-SEA-LION-v4.5-E2B-IT",
+    "--out",
+    "/root/noilai/data/audit/items_aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_core.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 9.691,
+   "outputs": [
+    "data/audit/items_aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_core.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_core.jsonl": {
+     "sha256": "c3acf18434d747a4a85fcfd2aa64eb0c3975289d517058e56909f9a3fc80f0ca",
+     "bytes": 1998716
+    }
+   },
+   "stdout_tail": "wrote 2992 rows for 1496 items with tokenizer aisingapore__Gemma-SEA-LION-v4.5-E2B-IT -> /root/noilai/data/audit/items_aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_core.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "sail__Sailor2-8B-Chat__noilai_core",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf sail/Sailor2-8B-Chat --out /root/noilai/data/audit/items_sail__Sailor2-8B-Chat__noilai_core.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_core.jsonl",
+    "--hf",
+    "sail/Sailor2-8B-Chat",
+    "--out",
+    "/root/noilai/data/audit/items_sail__Sailor2-8B-Chat__noilai_core.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 9.862,
+   "outputs": [
+    "data/audit/items_sail__Sailor2-8B-Chat__noilai_core.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_sail__Sailor2-8B-Chat__noilai_core.jsonl": {
+     "sha256": "b968c507c6edf3380504ae3313fb3ff157399ced6e6e971bee4558aa1d1d2e4f",
+     "bytes": 1912262
+    }
+   },
+   "stdout_tail": "wrote 2992 rows for 1496 items with tokenizer sail__Sailor2-8B-Chat -> /root/noilai/data/audit/items_sail__Sailor2-8B-Chat__noilai_core.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "vinai__PhoGPT-4B-Chat__noilai_core",
+   "status": "failed",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf vinai/PhoGPT-4B-Chat --out /root/noilai/data/audit/items_vinai__PhoGPT-4B-Chat__noilai_core.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_core.jsonl",
+    "--hf",
+    "vinai/PhoGPT-4B-Chat",
+    "--out",
+    "/root/noilai/data/audit/items_vinai__PhoGPT-4B-Chat__noilai_core.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 1,
+   "wall_s": 5.115,
+   "outputs": [
+    "data/audit/items_vinai__PhoGPT-4B-Chat__noilai_core.jsonl"
+   ],
+   "produced": {},
+   "stdout_tail": "",
+   "stderr_tail": "^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/models/auto/tokenization_auto.py\", line 805, in from_pretrained\n    config = AutoConfig.from_pretrained(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/models/auto/configuration_auto.py\", line 448, in from_pretrained\n    return config_class.from_dict(config_dict, **unused_kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 1085, in from_dict\n    config = cls(**config_dict)\n             ^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/huggingface_hub/dataclasses.py\", line 275, in init_with_validate\n    initial_init(self, *args, **kwargs)  # type: ignore [call-arg]\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 174, in __init__\n    self.__post_init__(**additional_kwargs)\n  File \"/root/venv/lib/python3.12/site-packages/transformers/models/mpt/configuration_mpt.py\", line 146, in __post_init__\n    self.attn_config = MptAttentionConfig(**self.attn_config)\n                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/huggingface_hub/dataclasses.py\", line 275, in init_with_validate\n    initial_init(self, *args, **kwargs)  # type: ignore [call-arg]\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 159, in __init__\n    setattr(self, f.name, standard_kwargs[f.name])\n  File \"/root/venv/lib/python3.12/site-packages/huggingface_hub/dataclasses.py\", line 146, in __strict_setattr__\n    raise StrictDataclassFieldValidationError(field=name, cause=e) from e\nhuggingface_hub.errors.StrictDataclassFieldValidationError: Validation error for field 'attn_pdrop':\n    TypeError: Field 'attn_pdrop' expected int, got float (value: 0.0)\n"
+  },
+  {
+   "job": "audit-items",
+   "name": "Viet-Mistral__Vistral-7B-Chat__noilai_core",
+   "status": "failed",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf Viet-Mistral/Vistral-7B-Chat --out /root/noilai/data/audit/items_Viet-Mistral__Vistral-7B-Chat__noilai_core.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_core.jsonl",
+    "--hf",
+    "Viet-Mistral/Vistral-7B-Chat",
+    "--out",
+    "/root/noilai/data/audit/items_Viet-Mistral__Vistral-7B-Chat__noilai_core.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 1,
+   "wall_s": 4.778,
+   "outputs": [
+    "data/audit/items_Viet-Mistral__Vistral-7B-Chat__noilai_core.jsonl"
+   ],
+   "produced": {},
+   "stdout_tail": "",
+   "stderr_tail": "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/models/auto/tokenization_auto.py\", line 809, in from_pretrained\n    config = PreTrainedConfig.from_pretrained(pretrained_model_name_or_path, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 879, in from_pretrained\n    config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)\n                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 929, in get_config_dict\n    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)\n                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 981, in _get_config_dict\n    resolved_config_file = cached_file(\n                           ^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/utils/hub.py\", line 370, in cached_file\n    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/utils/hub.py\", line 610, in cached_files\n    raise OSError(\nOSError: You are trying to access a gated repo.\nMake sure to have access to it at https://huggingface.co/Viet-Mistral/Vistral-7B-Chat.\n403 Client Error. (Request ID: Root=1-6adffe5c-7c9013e949439cc26ee54310;70f0d2a1-59a3-45d0-bb68-730b7d1edd74)\n\nCannot access gated repo for url https://huggingface.co/Viet-Mistral/Vistral-7B-Chat/resolve/d331b64e61b935cc43c2b3010ae9fb4fde599b45/config.json.\nYour request to access model Viet-Mistral/Vistral-7B-Chat is awaiting a review from the repo authors.\n"
+  },
+  {
+   "job": "audit-items",
+   "name": "meta-llama__Llama-3.1-8B-Instruct__noilai_core",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf meta-llama/Llama-3.1-8B-Instruct --out /root/noilai/data/audit/items_meta-llama__Llama-3.1-8B-Instruct__noilai_core.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_core.jsonl",
+    "--hf",
+    "meta-llama/Llama-3.1-8B-Instruct",
+    "--out",
+    "/root/noilai/data/audit/items_meta-llama__Llama-3.1-8B-Instruct__noilai_core.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 10.906,
+   "outputs": [
+    "data/audit/items_meta-llama__Llama-3.1-8B-Instruct__noilai_core.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_meta-llama__Llama-3.1-8B-Instruct__noilai_core.jsonl": {
+     "sha256": "5998a609c08af22540ea8a87ded9a675e8c50a111d0487c81b77d55c3460d93e",
+     "bytes": 2003432
+    }
+   },
+   "stdout_tail": "wrote 2992 rows for 1496 items with tokenizer meta-llama__Llama-3.1-8B-Instruct -> /root/noilai/data/audit/items_meta-llama__Llama-3.1-8B-Instruct__noilai_core.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "Qwen__Qwen3.8-27B__noilai_core",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf Qwen/Qwen3.8-27B --out /root/noilai/data/audit/items_Qwen__Qwen3.8-27B__noilai_core.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_core.jsonl",
+    "--hf",
+    "Qwen/Qwen3.8-27B",
+    "--out",
+    "/root/noilai/data/audit/items_Qwen__Qwen3.8-27B__noilai_core.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 15.872,
+   "outputs": [
+    "data/audit/items_Qwen__Qwen3.8-27B__noilai_core.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_Qwen__Qwen3.8-27B__noilai_core.jsonl": {
+     "sha256": "681cdba52aeac369c46c1d09e306e0b9362943e7385ea68f89ae060c2e773676",
+     "bytes": 1898708
+    }
+   },
+   "stdout_tail": "wrote 2992 rows for 1496 items with tokenizer Qwen__Qwen3.8-27B -> /root/noilai/data/audit/items_Qwen__Qwen3.8-27B__noilai_core.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_core",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf aisingapore/Qwen-SEA-LION-v4.5-27B-IT --out /root/noilai/data/audit/items_aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_core.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_core.jsonl",
+    "--hf",
+    "aisingapore/Qwen-SEA-LION-v4.5-27B-IT",
+    "--out",
+    "/root/noilai/data/audit/items_aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_core.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 8.887,
+   "outputs": [
+    "data/audit/items_aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_core.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_core.jsonl": {
+     "sha256": "9bda835832fd03b4f3dcbbb00adeb7002c5ba27449a7912582a43fea928efd79",
+     "bytes": 1961540
+    }
+   },
+   "stdout_tail": "wrote 2992 rows for 1496 items with tokenizer aisingapore__Qwen-SEA-LION-v4.5-27B-IT -> /root/noilai/data/audit/items_aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_core.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "openai__gpt-oss-120b__noilai_core",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf openai/gpt-oss-120b --out /root/noilai/data/audit/items_openai__gpt-oss-120b__noilai_core.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_core.jsonl",
+    "--hf",
+    "openai/gpt-oss-120b",
+    "--out",
+    "/root/noilai/data/audit/items_openai__gpt-oss-120b__noilai_core.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 6.77,
+   "outputs": [
+    "data/audit/items_openai__gpt-oss-120b__noilai_core.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_openai__gpt-oss-120b__noilai_core.jsonl": {
+     "sha256": "8329f59c4cf145052ff3ff3d40a8d224ec76336d7e8c73b32f1132d1966dc3b3",
+     "bytes": 1962264
+    }
+   },
+   "stdout_tail": "wrote 2992 rows for 1496 items with tokenizer openai__gpt-oss-120b -> /root/noilai/data/audit/items_openai__gpt-oss-120b__noilai_core.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "openai__gpt-oss-20b__noilai_core",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf openai/gpt-oss-20b --out /root/noilai/data/audit/items_openai__gpt-oss-20b__noilai_core.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_core.jsonl",
+    "--hf",
+    "openai/gpt-oss-20b",
+    "--out",
+    "/root/noilai/data/audit/items_openai__gpt-oss-20b__noilai_core.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 28.117,
+   "outputs": [
+    "data/audit/items_openai__gpt-oss-20b__noilai_core.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_openai__gpt-oss-20b__noilai_core.jsonl": {
+     "sha256": "f50c5431f013da551afafbaac64182137aeea4c8b7249ade935e43b4c1f33551",
+     "bytes": 1959272
+    }
+   },
+   "stdout_tail": "wrote 2992 rows for 1496 items with tokenizer openai__gpt-oss-20b -> /root/noilai/data/audit/items_openai__gpt-oss-20b__noilai_core.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "gemma3__noilai_dev",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --spm /root/noilai/data/external/gemma3_tokenizer.model:gemma3 --out /root/noilai/data/audit/items_gemma3__noilai_dev.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_dev.jsonl",
+    "--spm",
+    "/root/noilai/data/external/gemma3_tokenizer.model:gemma3",
+    "--out",
+    "/root/noilai/data/audit/items_gemma3__noilai_dev.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 1.441,
+   "outputs": [
+    "data/audit/items_gemma3__noilai_dev.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_gemma3__noilai_dev.jsonl": {
+     "sha256": "591f4fbf362f30a8b110527fd614d0eed3816e2f0bced0848ed31f3d56bba729",
+     "bytes": 2787152
+    }
+   },
+   "stdout_tail": "wrote 4074 rows for 2037 items with tokenizer gemma3 -> /root/noilai/data/audit/items_gemma3__noilai_dev.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "gemma2__noilai_dev",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --spm /root/noilai/data/external/gemma2_tokenizer.model:gemma2 --out /root/noilai/data/audit/items_gemma2__noilai_dev.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_dev.jsonl",
+    "--spm",
+    "/root/noilai/data/external/gemma2_tokenizer.model:gemma2",
+    "--out",
+    "/root/noilai/data/audit/items_gemma2__noilai_dev.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 1.413,
+   "outputs": [
+    "data/audit/items_gemma2__noilai_dev.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_gemma2__noilai_dev.jsonl": {
+     "sha256": "d7640d80856c63ec786509df34b31ef0d0edc783b4abd5dabdf670b677f7dd84",
+     "bytes": 2789658
+    }
+   },
+   "stdout_tail": "wrote 4074 rows for 2037 items with tokenizer gemma2 -> /root/noilai/data/audit/items_gemma2__noilai_dev.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "google__gemma-3-1b-it__noilai_dev",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf google/gemma-3-1b-it --out /root/noilai/data/audit/items_google__gemma-3-1b-it__noilai_dev.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_dev.jsonl",
+    "--hf",
+    "google/gemma-3-1b-it",
+    "--out",
+    "/root/noilai/data/audit/items_google__gemma-3-1b-it__noilai_dev.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 10.645,
+   "outputs": [
+    "data/audit/items_google__gemma-3-1b-it__noilai_dev.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_google__gemma-3-1b-it__noilai_dev.jsonl": {
+     "sha256": "36bdcaa6150a8639ea0c9d665ca3346065daf6d9565a4dafc7290e0745b39511",
+     "bytes": 2848262
+    }
+   },
+   "stdout_tail": "wrote 4074 rows for 2037 items with tokenizer google__gemma-3-1b-it -> /root/noilai/data/audit/items_google__gemma-3-1b-it__noilai_dev.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "google__gemma-3-4b-it__noilai_dev",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf google/gemma-3-4b-it --out /root/noilai/data/audit/items_google__gemma-3-4b-it__noilai_dev.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_dev.jsonl",
+    "--hf",
+    "google/gemma-3-4b-it",
+    "--out",
+    "/root/noilai/data/audit/items_google__gemma-3-4b-it__noilai_dev.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 8.232,
+   "outputs": [
+    "data/audit/items_google__gemma-3-4b-it__noilai_dev.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_google__gemma-3-4b-it__noilai_dev.jsonl": {
+     "sha256": "9eaaa25adef5c2c32d122d1ba142ecd02a084d779064db755c16333bc39e6c49",
+     "bytes": 2848262
+    }
+   },
+   "stdout_tail": "wrote 4074 rows for 2037 items with tokenizer google__gemma-3-4b-it -> /root/noilai/data/audit/items_google__gemma-3-4b-it__noilai_dev.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "google__gemma-3-12b-it__noilai_dev",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf google/gemma-3-12b-it --out /root/noilai/data/audit/items_google__gemma-3-12b-it__noilai_dev.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_dev.jsonl",
+    "--hf",
+    "google/gemma-3-12b-it",
+    "--out",
+    "/root/noilai/data/audit/items_google__gemma-3-12b-it__noilai_dev.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 20.261,
+   "outputs": [
+    "data/audit/items_google__gemma-3-12b-it__noilai_dev.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_google__gemma-3-12b-it__noilai_dev.jsonl": {
+     "sha256": "b56c949393b71b77daefa071f862af7d411b1955df3ea0b2630210d93bc2accd",
+     "bytes": 2852336
+    }
+   },
+   "stdout_tail": "wrote 4074 rows for 2037 items with tokenizer google__gemma-3-12b-it -> /root/noilai/data/audit/items_google__gemma-3-12b-it__noilai_dev.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "Qwen__Qwen3.5-0.8B__noilai_dev",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf Qwen/Qwen3.5-0.8B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-0.8B__noilai_dev.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_dev.jsonl",
+    "--hf",
+    "Qwen/Qwen3.5-0.8B",
+    "--out",
+    "/root/noilai/data/audit/items_Qwen__Qwen3.5-0.8B__noilai_dev.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 7.208,
+   "outputs": [
+    "data/audit/items_Qwen__Qwen3.5-0.8B__noilai_dev.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_Qwen__Qwen3.5-0.8B__noilai_dev.jsonl": {
+     "sha256": "b94548e89eec3e575765d9dc6c4daec4232abc1d59c0d0c739911c750d7460aa",
+     "bytes": 2787780
+    }
+   },
+   "stdout_tail": "wrote 4074 rows for 2037 items with tokenizer Qwen__Qwen3.5-0.8B -> /root/noilai/data/audit/items_Qwen__Qwen3.5-0.8B__noilai_dev.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "Qwen__Qwen3.5-2B__noilai_dev",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf Qwen/Qwen3.5-2B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-2B__noilai_dev.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_dev.jsonl",
+    "--hf",
+    "Qwen/Qwen3.5-2B",
+    "--out",
+    "/root/noilai/data/audit/items_Qwen__Qwen3.5-2B__noilai_dev.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 7.351,
+   "outputs": [
+    "data/audit/items_Qwen__Qwen3.5-2B__noilai_dev.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_Qwen__Qwen3.5-2B__noilai_dev.jsonl": {
+     "sha256": "cf12de4b6d0aadf3c5c18e0556e5d3aa3010f9c67b211108c07558f260f59de0",
+     "bytes": 2779632
+    }
+   },
+   "stdout_tail": "wrote 4074 rows for 2037 items with tokenizer Qwen__Qwen3.5-2B -> /root/noilai/data/audit/items_Qwen__Qwen3.5-2B__noilai_dev.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "Qwen__Qwen3.5-4B__noilai_dev",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf Qwen/Qwen3.5-4B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-4B__noilai_dev.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_dev.jsonl",
+    "--hf",
+    "Qwen/Qwen3.5-4B",
+    "--out",
+    "/root/noilai/data/audit/items_Qwen__Qwen3.5-4B__noilai_dev.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 11.666,
+   "outputs": [
+    "data/audit/items_Qwen__Qwen3.5-4B__noilai_dev.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_Qwen__Qwen3.5-4B__noilai_dev.jsonl": {
+     "sha256": "de5e4062171493f0f01b9ca55c3a539726980033eefedb9433320c493c376184",
+     "bytes": 2779632
+    }
+   },
+   "stdout_tail": "wrote 4074 rows for 2037 items with tokenizer Qwen__Qwen3.5-4B -> /root/noilai/data/audit/items_Qwen__Qwen3.5-4B__noilai_dev.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "Qwen__Qwen3.5-9B__noilai_dev",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf Qwen/Qwen3.5-9B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-9B__noilai_dev.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_dev.jsonl",
+    "--hf",
+    "Qwen/Qwen3.5-9B",
+    "--out",
+    "/root/noilai/data/audit/items_Qwen__Qwen3.5-9B__noilai_dev.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 9.67,
+   "outputs": [
+    "data/audit/items_Qwen__Qwen3.5-9B__noilai_dev.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_Qwen__Qwen3.5-9B__noilai_dev.jsonl": {
+     "sha256": "b53b338ad919e1718d77e5768b18472e67933770dbb4828ae9f1adef5553eb9c",
+     "bytes": 2779632
+    }
+   },
+   "stdout_tail": "wrote 4074 rows for 2037 items with tokenizer Qwen__Qwen3.5-9B -> /root/noilai/data/audit/items_Qwen__Qwen3.5-9B__noilai_dev.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "google__gemma-4-e2b-it__noilai_dev",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf google/gemma-4-e2b-it --out /root/noilai/data/audit/items_google__gemma-4-e2b-it__noilai_dev.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_dev.jsonl",
+    "--hf",
+    "google/gemma-4-e2b-it",
+    "--out",
+    "/root/noilai/data/audit/items_google__gemma-4-e2b-it__noilai_dev.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 11.043,
+   "outputs": [
+    "data/audit/items_google__gemma-4-e2b-it__noilai_dev.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_google__gemma-4-e2b-it__noilai_dev.jsonl": {
+     "sha256": "0e1b48617ce380d416442a1550bc1b6887ca41ac27eb4b06883d281fce4e8efd",
+     "bytes": 2852336
+    }
+   },
+   "stdout_tail": "wrote 4074 rows for 2037 items with tokenizer google__gemma-4-e2b-it -> /root/noilai/data/audit/items_google__gemma-4-e2b-it__noilai_dev.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "google__gemma-4-e4b-it__noilai_dev",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf google/gemma-4-e4b-it --out /root/noilai/data/audit/items_google__gemma-4-e4b-it__noilai_dev.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_dev.jsonl",
+    "--hf",
+    "google/gemma-4-e4b-it",
+    "--out",
+    "/root/noilai/data/audit/items_google__gemma-4-e4b-it__noilai_dev.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 158.28,
+   "outputs": [
+    "data/audit/items_google__gemma-4-e4b-it__noilai_dev.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_google__gemma-4-e4b-it__noilai_dev.jsonl": {
+     "sha256": "bbc0b4880fe384eee633910d95b443078367a8fbee4366d3368c50d140e1e267",
+     "bytes": 2852336
+    }
+   },
+   "stdout_tail": "wrote 4074 rows for 2037 items with tokenizer google__gemma-4-e4b-it -> /root/noilai/data/audit/items_google__gemma-4-e4b-it__noilai_dev.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "google__gemma-4-12b-it__noilai_dev",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf google/gemma-4-12b-it --out /root/noilai/data/audit/items_google__gemma-4-12b-it__noilai_dev.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_dev.jsonl",
+    "--hf",
+    "google/gemma-4-12b-it",
+    "--out",
+    "/root/noilai/data/audit/items_google__gemma-4-12b-it__noilai_dev.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 15.51,
+   "outputs": [
+    "data/audit/items_google__gemma-4-12b-it__noilai_dev.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_google__gemma-4-12b-it__noilai_dev.jsonl": {
+     "sha256": "e9d14329c8d7e834cbf3c5600bed15b7bf11d3cb76b9873a113f1e86cc14b119",
+     "bytes": 2852336
+    }
+   },
+   "stdout_tail": "wrote 4074 rows for 2037 items with tokenizer google__gemma-4-12b-it -> /root/noilai/data/audit/items_google__gemma-4-12b-it__noilai_dev.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_dev",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf aisingapore/Gemma-SEA-LION-v4.5-E2B-IT --out /root/noilai/data/audit/items_aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_dev.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_dev.jsonl",
+    "--hf",
+    "aisingapore/Gemma-SEA-LION-v4.5-E2B-IT",
+    "--out",
+    "/root/noilai/data/audit/items_aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_dev.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 10.097,
+   "outputs": [
+    "data/audit/items_aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_dev.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_dev.jsonl": {
+     "sha256": "8ff3d83474b0d147ebe1354c0f44d87122b727aa25e10667270bd2d16c1cdf6e",
+     "bytes": 2921594
+    }
+   },
+   "stdout_tail": "wrote 4074 rows for 2037 items with tokenizer aisingapore__Gemma-SEA-LION-v4.5-E2B-IT -> /root/noilai/data/audit/items_aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_dev.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "sail__Sailor2-8B-Chat__noilai_dev",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf sail/Sailor2-8B-Chat --out /root/noilai/data/audit/items_sail__Sailor2-8B-Chat__noilai_dev.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_dev.jsonl",
+    "--hf",
+    "sail/Sailor2-8B-Chat",
+    "--out",
+    "/root/noilai/data/audit/items_sail__Sailor2-8B-Chat__noilai_dev.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 7.381,
+   "outputs": [
+    "data/audit/items_sail__Sailor2-8B-Chat__noilai_dev.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_sail__Sailor2-8B-Chat__noilai_dev.jsonl": {
+     "sha256": "4158665f9d8d66fe549848cd5233a3c3ce9c70a192fdf2c4fb82627456b3c2d7",
+     "bytes": 2802178
+    }
+   },
+   "stdout_tail": "wrote 4074 rows for 2037 items with tokenizer sail__Sailor2-8B-Chat -> /root/noilai/data/audit/items_sail__Sailor2-8B-Chat__noilai_dev.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "vinai__PhoGPT-4B-Chat__noilai_dev",
+   "status": "failed",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf vinai/PhoGPT-4B-Chat --out /root/noilai/data/audit/items_vinai__PhoGPT-4B-Chat__noilai_dev.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_dev.jsonl",
+    "--hf",
+    "vinai/PhoGPT-4B-Chat",
+    "--out",
+    "/root/noilai/data/audit/items_vinai__PhoGPT-4B-Chat__noilai_dev.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 1,
+   "wall_s": 6.048,
+   "outputs": [
+    "data/audit/items_vinai__PhoGPT-4B-Chat__noilai_dev.jsonl"
+   ],
+   "produced": {},
+   "stdout_tail": "",
+   "stderr_tail": "^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/models/auto/tokenization_auto.py\", line 805, in from_pretrained\n    config = AutoConfig.from_pretrained(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/models/auto/configuration_auto.py\", line 448, in from_pretrained\n    return config_class.from_dict(config_dict, **unused_kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 1085, in from_dict\n    config = cls(**config_dict)\n             ^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/huggingface_hub/dataclasses.py\", line 275, in init_with_validate\n    initial_init(self, *args, **kwargs)  # type: ignore [call-arg]\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 174, in __init__\n    self.__post_init__(**additional_kwargs)\n  File \"/root/venv/lib/python3.12/site-packages/transformers/models/mpt/configuration_mpt.py\", line 146, in __post_init__\n    self.attn_config = MptAttentionConfig(**self.attn_config)\n                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/huggingface_hub/dataclasses.py\", line 275, in init_with_validate\n    initial_init(self, *args, **kwargs)  # type: ignore [call-arg]\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 159, in __init__\n    setattr(self, f.name, standard_kwargs[f.name])\n  File \"/root/venv/lib/python3.12/site-packages/huggingface_hub/dataclasses.py\", line 146, in __strict_setattr__\n    raise StrictDataclassFieldValidationError(field=name, cause=e) from e\nhuggingface_hub.errors.StrictDataclassFieldValidationError: Validation error for field 'attn_pdrop':\n    TypeError: Field 'attn_pdrop' expected int, got float (value: 0.0)\n"
+  },
+  {
+   "job": "audit-items",
+   "name": "Viet-Mistral__Vistral-7B-Chat__noilai_dev",
+   "status": "failed",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf Viet-Mistral/Vistral-7B-Chat --out /root/noilai/data/audit/items_Viet-Mistral__Vistral-7B-Chat__noilai_dev.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_dev.jsonl",
+    "--hf",
+    "Viet-Mistral/Vistral-7B-Chat",
+    "--out",
+    "/root/noilai/data/audit/items_Viet-Mistral__Vistral-7B-Chat__noilai_dev.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 1,
+   "wall_s": 6.516,
+   "outputs": [
+    "data/audit/items_Viet-Mistral__Vistral-7B-Chat__noilai_dev.jsonl"
+   ],
+   "produced": {},
+   "stdout_tail": "",
+   "stderr_tail": "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/models/auto/tokenization_auto.py\", line 809, in from_pretrained\n    config = PreTrainedConfig.from_pretrained(pretrained_model_name_or_path, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 879, in from_pretrained\n    config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)\n                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 929, in get_config_dict\n    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)\n                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py\", line 981, in _get_config_dict\n    resolved_config_file = cached_file(\n                           ^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/utils/hub.py\", line 370, in cached_file\n    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/venv/lib/python3.12/site-packages/transformers/utils/hub.py\", line 610, in cached_files\n    raise OSError(\nOSError: You are trying to access a gated repo.\nMake sure to have access to it at https://huggingface.co/Viet-Mistral/Vistral-7B-Chat.\n403 Client Error. (Request ID: Root=1-6adfffc7-5b08fb0220fce9c35990372d;c95f1952-c545-4c1f-87df-99cd3c6a292a)\n\nCannot access gated repo for url https://huggingface.co/Viet-Mistral/Vistral-7B-Chat/resolve/d331b64e61b935cc43c2b3010ae9fb4fde599b45/config.json.\nYour request to access model Viet-Mistral/Vistral-7B-Chat is awaiting a review from the repo authors.\n"
+  },
+  {
+   "job": "audit-items",
+   "name": "meta-llama__Llama-3.1-8B-Instruct__noilai_dev",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf meta-llama/Llama-3.1-8B-Instruct --out /root/noilai/data/audit/items_meta-llama__Llama-3.1-8B-Instruct__noilai_dev.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_dev.jsonl",
+    "--hf",
+    "meta-llama/Llama-3.1-8B-Instruct",
+    "--out",
+    "/root/noilai/data/audit/items_meta-llama__Llama-3.1-8B-Instruct__noilai_dev.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 11.308,
+   "outputs": [
+    "data/audit/items_meta-llama__Llama-3.1-8B-Instruct__noilai_dev.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_meta-llama__Llama-3.1-8B-Instruct__noilai_dev.jsonl": {
+     "sha256": "5fcc59e57de8bda3c1c9cffad2d4b4f783a54f8f1ed3f5b435e17883c92e37f9",
+     "bytes": 2924007
+    }
+   },
+   "stdout_tail": "wrote 4074 rows for 2037 items with tokenizer meta-llama__Llama-3.1-8B-Instruct -> /root/noilai/data/audit/items_meta-llama__Llama-3.1-8B-Instruct__noilai_dev.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "Qwen__Qwen3.8-27B__noilai_dev",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf Qwen/Qwen3.8-27B --out /root/noilai/data/audit/items_Qwen__Qwen3.8-27B__noilai_dev.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_dev.jsonl",
+    "--hf",
+    "Qwen/Qwen3.8-27B",
+    "--out",
+    "/root/noilai/data/audit/items_Qwen__Qwen3.8-27B__noilai_dev.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 9.658,
+   "outputs": [
+    "data/audit/items_Qwen__Qwen3.8-27B__noilai_dev.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_Qwen__Qwen3.8-27B__noilai_dev.jsonl": {
+     "sha256": "296c98d8cac665fb887df3e1c44abde005fc4d2a7916c75bc3dc567ac6278083",
+     "bytes": 2783706
+    }
+   },
+   "stdout_tail": "wrote 4074 rows for 2037 items with tokenizer Qwen__Qwen3.8-27B -> /root/noilai/data/audit/items_Qwen__Qwen3.8-27B__noilai_dev.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_dev",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf aisingapore/Qwen-SEA-LION-v4.5-27B-IT --out /root/noilai/data/audit/items_aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_dev.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_dev.jsonl",
+    "--hf",
+    "aisingapore/Qwen-SEA-LION-v4.5-27B-IT",
+    "--out",
+    "/root/noilai/data/audit/items_aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_dev.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 10.611,
+   "outputs": [
+    "data/audit/items_aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_dev.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_dev.jsonl": {
+     "sha256": "f1fbee2b993fd45d9fbf2cfaa1d3ff06b16635ecead0e475d1a8c9864df376a4",
+     "bytes": 2869260
+    }
+   },
+   "stdout_tail": "wrote 4074 rows for 2037 items with tokenizer aisingapore__Qwen-SEA-LION-v4.5-27B-IT -> /root/noilai/data/audit/items_aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_dev.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "openai__gpt-oss-120b__noilai_dev",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf openai/gpt-oss-120b --out /root/noilai/data/audit/items_openai__gpt-oss-120b__noilai_dev.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_dev.jsonl",
+    "--hf",
+    "openai/gpt-oss-120b",
+    "--out",
+    "/root/noilai/data/audit/items_openai__gpt-oss-120b__noilai_dev.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 9.85,
+   "outputs": [
+    "data/audit/items_openai__gpt-oss-120b__noilai_dev.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_openai__gpt-oss-120b__noilai_dev.jsonl": {
+     "sha256": "c20a91b740dc9f7b3926b4003bbbc8ed7592ed4924487401190013929b533882",
+     "bytes": 2869571
+    }
+   },
+   "stdout_tail": "wrote 4074 rows for 2037 items with tokenizer openai__gpt-oss-120b -> /root/noilai/data/audit/items_openai__gpt-oss-120b__noilai_dev.jsonl\n",
+   "stderr_tail": ""
+  },
+  {
+   "job": "audit-items",
+   "name": "openai__gpt-oss-20b__noilai_dev",
+   "status": "ok",
+   "command": "/root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf openai/gpt-oss-20b --out /root/noilai/data/audit/items_openai__gpt-oss-20b__noilai_dev.jsonl",
+   "argv": [
+    "/root/venv/bin/python",
+    "/root/noilai/scripts/audit_items.py",
+    "--items",
+    "/root/noilai/data/release/v0.4/noilai_dev.jsonl",
+    "--hf",
+    "openai/gpt-oss-20b",
+    "--out",
+    "/root/noilai/data/audit/items_openai__gpt-oss-20b__noilai_dev.jsonl"
+   ],
+   "skip_reason": null,
+   "note": null,
+   "returncode": 0,
+   "wall_s": 10.301,
+   "outputs": [
+    "data/audit/items_openai__gpt-oss-20b__noilai_dev.jsonl"
+   ],
+   "produced": {
+    "data/audit/items_openai__gpt-oss-20b__noilai_dev.jsonl": {
+     "sha256": "c62591cf06f35a729fc2a5061860592fa1783362470b262dccbd8197f6171f43",
+     "bytes": 2865497
+    }
+   },
+   "stdout_tail": "wrote 4074 rows for 2037 items with tokenizer openai__gpt-oss-20b -> /root/noilai/data/audit/items_openai__gpt-oss-20b__noilai_dev.jsonl\n",
+   "stderr_tail": ""
+  }
+ ]
+}

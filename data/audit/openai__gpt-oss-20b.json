@@ -1,0 +1,98 @@
+{
+  "tokenizer": "openai__gpt-oss-20b",
+  "summary": {
+    "nfc": {
+      "n": 6595,
+      "tokens_per_syllable_mean": 1.9290371493555725,
+      "single_token_frac": 0.2045489006823351,
+      "boundary_alignment_mean": 0.9295425827647208,
+      "boundary_alignment_among_split_mean": 0.9114245774558394,
+      "n_split": 5246,
+      "onset_rime_split_frac": 0.577710386656558,
+      "tone_isolated_frac": 0,
+      "byte_fallback_frac": 0,
+      "n_tokens_hist": {
+        "1": 1349,
+        "2": 4379,
+        "3": 853,
+        "4": 14
+      }
+    },
+    "nfd": {
+      "n": 6595,
+      "tokens_per_syllable_mean": 3.366641394996209,
+      "single_token_frac": 0.0670204700530705,
+      "boundary_alignment_mean": 0.40444781400050545,
+      "boundary_alignment_among_split_mean": 0.3616663957960886,
+      "n_split": 6153,
+      "onset_rime_split_frac": 0.0843062926459439,
+      "tone_isolated_frac": 0.7751326762699015,
+      "byte_fallback_frac": 0,
+      "n_tokens_hist": {
+        "1": 442,
+        "2": 825,
+        "3": 2680,
+        "4": 1813,
+        "5": 596,
+        "6": 23,
+        "7": 43,
+        "8": 157,
+        "9": 16
+      }
+    }
+  },
+  "normalization_census": {
+    "n_samples": 1000,
+    "forms": [
+      "nfd",
+      "pc"
+    ],
+    "nfd_same_ids_frac": 0.012,
+    "nfd_longer_frac": 0.946,
+    "nfd_byte_fallback_frac": 0.0,
+    "nfd_roundtrip_ok_frac": 1.0,
+    "nfd_roundtrip_failures": [],
+    "verdict_nfd": "passes_through",
+    "pc_same_ids_frac": 0.061,
+    "pc_longer_frac": 0.864,
+    "pc_byte_fallback_frac": 0.0,
+    "pc_roundtrip_ok_frac": 1.0,
+    "pc_roundtrip_failures": [],
+    "verdict_pc": "passes_through",
+    "normalizes_nfd": false,
+    "verdict": "passes_through",
+    "roundtrip_rule": "NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)",
+    "type": "huggingface",
+    "class": "TokenizersBackend",
+    "vocab_size": 200019,
+    "normalizer": null,
+    "pre_tokenizer": {
+      "type": "Sequence",
+      "pretokenizers": [
+        {
+          "type": "Split",
+          "pattern": {
+            "Regex": "[^\\r\\n\\p{L}\\p{N}]?[\\p{Lu}\\p{Lt}\\p{Lm}\\p{Lo}\\p{M}]*[\\p{Ll}\\p{Lm}\\p{Lo}\\p{M}]+(?i:'s|'t|'re|'ve|'m|'ll|'d)?|[^\\r\\n\\p{L}\\p{N}]?[\\p{Lu}\\p{Lt}\\p{Lm}\\p{Lo}\\p{M}]+[\\p{Ll}\\p{Lm}\\p{Lo}\\p{M}]*(?i:'s|'t|'re|'ve|'m|'ll|'d)?|\\p{N}{1,3}| ?[^\\s\\p{L}\\p{N}]+[\\r\\n/]*|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+"
+          },
+          "behavior": "Isolated",
+          "invert": false
+        },
+        {
+          "type": "ByteLevel",
+          "add_prefix_space": false,
+          "trim_offsets": true,
+          "use_regex": false
+        }
+      ]
+    },
+    "model_type": "BPE",
+    "probe_set": {
+      "n": 1000,
+      "n_words": 500,
+      "n_items": 500,
+      "items_file": "data/release/v0.4/noilai_main.jsonl",
+      "seed": 0,
+      "rule": "500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)"
+    }
+  }
+}

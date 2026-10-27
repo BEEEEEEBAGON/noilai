@@ -208,7 +208,7 @@ models:
     display_name: "Gemma 3 1B (IT)"
     hf_id: google/gemma-3-1b-it
     hf_id_status: known
-    revision: null            # full commit hash, required before a paper run (DD 7.1)
+    revision: "dcc83ea841ab6100d6b47a070329e1ba4cf78752"            # full commit hash, required before a paper run (DD 7.1)
     gated: true
     family: gemma3
     group: interpretability_ladder
@@ -232,7 +232,7 @@ models:
     display_name: "Gemma 3 4B (IT)"
     hf_id: google/gemma-3-4b-it
     hf_id_status: known
-    revision: null            # full commit hash, required before a paper run (DD 7.1)
+    revision: "093f9f388b31de276ce2de164bdc2081324b9767"            # full commit hash, required before a paper run (DD 7.1)
     gated: true
     family: gemma3
     group: interpretability_ladder
@@ -255,7 +255,7 @@ models:
     display_name: "Gemma 3 12B (IT)"
     hf_id: google/gemma-3-12b-it
     hf_id_status: known
-    revision: null            # full commit hash, required before a paper run (DD 7.1)
+    revision: "96b6f1eccf38110c56df3a15bffe176da04bfd80"            # full commit hash, required before a paper run (DD 7.1)
     gated: true
     family: gemma3
     group: interpretability_ladder
@@ -280,7 +280,7 @@ models:
     display_name: "Qwen3.5-0.8B"
     hf_id: Qwen/Qwen3.5-0.8B          # [UNCERTAIN: verify] the plan's family name; the exact repo id and the instruct suffix were not resolvable from here
     hf_id_status: uncertain
-    revision: null            # full commit hash, required before a paper run (DD 7.1)
+    revision: "2fc06364715b967f1860aea9cf38778875588b17"            # full commit hash, required before a paper run (DD 7.1)
     gated: false
     family: qwen3.5
     group: general_multilingual
@@ -304,7 +304,7 @@ models:
     display_name: "Qwen3.5-2B"
     hf_id: Qwen/Qwen3.5-2B            # [UNCERTAIN: verify]
     hf_id_status: uncertain
-    revision: null            # full commit hash, required before a paper run (DD 7.1)
+    revision: "15852e8c16360a2fea060d615a32b45270f8a8fc"            # full commit hash, required before a paper run (DD 7.1)
     gated: false
     family: qwen3.5
     group: general_multilingual
@@ -327,7 +327,7 @@ models:
     display_name: "Qwen3.5-4B"
     hf_id: Qwen/Qwen3.5-4B            # [UNCERTAIN: verify]
     hf_id_status: uncertain
-    revision: null            # full commit hash, required before a paper run (DD 7.1)
+    revision: "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a"            # full commit hash, required before a paper run (DD 7.1)
     gated: false
     family: qwen3.5
     group: general_multilingual
@@ -466,7 +466,7 @@ models:
     display_name: "Sailor2-8B-Chat"
     hf_id: sail/Sailor2-8B-Chat
     hf_id_status: known
-    revision: null            # full commit hash, required before a paper run (DD 7.1)
+    revision: "577d5b2745863cec11e1b2f1c92586a91cea446e"            # full commit hash, required before a paper run (DD 7.1)
     gated: false
     family: sailor2
     base_model: qwen2.5
@@ -490,7 +490,7 @@ models:
     display_name: "PhoGPT-4B-Chat"
     hf_id: vinai/PhoGPT-4B-Chat
     hf_id_status: known
-    revision: null            # full commit hash, required before a paper run (DD 7.1)
+    revision: "3b11fad96d853b78f2fecc76f13aedb381b02d5a"            # full commit hash, required before a paper run (DD 7.1)
     gated: false
     family: phogpt
     group: vietnamese_specialised
@@ -516,7 +516,7 @@ models:
     display_name: "Vistral-7B-Chat"
     hf_id: Viet-Mistral/Vistral-7B-Chat
     hf_id_status: known
-    revision: null            # full commit hash, required before a paper run (DD 7.1)
+    revision: "d331b64e61b935cc43c2b3010ae9fb4fde599b45"            # full commit hash, required before a paper run (DD 7.1)
     gated: true
     family: vistral
     base_model: mistral-7b
@@ -541,7 +541,7 @@ models:
     display_name: "Llama-3.1-8B-Instruct"
     hf_id: meta-llama/Llama-3.1-8B-Instruct
     hf_id_status: known
-    revision: null            # full commit hash, required before a paper run (DD 7.1)
+    revision: "db1f81ad4b8c7e39777509fac66c652eb0a52f91"            # full commit hash, required before a paper run (DD 7.1)
     gated: true
     family: llama3.1
     group: legacy_baseline
@@ -564,7 +564,7 @@ models:
     display_name: "Qwen3.8-27B"
     hf_id: Qwen/Qwen3.8-27B           # [UNCERTAIN: verify] the plan cites https://github.com/QwenLM/Qwen3.8; the HF id and instruct suffix are unresolved
     hf_id_status: uncertain
-    revision: null            # full commit hash, required before a paper run (DD 7.1)
+    revision: "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"            # full commit hash, required before a paper run (DD 7.1)
     gated: false
     family: qwen3.8
     group: large_open_reference
@@ -590,7 +590,7 @@ models:
     display_name: "Qwen-SEA-LION-v4.5-27B-IT"
     hf_id: aisingapore/Qwen-SEA-LION-v4.5-27B-IT   # [UNCERTAIN: verify]
     hf_id_status: uncertain
-    revision: null            # full commit hash, required before a paper run (DD 7.1)
+    revision: "544e416f68a5700c7577547ad48e351e7d294116"            # full commit hash, required before a paper run (DD 7.1)
     gated: false
     family: sea-lion-v4.5
     base_model: qwen3.6-27b
@@ -714,27 +714,27 @@ models:
   # Same weights as the panel entry named in `reference_of`, served unquantized in bf16 on the
   # TPU for the ~200-item drift check (plan 2.5: "about 200 items per model are re-run in bf16").
   # Modal L4 (bf16-capable) is the fallback if the TPU route fails (plan 3).
-  - {name: gemma-3-1b-it--bf16, reference_of: gemma-3-1b-it, hf_id: google/gemma-3-1b-it, hf_id_status: known, revision: null, gated: true, family: gemma3, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, never_float16: true, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: [], notes: ["bf16 reference for the fp32 T4 run"]}
-  - {name: gemma-3-4b-it--bf16, reference_of: gemma-3-4b-it, hf_id: google/gemma-3-4b-it, hf_id_status: known, revision: null, gated: true, family: gemma3, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, never_float16: true, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: [], notes: ["bf16 reference for the fp32 2xT4 run"]}
-  - {name: qwen3.5-0.8b--bf16, reference_of: qwen3.5-0.8b, hf_id: Qwen/Qwen3.5-0.8B, hf_id_status: uncertain, revision: null, gated: false, family: qwen3.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {enable_thinking: false}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
-  - {name: qwen3.5-2b--bf16, reference_of: qwen3.5-2b, hf_id: Qwen/Qwen3.5-2B, hf_id_status: uncertain, revision: null, gated: false, family: qwen3.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {enable_thinking: false}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
-  - {name: qwen3.5-4b--bf16, reference_of: qwen3.5-4b, hf_id: Qwen/Qwen3.5-4B, hf_id_status: uncertain, revision: null, gated: false, family: qwen3.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {enable_thinking: false}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
-  - {name: qwen3.5-9b--bf16, reference_of: qwen3.5-9b, hf_id: Qwen/Qwen3.5-9B, hf_id_status: uncertain, revision: null, gated: false, family: qwen3.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {enable_thinking: false}, verify: ["[UNCERTAIN: verify] as reference"], notes: ["unquantized bf16 reference for the 4-bit T4 run"]}
-  - {name: gemma-4-e2b--bf16, reference_of: gemma-4-e2b, hf_id: google/gemma-4-e2b-it, hf_id_status: uncertain, revision: null, gated: true, family: gemma4, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] as reference"], notes: ["unquantized bf16 reference for the 4-bit T4 run"]}
-  - {name: gemma-4-e4b--bf16, reference_of: gemma-4-e4b, hf_id: google/gemma-4-e4b-it, hf_id_status: uncertain, revision: null, gated: true, family: gemma4, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
-  - {name: gemma-4-12b--bf16, reference_of: gemma-4-12b, hf_id: google/gemma-4-12b-it, hf_id_status: uncertain, revision: null, gated: true, family: gemma4, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
-  - {name: gemma-sea-lion-v4.5-e2b-it--bf16, reference_of: gemma-sea-lion-v4.5-e2b-it, hf_id: aisingapore/Gemma-SEA-LION-v4.5-E2B-IT, hf_id_status: uncertain, revision: null, gated: false, family: sea-lion-v4.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
-  - {name: sailor2-8b-chat--bf16, reference_of: sailor2-8b-chat, hf_id: sail/Sailor2-8B-Chat, hf_id_status: known, revision: null, gated: false, family: sailor2, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: [], notes: []}
-  - {name: phogpt-4b-chat--bf16, reference_of: phogpt-4b-chat, hf_id: vinai/PhoGPT-4B-Chat, hf_id_status: known, revision: null, gated: false, family: phogpt, group: bf16_reference, tokenizer_type: "as reference", backend: hf, fallback_backend: llama_cpp, dtype: bfloat16, quantization: null, hardware: l4, max_model_len: 2048, trust_remote_code: true, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] Modal L4 route (card on file); MPT is not runnable on vLLM 0.30, so the TPU route does not exist for this model"], notes: ["bf16 reference through HF transformers on the Modal L4 (plan 3: bf16 reruns if the TPU route fails); DD 7.2 / 12.25"]}
-  - {name: vistral-7b-chat--bf16, reference_of: vistral-7b-chat, hf_id: Viet-Mistral/Vistral-7B-Chat, hf_id_status: known, revision: null, gated: true, family: vistral, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: [], notes: []}
-  - {name: llama-3.1-8b-instruct--bf16, reference_of: llama-3.1-8b-instruct, hf_id: meta-llama/Llama-3.1-8B-Instruct, hf_id_status: known, revision: null, gated: true, family: llama3.1, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: [], notes: ["unquantized bf16 reference for the AWQ T4 run"]}
+  - {name: gemma-3-1b-it--bf16, reference_of: gemma-3-1b-it, hf_id: google/gemma-3-1b-it, hf_id_status: known, revision: "dcc83ea841ab6100d6b47a070329e1ba4cf78752", gated: true, family: gemma3, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, never_float16: true, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: [], notes: ["bf16 reference for the fp32 T4 run"]}
+  - {name: gemma-3-4b-it--bf16, reference_of: gemma-3-4b-it, hf_id: google/gemma-3-4b-it, hf_id_status: known, revision: "093f9f388b31de276ce2de164bdc2081324b9767", gated: true, family: gemma3, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, never_float16: true, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: [], notes: ["bf16 reference for the fp32 2xT4 run"]}
+  - {name: qwen3.5-0.8b--bf16, reference_of: qwen3.5-0.8b, hf_id: Qwen/Qwen3.5-0.8B, hf_id_status: uncertain, revision: "2fc06364715b967f1860aea9cf38778875588b17", gated: false, family: qwen3.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {enable_thinking: false}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
+  - {name: qwen3.5-2b--bf16, reference_of: qwen3.5-2b, hf_id: Qwen/Qwen3.5-2B, hf_id_status: uncertain, revision: "15852e8c16360a2fea060d615a32b45270f8a8fc", gated: false, family: qwen3.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {enable_thinking: false}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
+  - {name: qwen3.5-4b--bf16, reference_of: qwen3.5-4b, hf_id: Qwen/Qwen3.5-4B, hf_id_status: uncertain, revision: "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a", gated: false, family: qwen3.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {enable_thinking: false}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
+  - {name: qwen3.5-9b--bf16, reference_of: qwen3.5-9b, hf_id: Qwen/Qwen3.5-9B, hf_id_status: uncertain, revision: "c202236235762e1c871ad0ccb60c8ee5ba337b9a", gated: false, family: qwen3.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {enable_thinking: false}, verify: ["[UNCERTAIN: verify] as reference"], notes: ["unquantized bf16 reference for the 4-bit T4 run"]}
+  - {name: gemma-4-e2b--bf16, reference_of: gemma-4-e2b, hf_id: google/gemma-4-e2b-it, hf_id_status: uncertain, revision: "3e22461f65e89153144f8adb70e3b8c2cc9845a7", gated: true, family: gemma4, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] as reference"], notes: ["unquantized bf16 reference for the 4-bit T4 run"]}
+  - {name: gemma-4-e4b--bf16, reference_of: gemma-4-e4b, hf_id: google/gemma-4-e4b-it, hf_id_status: uncertain, revision: "ee0ef6023621cff504d758262d4e04895a5af4a2", gated: true, family: gemma4, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
+  - {name: gemma-4-12b--bf16, reference_of: gemma-4-12b, hf_id: google/gemma-4-12b-it, hf_id_status: uncertain, revision: "707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7", gated: true, family: gemma4, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
+  - {name: gemma-sea-lion-v4.5-e2b-it--bf16, reference_of: gemma-sea-lion-v4.5-e2b-it, hf_id: aisingapore/Gemma-SEA-LION-v4.5-E2B-IT, hf_id_status: uncertain, revision: "c028f609f6f84dd0e9b669dad9dc1f9fd61b8bed", gated: false, family: sea-lion-v4.5, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
+  - {name: sailor2-8b-chat--bf16, reference_of: sailor2-8b-chat, hf_id: sail/Sailor2-8B-Chat, hf_id_status: known, revision: "577d5b2745863cec11e1b2f1c92586a91cea446e", gated: false, family: sailor2, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: [], notes: []}
+  - {name: phogpt-4b-chat--bf16, reference_of: phogpt-4b-chat, hf_id: vinai/PhoGPT-4B-Chat, hf_id_status: known, revision: "3b11fad96d853b78f2fecc76f13aedb381b02d5a", gated: false, family: phogpt, group: bf16_reference, tokenizer_type: "as reference", backend: hf, fallback_backend: llama_cpp, dtype: bfloat16, quantization: null, hardware: l4, max_model_len: 2048, trust_remote_code: true, chat_template_kwargs: {}, verify: ["[UNCERTAIN: verify] Modal L4 route (card on file); MPT is not runnable on vLLM 0.30, so the TPU route does not exist for this model"], notes: ["bf16 reference through HF transformers on the Modal L4 (plan 3: bf16 reruns if the TPU route fails); DD 7.2 / 12.25"]}
+  - {name: vistral-7b-chat--bf16, reference_of: vistral-7b-chat, hf_id: Viet-Mistral/Vistral-7B-Chat, hf_id_status: known, revision: "d331b64e61b935cc43c2b3010ae9fb4fde599b45", gated: true, family: vistral, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: [], notes: []}
+  - {name: llama-3.1-8b-instruct--bf16, reference_of: llama-3.1-8b-instruct, hf_id: meta-llama/Llama-3.1-8B-Instruct, hf_id_status: known, revision: "0e9e39f249a16976918f6564b8830bc894c89659", gated: true, family: llama3.1, group: bf16_reference, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 2048, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, chat_template_kwargs: {}, verify: [], notes: ["unquantized bf16 reference for the AWQ T4 run"]}
 
   # ------------------------------------------------------------------ reasoning sub-study variants
   # Thinking ON, longer context for the reasoning tokens; 500 items (plan 2.5: "a budgeted
   # 500-item run instead plots accuracy against reasoning tokens"). About six models.
-  - {name: qwen3.5-4b--thinking, reference_of: qwen3.5-4b, hf_id: Qwen/Qwen3.5-4B, hf_id_status: uncertain, revision: null, gated: false, family: qwen3.5, group: reasoning_substudy, tokenizer_type: "as reference", backend: vllm, dtype: float16, quantization: null, hardware: t4, max_model_len: 4096, max_new_tokens: 2048, chat_template_kwargs: {enable_thinking: true}, verify: ["[UNCERTAIN: verify] as reference"], notes: ["reasoning tokens are counted from the raw completion"]}
+  - {name: qwen3.5-4b--thinking, reference_of: qwen3.5-4b, hf_id: Qwen/Qwen3.5-4B, hf_id_status: uncertain, revision: "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a", gated: false, family: qwen3.5, group: reasoning_substudy, tokenizer_type: "as reference", backend: vllm, dtype: float16, quantization: null, hardware: t4, max_model_len: 4096, max_new_tokens: 2048, chat_template_kwargs: {enable_thinking: true}, verify: ["[UNCERTAIN: verify] as reference"], notes: ["reasoning tokens are counted from the raw completion"]}
   - {name: qwen3.5-9b--thinking, reference_of: qwen3.5-9b, hf_id: Qwen/Qwen3.5-9B, hf_id_status: uncertain, revision: null, gated: false, family: qwen3.5, group: reasoning_substudy, tokenizer_type: "as reference", backend: vllm, dtype: float16, quantization: {method: awq, bits: 4, checkpoint: null}, hardware: t4, max_model_len: 4096, max_new_tokens: 2048, chat_template_kwargs: {enable_thinking: true}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
-  - {name: qwen3.8-27b--thinking, reference_of: qwen3.8-27b, hf_id: Qwen/Qwen3.8-27B, hf_id_status: uncertain, revision: null, gated: false, family: qwen3.8, group: reasoning_substudy, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 4096, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, max_new_tokens: 2048, chat_template_kwargs: {enable_thinking: true}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
+  - {name: qwen3.8-27b--thinking, reference_of: qwen3.8-27b, hf_id: Qwen/Qwen3.8-27B, hf_id_status: uncertain, revision: "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0", gated: false, family: qwen3.8, group: reasoning_substudy, tokenizer_type: "as reference", backend: vllm, dtype: bfloat16, quantization: null, hardware: tpu, max_model_len: 4096, engine_kwargs: {limit_mm_per_prompt: {image: 0, audio: 0}, enable_prefix_caching: true, max_num_seqs: 64}, max_new_tokens: 2048, chat_template_kwargs: {enable_thinking: true}, verify: ["[UNCERTAIN: verify] as reference"], notes: []}
   - {name: gpt-oss-120b--thinking, reference_of: gpt-oss-120b, hf_id: openai/gpt-oss-120b, provider: groq, provider_model_id: openai/gpt-oss-120b, hf_id_status: known, family: gpt-oss, group: reasoning_substudy, tokenizer_type: "as reference", backend: openai_compat, dtype: null, quantization: null, hardware: api, max_model_len: null, max_new_tokens: 2048, chat_template_kwargs: {}, generation_kwargs: {reasoning_effort: high}, requests_per_minute: 30, max_retries: 8, verify: ["[UNCERTAIN: verify] reasoning_effort values"], notes: ["counts against the same 200K tokens/day: budget ~250 calls a day at 800 tokens"]}
   - {name: gpt-oss-20b--thinking, reference_of: gpt-oss-20b, hf_id: openai/gpt-oss-20b, provider: groq, provider_model_id: openai/gpt-oss-20b, hf_id_status: known, family: gpt-oss, group: reasoning_substudy, tokenizer_type: "as reference", backend: openai_compat, dtype: null, quantization: null, hardware: api, max_model_len: null, max_new_tokens: 2048, chat_template_kwargs: {}, generation_kwargs: {reasoning_effort: high}, requests_per_minute: 30, max_retries: 8, verify: ["[UNCERTAIN: verify] reasoning_effort values"], notes: []}
   - {name: gemini-flash--thinking, reference_of: gemini-flash, hf_id: null, provider: gemini, provider_model_id: gemini-3.5-flash, hf_id_status: uncertain, family: gemini, group: reasoning_substudy, tokenizer_type: "as reference", backend: gemini, dtype: null, quantization: null, hardware: api, max_model_len: null, max_new_tokens: 2048, chat_template_kwargs: {}, generation_kwargs: {thinking_budget: -1}, requests_per_minute: 5, max_retries: 8, verify: ["[UNCERTAIN: verify] model id; -1 = dynamic thinking in the current SDK"], notes: []}
