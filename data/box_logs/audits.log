@@ -1,0 +1,243 @@
+[audit-tokenizers] gemma3: /root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --spm /root/noilai/data/external/gemma3_tokenizer.model:gemma3 --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl
+[audit-tokenizers] gemma3: ok (rc=0, 1.413s, 2/2 outputs)
+[audit-tokenizers] gemma2: /root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --spm /root/noilai/data/external/gemma2_tokenizer.model:gemma2 --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl
+[audit-tokenizers] gemma2: ok (rc=0, 1.359s, 2/2 outputs)
+[audit-tokenizers] google__gemma-3-1b-it: /root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf google/gemma-3-1b-it --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl
+[audit-tokenizers] google__gemma-3-1b-it: ok (rc=0, 11.313s, 2/2 outputs)
+[audit-tokenizers] google__gemma-3-4b-it: /root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf google/gemma-3-4b-it --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl
+[audit-tokenizers] google__gemma-3-4b-it: ok (rc=0, 15.131s, 2/2 outputs)
+[audit-tokenizers] google__gemma-3-12b-it: /root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf google/gemma-3-12b-it --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl
+[audit-tokenizers] google__gemma-3-12b-it: ok (rc=0, 17.828s, 2/2 outputs)
+[audit-tokenizers] Qwen__Qwen3.5-0.8B: /root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf Qwen/Qwen3.5-0.8B --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl
+[audit-tokenizers] Qwen__Qwen3.5-0.8B: ok (rc=0, 9.474s, 2/2 outputs)
+[audit-tokenizers] Qwen__Qwen3.5-2B: /root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf Qwen/Qwen3.5-2B --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl
+[audit-tokenizers] Qwen__Qwen3.5-2B: ok (rc=0, 15.289s, 2/2 outputs)
+[audit-tokenizers] Qwen__Qwen3.5-4B: /root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf Qwen/Qwen3.5-4B --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl
+[audit-tokenizers] Qwen__Qwen3.5-4B: ok (rc=0, 9.965s, 2/2 outputs)
+[audit-tokenizers] Qwen__Qwen3.5-9B: /root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf Qwen/Qwen3.5-9B --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl
+[audit-tokenizers] Qwen__Qwen3.5-9B: ok (rc=0, 22.009s, 2/2 outputs)
+[audit-tokenizers] google__gemma-4-e2b-it: /root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf google/gemma-4-e2b-it --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl
+[audit-tokenizers] google__gemma-4-e2b-it: ok (rc=0, 21.656s, 2/2 outputs)
+[audit-tokenizers] google__gemma-4-e4b-it: /root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf google/gemma-4-e4b-it --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl
+[audit-tokenizers] google__gemma-4-e4b-it: ok (rc=0, 21.722s, 2/2 outputs)
+[audit-tokenizers] google__gemma-4-12b-it: /root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf google/gemma-4-12b-it --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl
+[audit-tokenizers] google__gemma-4-12b-it: ok (rc=0, 20.267s, 2/2 outputs)
+[audit-tokenizers] aisingapore__Gemma-SEA-LION-v4.5-E2B-IT: /root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf aisingapore/Gemma-SEA-LION-v4.5-E2B-IT --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl
+[audit-tokenizers] aisingapore__Gemma-SEA-LION-v4.5-E2B-IT: ok (rc=0, 17.296s, 2/2 outputs)
+[audit-tokenizers] sail__Sailor2-8B-Chat: /root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf sail/Sailor2-8B-Chat --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl
+[audit-tokenizers] sail__Sailor2-8B-Chat: ok (rc=0, 12.523s, 2/2 outputs)
+[audit-tokenizers] vinai__PhoGPT-4B-Chat: /root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf vinai/PhoGPT-4B-Chat --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl
+[audit-tokenizers] vinai__PhoGPT-4B-Chat: failed (rc=1, 17.829s, 0/2 outputs)
+rgs, **kwargs)  # type: ignore [call-arg]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py", line 159, in __init__
+    setattr(self, f.name, standard_kwargs[f.name])
+  File "/root/venv/lib/python3.12/site-packages/huggingface_hub/dataclasses.py", line 146, in __strict_setattr__
+    raise StrictDataclassFieldValidationError(field=name, cause=e) from e
+huggingface_hub.errors.StrictDataclassFieldValidationError: Validation error for field 'attn_pdrop':
+    TypeError: Field 'attn_pdrop' expected int, got float (value: 0.0)
+
+[audit-tokenizers] Viet-Mistral__Vistral-7B-Chat: /root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf Viet-Mistral/Vistral-7B-Chat --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl
+[audit-tokenizers] Viet-Mistral__Vistral-7B-Chat: failed (rc=1, 5.214s, 0/2 outputs)
+nv/lib/python3.12/site-packages/transformers/utils/hub.py", line 610, in cached_files
+    raise OSError(
+OSError: You are trying to access a gated repo.
+Make sure to have access to it at https://huggingface.co/Viet-Mistral/Vistral-7B-Chat.
+403 Client Error. (Request ID: Root=1-6adffb3d-4b011e06751898497534b99b;a396b473-f332-4bc0-92d1-c5b5a09f6922)
+
+Cannot access gated repo for url https://huggingface.co/Viet-Mistral/Vistral-7B-Chat/resolve/d331b64e61b935cc43c2b3010ae9fb4fde599b45/config.json.
+Your request to access model Viet-Mistral/Vistral-7B-Chat is awaiting a review from the repo authors.
+
+[audit-tokenizers] meta-llama__Llama-3.1-8B-Instruct: /root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf meta-llama/Llama-3.1-8B-Instruct --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl
+[audit-tokenizers] meta-llama__Llama-3.1-8B-Instruct: ok (rc=0, 10.4s, 2/2 outputs)
+[audit-tokenizers] Qwen__Qwen3.8-27B: /root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf Qwen/Qwen3.8-27B --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl
+[audit-tokenizers] Qwen__Qwen3.8-27B: ok (rc=0, 9.764s, 2/2 outputs)
+[audit-tokenizers] aisingapore__Qwen-SEA-LION-v4.5-27B-IT: /root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf aisingapore/Qwen-SEA-LION-v4.5-27B-IT --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl
+[audit-tokenizers] aisingapore__Qwen-SEA-LION-v4.5-27B-IT: ok (rc=0, 23.197s, 2/2 outputs)
+[audit-tokenizers] openai__gpt-oss-120b: /root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf openai/gpt-oss-120b --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl
+[audit-tokenizers] openai__gpt-oss-120b: ok (rc=0, 56.346s, 2/2 outputs)
+[audit-tokenizers] openai__gpt-oss-20b: /root/venv/bin/python /root/noilai/scripts/audit_tokenizers.py --hf openai/gpt-oss-20b --out /root/noilai/data/audit --items /root/noilai/data/release/v0.4/noilai_main.jsonl
+[audit-tokenizers] openai__gpt-oss-20b: ok (rc=0, 15.033s, 2/2 outputs)
+[audit-items] gemma3__noilai_main: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --spm /root/noilai/data/external/gemma3_tokenizer.model:gemma3 --out /root/noilai/data/audit/items_gemma3__noilai_main.jsonl
+[audit-items] gemma3__noilai_main: ok (rc=0, 2.547s, 1/1 outputs)
+[audit-items] gemma2__noilai_main: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --spm /root/noilai/data/external/gemma2_tokenizer.model:gemma2 --out /root/noilai/data/audit/items_gemma2__noilai_main.jsonl
+[audit-items] gemma2__noilai_main: ok (rc=0, 2.709s, 1/1 outputs)
+[audit-items] google__gemma-3-1b-it__noilai_main: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf google/gemma-3-1b-it --out /root/noilai/data/audit/items_google__gemma-3-1b-it__noilai_main.jsonl
+[audit-items] google__gemma-3-1b-it__noilai_main: ok (rc=0, 9.808s, 1/1 outputs)
+[audit-items] google__gemma-3-4b-it__noilai_main: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf google/gemma-3-4b-it --out /root/noilai/data/audit/items_google__gemma-3-4b-it__noilai_main.jsonl
+[audit-items] google__gemma-3-4b-it__noilai_main: ok (rc=0, 12.075s, 1/1 outputs)
+[audit-items] google__gemma-3-12b-it__noilai_main: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf google/gemma-3-12b-it --out /root/noilai/data/audit/items_google__gemma-3-12b-it__noilai_main.jsonl
+[audit-items] google__gemma-3-12b-it__noilai_main: ok (rc=0, 145.068s, 1/1 outputs)
+[audit-items] Qwen__Qwen3.5-0.8B__noilai_main: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf Qwen/Qwen3.5-0.8B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-0.8B__noilai_main.jsonl
+[audit-items] Qwen__Qwen3.5-0.8B__noilai_main: ok (rc=0, 10.943s, 1/1 outputs)
+[audit-items] Qwen__Qwen3.5-2B__noilai_main: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf Qwen/Qwen3.5-2B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-2B__noilai_main.jsonl
+[audit-items] Qwen__Qwen3.5-2B__noilai_main: ok (rc=0, 11.246s, 1/1 outputs)
+[audit-items] Qwen__Qwen3.5-4B__noilai_main: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf Qwen/Qwen3.5-4B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-4B__noilai_main.jsonl
+[audit-items] Qwen__Qwen3.5-4B__noilai_main: ok (rc=0, 14.104s, 1/1 outputs)
+[audit-items] Qwen__Qwen3.5-9B__noilai_main: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf Qwen/Qwen3.5-9B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-9B__noilai_main.jsonl
+[audit-items] Qwen__Qwen3.5-9B__noilai_main: ok (rc=0, 8.641s, 1/1 outputs)
+[audit-items] google__gemma-4-e2b-it__noilai_main: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf google/gemma-4-e2b-it --out /root/noilai/data/audit/items_google__gemma-4-e2b-it__noilai_main.jsonl
+[audit-items] google__gemma-4-e2b-it__noilai_main: ok (rc=0, 16.997s, 1/1 outputs)
+[audit-items] google__gemma-4-e4b-it__noilai_main: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf google/gemma-4-e4b-it --out /root/noilai/data/audit/items_google__gemma-4-e4b-it__noilai_main.jsonl
+[audit-items] google__gemma-4-e4b-it__noilai_main: ok (rc=0, 16.626s, 1/1 outputs)
+[audit-items] google__gemma-4-12b-it__noilai_main: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf google/gemma-4-12b-it --out /root/noilai/data/audit/items_google__gemma-4-12b-it__noilai_main.jsonl
+[audit-items] google__gemma-4-12b-it__noilai_main: ok (rc=0, 15.068s, 1/1 outputs)
+[audit-items] aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_main: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf aisingapore/Gemma-SEA-LION-v4.5-E2B-IT --out /root/noilai/data/audit/items_aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_main.jsonl
+[audit-items] aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_main: ok (rc=0, 13.622s, 1/1 outputs)
+[audit-items] sail__Sailor2-8B-Chat__noilai_main: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf sail/Sailor2-8B-Chat --out /root/noilai/data/audit/items_sail__Sailor2-8B-Chat__noilai_main.jsonl
+[audit-items] sail__Sailor2-8B-Chat__noilai_main: ok (rc=0, 10.718s, 1/1 outputs)
+[audit-items] vinai__PhoGPT-4B-Chat__noilai_main: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf vinai/PhoGPT-4B-Chat --out /root/noilai/data/audit/items_vinai__PhoGPT-4B-Chat__noilai_main.jsonl
+[audit-items] vinai__PhoGPT-4B-Chat__noilai_main: failed (rc=1, 4.292s, 0/1 outputs)
+rgs, **kwargs)  # type: ignore [call-arg]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py", line 159, in __init__
+    setattr(self, f.name, standard_kwargs[f.name])
+  File "/root/venv/lib/python3.12/site-packages/huggingface_hub/dataclasses.py", line 146, in __strict_setattr__
+    raise StrictDataclassFieldValidationError(field=name, cause=e) from e
+huggingface_hub.errors.StrictDataclassFieldValidationError: Validation error for field 'attn_pdrop':
+    TypeError: Field 'attn_pdrop' expected int, got float (value: 0.0)
+
+[audit-items] Viet-Mistral__Vistral-7B-Chat__noilai_main: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf Viet-Mistral/Vistral-7B-Chat --out /root/noilai/data/audit/items_Viet-Mistral__Vistral-7B-Chat__noilai_main.jsonl
+[audit-items] Viet-Mistral__Vistral-7B-Chat__noilai_main: failed (rc=1, 137.277s, 0/1 outputs)
+nv/lib/python3.12/site-packages/transformers/utils/hub.py", line 610, in cached_files
+    raise OSError(
+OSError: You are trying to access a gated repo.
+Make sure to have access to it at https://huggingface.co/Viet-Mistral/Vistral-7B-Chat.
+403 Client Error. (Request ID: Root=1-6adffd60-7365a480188de191373ae43f;cf438b23-d1db-4814-ac14-eb7a6db67914)
+
+Cannot access gated repo for url https://huggingface.co/Viet-Mistral/Vistral-7B-Chat/resolve/d331b64e61b935cc43c2b3010ae9fb4fde599b45/config.json.
+Your request to access model Viet-Mistral/Vistral-7B-Chat is awaiting a review from the repo authors.
+
+[audit-items] meta-llama__Llama-3.1-8B-Instruct__noilai_main: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf meta-llama/Llama-3.1-8B-Instruct --out /root/noilai/data/audit/items_meta-llama__Llama-3.1-8B-Instruct__noilai_main.jsonl
+[audit-items] meta-llama__Llama-3.1-8B-Instruct__noilai_main: ok (rc=0, 9.907s, 1/1 outputs)
+[audit-items] Qwen__Qwen3.8-27B__noilai_main: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf Qwen/Qwen3.8-27B --out /root/noilai/data/audit/items_Qwen__Qwen3.8-27B__noilai_main.jsonl
+[audit-items] Qwen__Qwen3.8-27B__noilai_main: ok (rc=0, 10.826s, 1/1 outputs)
+[audit-items] aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_main: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf aisingapore/Qwen-SEA-LION-v4.5-27B-IT --out /root/noilai/data/audit/items_aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_main.jsonl
+[audit-items] aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_main: ok (rc=0, 17.901s, 1/1 outputs)
+[audit-items] openai__gpt-oss-120b__noilai_main: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf openai/gpt-oss-120b --out /root/noilai/data/audit/items_openai__gpt-oss-120b__noilai_main.jsonl
+[audit-items] openai__gpt-oss-120b__noilai_main: ok (rc=0, 16.326s, 1/1 outputs)
+[audit-items] openai__gpt-oss-20b__noilai_main: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_main.jsonl --hf openai/gpt-oss-20b --out /root/noilai/data/audit/items_openai__gpt-oss-20b__noilai_main.jsonl
+[audit-items] openai__gpt-oss-20b__noilai_main: ok (rc=0, 12.999s, 1/1 outputs)
+[audit-items] gemma3__noilai_core: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --spm /root/noilai/data/external/gemma3_tokenizer.model:gemma3 --out /root/noilai/data/audit/items_gemma3__noilai_core.jsonl
+[audit-items] gemma3__noilai_core: ok (rc=0, 1.013s, 1/1 outputs)
+[audit-items] gemma2__noilai_core: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --spm /root/noilai/data/external/gemma2_tokenizer.model:gemma2 --out /root/noilai/data/audit/items_gemma2__noilai_core.jsonl
+[audit-items] gemma2__noilai_core: ok (rc=0, 1.003s, 1/1 outputs)
+[audit-items] google__gemma-3-1b-it__noilai_core: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf google/gemma-3-1b-it --out /root/noilai/data/audit/items_google__gemma-3-1b-it__noilai_core.jsonl
+[audit-items] google__gemma-3-1b-it__noilai_core: ok (rc=0, 23.977s, 1/1 outputs)
+[audit-items] google__gemma-3-4b-it__noilai_core: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf google/gemma-3-4b-it --out /root/noilai/data/audit/items_google__gemma-3-4b-it__noilai_core.jsonl
+[audit-items] google__gemma-3-4b-it__noilai_core: ok (rc=0, 48.566s, 1/1 outputs)
+[audit-items] google__gemma-3-12b-it__noilai_core: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf google/gemma-3-12b-it --out /root/noilai/data/audit/items_google__gemma-3-12b-it__noilai_core.jsonl
+[audit-items] google__gemma-3-12b-it__noilai_core: ok (rc=0, 9.402s, 1/1 outputs)
+[audit-items] Qwen__Qwen3.5-0.8B__noilai_core: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf Qwen/Qwen3.5-0.8B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-0.8B__noilai_core.jsonl
+[audit-items] Qwen__Qwen3.5-0.8B__noilai_core: ok (rc=0, 9.872s, 1/1 outputs)
+[audit-items] Qwen__Qwen3.5-2B__noilai_core: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf Qwen/Qwen3.5-2B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-2B__noilai_core.jsonl
+[audit-items] Qwen__Qwen3.5-2B__noilai_core: ok (rc=0, 7.187s, 1/1 outputs)
+[audit-items] Qwen__Qwen3.5-4B__noilai_core: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf Qwen/Qwen3.5-4B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-4B__noilai_core.jsonl
+[audit-items] Qwen__Qwen3.5-4B__noilai_core: ok (rc=0, 7.033s, 1/1 outputs)
+[audit-items] Qwen__Qwen3.5-9B__noilai_core: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf Qwen/Qwen3.5-9B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-9B__noilai_core.jsonl
+[audit-items] Qwen__Qwen3.5-9B__noilai_core: ok (rc=0, 13.017s, 1/1 outputs)
+[audit-items] google__gemma-4-e2b-it__noilai_core: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf google/gemma-4-e2b-it --out /root/noilai/data/audit/items_google__gemma-4-e2b-it__noilai_core.jsonl
+[audit-items] google__gemma-4-e2b-it__noilai_core: ok (rc=0, 14.544s, 1/1 outputs)
+[audit-items] google__gemma-4-e4b-it__noilai_core: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf google/gemma-4-e4b-it --out /root/noilai/data/audit/items_google__gemma-4-e4b-it__noilai_core.jsonl
+[audit-items] google__gemma-4-e4b-it__noilai_core: ok (rc=0, 10.75s, 1/1 outputs)
+[audit-items] google__gemma-4-12b-it__noilai_core: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf google/gemma-4-12b-it --out /root/noilai/data/audit/items_google__gemma-4-12b-it__noilai_core.jsonl
+[audit-items] google__gemma-4-12b-it__noilai_core: ok (rc=0, 8.652s, 1/1 outputs)
+[audit-items] aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_core: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf aisingapore/Gemma-SEA-LION-v4.5-E2B-IT --out /root/noilai/data/audit/items_aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_core.jsonl
+[audit-items] aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_core: ok (rc=0, 9.691s, 1/1 outputs)
+[audit-items] sail__Sailor2-8B-Chat__noilai_core: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf sail/Sailor2-8B-Chat --out /root/noilai/data/audit/items_sail__Sailor2-8B-Chat__noilai_core.jsonl
+[audit-items] sail__Sailor2-8B-Chat__noilai_core: ok (rc=0, 9.862s, 1/1 outputs)
+[audit-items] vinai__PhoGPT-4B-Chat__noilai_core: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf vinai/PhoGPT-4B-Chat --out /root/noilai/data/audit/items_vinai__PhoGPT-4B-Chat__noilai_core.jsonl
+[audit-items] vinai__PhoGPT-4B-Chat__noilai_core: failed (rc=1, 5.115s, 0/1 outputs)
+rgs, **kwargs)  # type: ignore [call-arg]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py", line 159, in __init__
+    setattr(self, f.name, standard_kwargs[f.name])
+  File "/root/venv/lib/python3.12/site-packages/huggingface_hub/dataclasses.py", line 146, in __strict_setattr__
+    raise StrictDataclassFieldValidationError(field=name, cause=e) from e
+huggingface_hub.errors.StrictDataclassFieldValidationError: Validation error for field 'attn_pdrop':
+    TypeError: Field 'attn_pdrop' expected int, got float (value: 0.0)
+
+[audit-items] Viet-Mistral__Vistral-7B-Chat__noilai_core: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf Viet-Mistral/Vistral-7B-Chat --out /root/noilai/data/audit/items_Viet-Mistral__Vistral-7B-Chat__noilai_core.jsonl
+[audit-items] Viet-Mistral__Vistral-7B-Chat__noilai_core: failed (rc=1, 4.778s, 0/1 outputs)
+nv/lib/python3.12/site-packages/transformers/utils/hub.py", line 610, in cached_files
+    raise OSError(
+OSError: You are trying to access a gated repo.
+Make sure to have access to it at https://huggingface.co/Viet-Mistral/Vistral-7B-Chat.
+403 Client Error. (Request ID: Root=1-6adffe5c-7c9013e949439cc26ee54310;70f0d2a1-59a3-45d0-bb68-730b7d1edd74)
+
+Cannot access gated repo for url https://huggingface.co/Viet-Mistral/Vistral-7B-Chat/resolve/d331b64e61b935cc43c2b3010ae9fb4fde599b45/config.json.
+Your request to access model Viet-Mistral/Vistral-7B-Chat is awaiting a review from the repo authors.
+
+[audit-items] meta-llama__Llama-3.1-8B-Instruct__noilai_core: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf meta-llama/Llama-3.1-8B-Instruct --out /root/noilai/data/audit/items_meta-llama__Llama-3.1-8B-Instruct__noilai_core.jsonl
+[audit-items] meta-llama__Llama-3.1-8B-Instruct__noilai_core: ok (rc=0, 10.906s, 1/1 outputs)
+[audit-items] Qwen__Qwen3.8-27B__noilai_core: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf Qwen/Qwen3.8-27B --out /root/noilai/data/audit/items_Qwen__Qwen3.8-27B__noilai_core.jsonl
+[audit-items] Qwen__Qwen3.8-27B__noilai_core: ok (rc=0, 15.872s, 1/1 outputs)
+[audit-items] aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_core: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf aisingapore/Qwen-SEA-LION-v4.5-27B-IT --out /root/noilai/data/audit/items_aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_core.jsonl
+[audit-items] aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_core: ok (rc=0, 8.887s, 1/1 outputs)
+[audit-items] openai__gpt-oss-120b__noilai_core: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf openai/gpt-oss-120b --out /root/noilai/data/audit/items_openai__gpt-oss-120b__noilai_core.jsonl
+[audit-items] openai__gpt-oss-120b__noilai_core: ok (rc=0, 6.77s, 1/1 outputs)
+[audit-items] openai__gpt-oss-20b__noilai_core: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_core.jsonl --hf openai/gpt-oss-20b --out /root/noilai/data/audit/items_openai__gpt-oss-20b__noilai_core.jsonl
+[audit-items] openai__gpt-oss-20b__noilai_core: ok (rc=0, 28.117s, 1/1 outputs)
+[audit-items] gemma3__noilai_dev: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --spm /root/noilai/data/external/gemma3_tokenizer.model:gemma3 --out /root/noilai/data/audit/items_gemma3__noilai_dev.jsonl
+[audit-items] gemma3__noilai_dev: ok (rc=0, 1.441s, 1/1 outputs)
+[audit-items] gemma2__noilai_dev: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --spm /root/noilai/data/external/gemma2_tokenizer.model:gemma2 --out /root/noilai/data/audit/items_gemma2__noilai_dev.jsonl
+[audit-items] gemma2__noilai_dev: ok (rc=0, 1.413s, 1/1 outputs)
+[audit-items] google__gemma-3-1b-it__noilai_dev: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf google/gemma-3-1b-it --out /root/noilai/data/audit/items_google__gemma-3-1b-it__noilai_dev.jsonl
+[audit-items] google__gemma-3-1b-it__noilai_dev: ok (rc=0, 10.645s, 1/1 outputs)
+[audit-items] google__gemma-3-4b-it__noilai_dev: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf google/gemma-3-4b-it --out /root/noilai/data/audit/items_google__gemma-3-4b-it__noilai_dev.jsonl
+[audit-items] google__gemma-3-4b-it__noilai_dev: ok (rc=0, 8.232s, 1/1 outputs)
+[audit-items] google__gemma-3-12b-it__noilai_dev: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf google/gemma-3-12b-it --out /root/noilai/data/audit/items_google__gemma-3-12b-it__noilai_dev.jsonl
+[audit-items] google__gemma-3-12b-it__noilai_dev: ok (rc=0, 20.261s, 1/1 outputs)
+[audit-items] Qwen__Qwen3.5-0.8B__noilai_dev: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf Qwen/Qwen3.5-0.8B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-0.8B__noilai_dev.jsonl
+[audit-items] Qwen__Qwen3.5-0.8B__noilai_dev: ok (rc=0, 7.208s, 1/1 outputs)
+[audit-items] Qwen__Qwen3.5-2B__noilai_dev: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf Qwen/Qwen3.5-2B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-2B__noilai_dev.jsonl
+[audit-items] Qwen__Qwen3.5-2B__noilai_dev: ok (rc=0, 7.351s, 1/1 outputs)
+[audit-items] Qwen__Qwen3.5-4B__noilai_dev: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf Qwen/Qwen3.5-4B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-4B__noilai_dev.jsonl
+[audit-items] Qwen__Qwen3.5-4B__noilai_dev: ok (rc=0, 11.666s, 1/1 outputs)
+[audit-items] Qwen__Qwen3.5-9B__noilai_dev: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf Qwen/Qwen3.5-9B --out /root/noilai/data/audit/items_Qwen__Qwen3.5-9B__noilai_dev.jsonl
+[audit-items] Qwen__Qwen3.5-9B__noilai_dev: ok (rc=0, 9.67s, 1/1 outputs)
+[audit-items] google__gemma-4-e2b-it__noilai_dev: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf google/gemma-4-e2b-it --out /root/noilai/data/audit/items_google__gemma-4-e2b-it__noilai_dev.jsonl
+[audit-items] google__gemma-4-e2b-it__noilai_dev: ok (rc=0, 11.043s, 1/1 outputs)
+[audit-items] google__gemma-4-e4b-it__noilai_dev: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf google/gemma-4-e4b-it --out /root/noilai/data/audit/items_google__gemma-4-e4b-it__noilai_dev.jsonl
+[audit-items] google__gemma-4-e4b-it__noilai_dev: ok (rc=0, 158.28s, 1/1 outputs)
+[audit-items] google__gemma-4-12b-it__noilai_dev: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf google/gemma-4-12b-it --out /root/noilai/data/audit/items_google__gemma-4-12b-it__noilai_dev.jsonl
+[audit-items] google__gemma-4-12b-it__noilai_dev: ok (rc=0, 15.51s, 1/1 outputs)
+[audit-items] aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_dev: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf aisingapore/Gemma-SEA-LION-v4.5-E2B-IT --out /root/noilai/data/audit/items_aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_dev.jsonl
+[audit-items] aisingapore__Gemma-SEA-LION-v4.5-E2B-IT__noilai_dev: ok (rc=0, 10.097s, 1/1 outputs)
+[audit-items] sail__Sailor2-8B-Chat__noilai_dev: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf sail/Sailor2-8B-Chat --out /root/noilai/data/audit/items_sail__Sailor2-8B-Chat__noilai_dev.jsonl
+[audit-items] sail__Sailor2-8B-Chat__noilai_dev: ok (rc=0, 7.381s, 1/1 outputs)
+[audit-items] vinai__PhoGPT-4B-Chat__noilai_dev: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf vinai/PhoGPT-4B-Chat --out /root/noilai/data/audit/items_vinai__PhoGPT-4B-Chat__noilai_dev.jsonl
+[audit-items] vinai__PhoGPT-4B-Chat__noilai_dev: failed (rc=1, 6.048s, 0/1 outputs)
+rgs, **kwargs)  # type: ignore [call-arg]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/venv/lib/python3.12/site-packages/transformers/configuration_utils.py", line 159, in __init__
+    setattr(self, f.name, standard_kwargs[f.name])
+  File "/root/venv/lib/python3.12/site-packages/huggingface_hub/dataclasses.py", line 146, in __strict_setattr__
+    raise StrictDataclassFieldValidationError(field=name, cause=e) from e
+huggingface_hub.errors.StrictDataclassFieldValidationError: Validation error for field 'attn_pdrop':
+    TypeError: Field 'attn_pdrop' expected int, got float (value: 0.0)
+
+[audit-items] Viet-Mistral__Vistral-7B-Chat__noilai_dev: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf Viet-Mistral/Vistral-7B-Chat --out /root/noilai/data/audit/items_Viet-Mistral__Vistral-7B-Chat__noilai_dev.jsonl
+[audit-items] Viet-Mistral__Vistral-7B-Chat__noilai_dev: failed (rc=1, 6.516s, 0/1 outputs)
+nv/lib/python3.12/site-packages/transformers/utils/hub.py", line 610, in cached_files
+    raise OSError(
+OSError: You are trying to access a gated repo.
+Make sure to have access to it at https://huggingface.co/Viet-Mistral/Vistral-7B-Chat.
+403 Client Error. (Request ID: Root=1-6adfffc7-5b08fb0220fce9c35990372d;c95f1952-c545-4c1f-87df-99cd3c6a292a)
+
+Cannot access gated repo for url https://huggingface.co/Viet-Mistral/Vistral-7B-Chat/resolve/d331b64e61b935cc43c2b3010ae9fb4fde599b45/config.json.
+Your request to access model Viet-Mistral/Vistral-7B-Chat is awaiting a review from the repo authors.
+
+[audit-items] meta-llama__Llama-3.1-8B-Instruct__noilai_dev: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf meta-llama/Llama-3.1-8B-Instruct --out /root/noilai/data/audit/items_meta-llama__Llama-3.1-8B-Instruct__noilai_dev.jsonl
+[audit-items] meta-llama__Llama-3.1-8B-Instruct__noilai_dev: ok (rc=0, 11.308s, 1/1 outputs)
+[audit-items] Qwen__Qwen3.8-27B__noilai_dev: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf Qwen/Qwen3.8-27B --out /root/noilai/data/audit/items_Qwen__Qwen3.8-27B__noilai_dev.jsonl
+[audit-items] Qwen__Qwen3.8-27B__noilai_dev: ok (rc=0, 9.658s, 1/1 outputs)
+[audit-items] aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_dev: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf aisingapore/Qwen-SEA-LION-v4.5-27B-IT --out /root/noilai/data/audit/items_aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_dev.jsonl
+[audit-items] aisingapore__Qwen-SEA-LION-v4.5-27B-IT__noilai_dev: ok (rc=0, 10.611s, 1/1 outputs)
+[audit-items] openai__gpt-oss-120b__noilai_dev: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf openai/gpt-oss-120b --out /root/noilai/data/audit/items_openai__gpt-oss-120b__noilai_dev.jsonl
+[audit-items] openai__gpt-oss-120b__noilai_dev: ok (rc=0, 9.85s, 1/1 outputs)
+[audit-items] openai__gpt-oss-20b__noilai_dev: /root/venv/bin/python /root/noilai/scripts/audit_items.py --items /root/noilai/data/release/v0.4/noilai_dev.jsonl --hf openai/gpt-oss-20b --out /root/noilai/data/audit/items_openai__gpt-oss-20b__noilai_dev.jsonl
+[audit-items] openai__gpt-oss-20b__noilai_dev: ok (rc=0, 10.301s, 1/1 outputs)
+{"audit-tokenizers": {"n_commands": 21, "planned": 0, "ok": 19, "failed": 2, "skipped": 0, "ran": true}, "audit-items": {"n_commands": 63, "planned": 0, "ok": 57, "failed": 6, "skipped": 0, "ran": true}}
+report: /root/noilai/data/audit/cpu_jobs_report.json
+[box] audits rc=0

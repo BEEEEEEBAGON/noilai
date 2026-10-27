@@ -1,6 +1,6 @@
 # BLOCKED — one list, ordered by the date each item blocks (experiments and validation workstreams)
 
-Updated **2026-10-16**. One entry per thing that waits on a person, ordered by the date it blocks; **PAST DUE** = a
+Updated **2026-10-27**. One entry per thing that waits on a person, ordered by the date it blocks; **PAST DUE** = a
 deadline before 16 October (status unknown to the assistant: nothing has been handed back). The rented box (2x
 A800-SXM4-40GB, about 24 h of credit; `RUNBOOK.md` §6) is the primary route of entries 14 and 19 and, after the gate,
 of entry 33; its own steps live inside those entries, so no number moves. Each entry: deadline, who (author / adult collaborator / validators / respondents /
@@ -131,6 +131,11 @@ latest (25 Oct recommended, memo N13), results freeze 22 Nov, E4 23 Nov–6 Dec.
     of it the ~280 GB of downloads; hand-back `RUNBOOK.md` §6 (7) (`rsync` of `data/runs`, `scp` of `compute_log.csv`, then §5 steps
     1–8; the directories are the chunk units). Blocks: Gate 1 evidence by the GPU route, the smoke week's CPU-vs-GPU
     comparison rows (entry 19), the pin (entries 19, 22). Memo N11, N10, 9.
+    **Status 27 Oct: DONE for two of the three pilot models.** On a 1x A100-SXM4-80GB (345 min, `laptop_start.sh` /
+    `box_run.sh`): `c05_gpu_t0` complete for gemma-3-1b-it and qwen3.5-2b (8 units, hash-verified, ingested; the
+    `c02`–`c04` CPU twins cut); PhoGPT-4B-Chat failed to load (its remote code under Transformers 5.x; STATUS open
+    question 9). Interim: strict T1 accuracy 0.0% in every cell of both models, XCOPA 51.5%/60.5% (nfc). Gate 1
+    (entry 17) is now the author's call on these two models.
 15. **[18 Oct] The C2 placement corpus count.** Who: author or adult collaborator, any machine with internet (a
     laptop or a Kaggle CPU session; no GPU). Steps: `bash scripts/corpus_count_kit.sh` streams the first 2M lines of
     the Vietnamese Wikipedia dump and of CC-100 vi, counts both conventions, writes
@@ -149,6 +154,11 @@ latest (25 Oct recommended, memo N13), results freeze 22 Nov, E4 23 Nov–6 Dec.
     files; the novelty verdict (hand-repeat the arXiv searches of `docs/NOVELTY_SWEEP_2026-09-30.md`); the scope
     decisions (saturation, E3 at full scale, sample sizes); record in RESULTS_LOG / DEVIATIONS. Blocks: every
     "after Gate 1" window; the Bundle B switch is open only here. Memo: none (PREREG §10 binds); N11 feeds it.
+    **Status 27 Oct: the pilot files are in** (`experiments/interim/2026-10-27_interim.md`): the T1 criterion of
+    PREREG §10 (strict T1 ≥ 15 points over the copy baseline for ≥ 1 model) is NOT met by gemma-3-1b-it or
+    qwen3.5-2b (0.0% in every cell; copy rate 68.5% for qwen3.5-2b); the E3 scope reading is possible on the XCOPA
+    pilot (gemma-3-1b-it 51.5% nfc → 39.5% nfd; qwen3.5-2b 60.5% both arms). Decide: no-go as pre-registered, a
+    repeat of the pilot on a larger model before deciding, or the Bundle B switch; record in RESULTS_LOG / DEVIATIONS.
 18. **[19 Oct – 1 Nov] Validators work Parts B–E; weekly returns scored.** Who: validators; author after each
     return. Steps: `make validation-score` → `data/validation/report/validation_report.json` (α, AC1, marginals,
     control catch rate; under 75% on controls → re-brief) and `data/audit/validator_flags.json`, COMMITTED before any
@@ -176,6 +186,12 @@ latest (25 Oct recommended, memo N13), results freeze 22 Nov, E4 23 Nov–6 Dec.
     from `c01`'s `__cpu` directories against the box's; the x1/x2 quota reading (entry 1) still needs a Kaggle 2xT4
     session. Blocks: the panel freeze (entry 22), every E1/E3 run,
     the census column, the H1 floor, E2's item audits, the tier-5 re-pack. Memo 9 (a), 11, N3, N8, N11.
+    **Status 27 Oct:** (i) DONE on the box: the pin (`experiments/panel_pins.json`, 28 of 34 entries; the five
+    `quantization.checkpoint: null` entries and Vistral unresolved) applied to `configs/models.yaml` and committed
+    together; the tokenizer and item audits for 24 models in `data/audit/`; the v0.4 re-census NOT adopted (STATUS
+    open question 10). (ii) `c06` 4 of 14 units done (gemma-3-1b-it, qwen3.5-0.8b, qwen3.5-2b, qwen3.5-4b); 7 failed
+    for panel reasons (STATUS open questions 8, 9; Vistral gated), 3 not reached. (iii) `c07` not reached. The next
+    rental finishes both; the x1/x2 quota reading still needs a Kaggle 2xT4 session.
 20. **[25 Oct] Gemini route decided and recorded.** Who: author (+ an adult holding a Google AI Studio key if (b)).
     Steps: (a) drop Gemini (panel of 19; the paper names the drop) or (b) dev-only on the dev-derived API set with an
     adult's key, reported separately and never in Table 2 — (b) needs a `noilai_api_dev` `derive` block and a run
@@ -198,6 +214,10 @@ latest (25 Oct recommended, memo N13), results freeze 22 Nov, E4 23 Nov–6 Dec.
     `--bf16` twin from the panel as decided on 17 Oct (DEVIATIONS 2026-10-17) and re-pack (`plan_chunks.py --write`,
     `ledger.py init --force`); the analysis then has six tokenizer families. Blocks: every E1/E3 run; stage 2 (panel,
     families); no model enters the main tables after it. Memo 9, 11.
+    **Status 27 Oct:** (a) done for 28 entries (the pin is in `configs/models.yaml`); (b) now a yes/no (STATUS open
+    question 8): vLLM 0.30 rejects `qat_int4` and `bitsandbytes`, and every affected entry fits the rented A100-80GB
+    in bf16; (c) smoke results in `experiments/ledger.csv` for 4 of 14 models; (f) Vistral still pending (2 Oct
+    request); plus PhoGPT (open question 9). The freeze commit waits on (b), (f), PhoGPT and the next rental.
 23. **[25 Oct] Co-author outreach checkpoint (sent in week 1, 5–11 Oct).** Who: author. Steps: e-mail 5–10 PhD
     students/postdocs (`docs/CONTRIBUTOR_OUTREACH.md`; attach the tokenizer-audit result and the plan's abstract);
     offer E2 and E4 as the open sections; no reply by 25 Oct → widen (ACL mentorship Slack, SEACrowd, Cohere Labs)

@@ -31,9 +31,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from noilai.eval.run import sha256_file
+from noilai.eval.run import load_item_file, sha256_file
 from noilai.eval.score import score_outputs
-from noilai.gen.generate import load_items
 from noilai.stats.bootstrap import accuracy_ci
 from noilai.stats.tests import paired_test
 
@@ -126,7 +125,7 @@ def main(argv=None) -> int:
         rc = KV.main(["--key", args.plan_key])
         report["checks"]["item_file_matches_run_plan"] = rc == 0
     # 2. deterministic rescoring
-    items = load_items(item_file)
+    items, _ = load_item_file(item_file)       # the eval's loader: an XCOPA file gets its XCOPA-<split>-<idx> ids
     outs = [json.loads(line) for line in (run / "outputs.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     rescored = score_outputs(items, outs)
     stored = [json.loads(line) for line in (run / "scores.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]

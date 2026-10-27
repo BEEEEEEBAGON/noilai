@@ -1,0 +1,936 @@
+{
+ "models_config": "configs/models.yaml",
+ "models_config_sha256": "967e2665844bfbc4969ff24642da8aea6796775ff3712d8724f288538e045ed8",
+ "env_pins_sha256": "a7384be783857e281cec3a518d0916474cbd134d687ce44d45b74511c62c3b12",
+ "written_utc": "2026-10-27T01:12:01+00:00",
+ "huggingface_hub_version": "2.3.0",
+ "n_records": 34,
+ "n_resolved": 28,
+ "n_unresolved_panel": 5,
+ "n_checkpoint_unchosen": 6,
+ "records": [
+  {
+   "name": "gemma-3-1b-it",
+   "hf_id": "google/gemma-3-1b-it",
+   "checkpoint": "google/gemma-3-1b-it",
+   "group": "interpretability_ladder",
+   "backend": "vllm",
+   "panel": true,
+   "config_hf_id_status": "known",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "dcc83ea841ab6100d6b47a070329e1ba4cf78752",
+   "hub_gated": "manual",
+   "license": {
+    "card": "gemma",
+    "license_name": null,
+    "tags": [
+     "license:gemma"
+    ]
+   },
+   "last_modified": "2025-04-04T13:12:40+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.model": "1299c11d7cf632ef3b4e11937501358ada021bbdf7c47638d13c0ee982f2e79c",
+    "tokenizer.json": "4667f2089529e8e7657cfb6d1c19910ae71ff5f28aa7ab2ff2763330affad795",
+    "tokenizer_config.json": "bfe25c2735e395407beb78456ea9a6984a1f00d8c16fa04a8b75f2a614cf53e1",
+    "special_tokens_map.json": "2f7b0adf4fb469770bb1490e3e35df87b1dc578246c5e7e6fc76ecf33213a397"
+   },
+   "chat_template_sha256": "7de1c58e208eda46e9c7f86397df37ec49883aeece39fb961e0a6b24088dd3c4",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:07:59+00:00"
+  },
+  {
+   "name": "gemma-3-4b-it",
+   "hf_id": "google/gemma-3-4b-it",
+   "checkpoint": "google/gemma-3-4b-it",
+   "group": "interpretability_ladder",
+   "backend": "vllm",
+   "panel": true,
+   "config_hf_id_status": "known",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "093f9f388b31de276ce2de164bdc2081324b9767",
+   "hub_gated": "manual",
+   "license": {
+    "card": "gemma",
+    "license_name": null,
+    "tags": [
+     "license:gemma"
+    ]
+   },
+   "last_modified": "2025-03-21T20:20:53+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.model": "1299c11d7cf632ef3b4e11937501358ada021bbdf7c47638d13c0ee982f2e79c",
+    "tokenizer.json": "4667f2089529e8e7657cfb6d1c19910ae71ff5f28aa7ab2ff2763330affad795",
+    "tokenizer_config.json": "bfe25c2735e395407beb78456ea9a6984a1f00d8c16fa04a8b75f2a614cf53e1",
+    "special_tokens_map.json": "2f7b0adf4fb469770bb1490e3e35df87b1dc578246c5e7e6fc76ecf33213a397"
+   },
+   "chat_template_sha256": "7de1c58e208eda46e9c7f86397df37ec49883aeece39fb961e0a6b24088dd3c4",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:08:42+00:00"
+  },
+  {
+   "name": "gemma-3-12b-it",
+   "hf_id": "google/gemma-3-12b-it",
+   "checkpoint": "google/gemma-3-12b-it",
+   "group": "interpretability_ladder",
+   "backend": "vllm",
+   "panel": true,
+   "config_hf_id_status": "known",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "96b6f1eccf38110c56df3a15bffe176da04bfd80",
+   "hub_gated": "manual",
+   "license": {
+    "card": "gemma",
+    "license_name": null,
+    "tags": [
+     "license:gemma"
+    ]
+   },
+   "last_modified": "2025-03-21T20:28:56+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.model": "1299c11d7cf632ef3b4e11937501358ada021bbdf7c47638d13c0ee982f2e79c",
+    "tokenizer.json": "4667f2089529e8e7657cfb6d1c19910ae71ff5f28aa7ab2ff2763330affad795",
+    "tokenizer_config.json": "bfe25c2735e395407beb78456ea9a6984a1f00d8c16fa04a8b75f2a614cf53e1",
+    "special_tokens_map.json": "2f7b0adf4fb469770bb1490e3e35df87b1dc578246c5e7e6fc76ecf33213a397"
+   },
+   "chat_template_sha256": "7de1c58e208eda46e9c7f86397df37ec49883aeece39fb961e0a6b24088dd3c4",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:08:47+00:00"
+  },
+  {
+   "name": "qwen3.5-0.8b",
+   "hf_id": "Qwen/Qwen3.5-0.8B",
+   "checkpoint": "Qwen/Qwen3.5-0.8B",
+   "group": "general_multilingual",
+   "backend": "vllm",
+   "panel": true,
+   "config_hf_id_status": "uncertain",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "2fc06364715b967f1860aea9cf38778875588b17",
+   "hub_gated": false,
+   "license": {
+    "card": "apache-2.0",
+    "license_name": null,
+    "tags": [
+     "license:apache-2.0"
+    ]
+   },
+   "last_modified": "2026-03-02T11:26:58+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+    "tokenizer_config.json": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c",
+    "chat_template.jinja": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80"
+   },
+   "chat_template_sha256": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:08:52+00:00"
+  },
+  {
+   "name": "qwen3.5-2b",
+   "hf_id": "Qwen/Qwen3.5-2B",
+   "checkpoint": "Qwen/Qwen3.5-2B",
+   "group": "general_multilingual",
+   "backend": "vllm",
+   "panel": true,
+   "config_hf_id_status": "uncertain",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+   "hub_gated": false,
+   "license": {
+    "card": "apache-2.0",
+    "license_name": null,
+    "tags": [
+     "license:apache-2.0"
+    ]
+   },
+   "last_modified": "2026-03-02T11:26:29+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+    "tokenizer_config.json": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c",
+    "chat_template.jinja": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80"
+   },
+   "chat_template_sha256": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:09:03+00:00"
+  },
+  {
+   "name": "qwen3.5-4b",
+   "hf_id": "Qwen/Qwen3.5-4B",
+   "checkpoint": "Qwen/Qwen3.5-4B",
+   "group": "general_multilingual",
+   "backend": "vllm",
+   "panel": true,
+   "config_hf_id_status": "uncertain",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+   "hub_gated": false,
+   "license": {
+    "card": "apache-2.0",
+    "license_name": null,
+    "tags": [
+     "license:apache-2.0"
+    ]
+   },
+   "last_modified": "2026-03-02T00:52:52+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+    "tokenizer_config.json": "316230d6a809701f4db5ea8f8fc862bc3a6f3229c937c174e674ff3ca0a64ac8",
+    "chat_template.jinja": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715"
+   },
+   "chat_template_sha256": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:09:14+00:00"
+  },
+  {
+   "name": "qwen3.5-9b",
+   "hf_id": "Qwen/Qwen3.5-9B",
+   "checkpoint": "Qwen/Qwen3.5-9B",
+   "group": "general_multilingual",
+   "backend": "vllm",
+   "panel": true,
+   "config_hf_id_status": "uncertain",
+   "config_revision": null,
+   "hf_id_status": "checkpoint_unchosen",
+   "revision": null,
+   "hub_gated": null,
+   "license": null,
+   "last_modified": null,
+   "tokenizer_sha256": {},
+   "chat_template_sha256": null,
+   "error": "quantized checkpoint not chosen (quantization.checkpoint is null): choose it, then pin it",
+   "resolved_utc": "2026-10-27T01:09:28+00:00"
+  },
+  {
+   "name": "gemma-4-e2b",
+   "hf_id": "google/gemma-4-e2b-it",
+   "checkpoint": "google/gemma-4-e2b-it",
+   "group": "general_multilingual",
+   "backend": "vllm",
+   "panel": true,
+   "config_hf_id_status": "uncertain",
+   "config_revision": null,
+   "hf_id_status": "checkpoint_unchosen",
+   "revision": null,
+   "hub_gated": null,
+   "license": null,
+   "last_modified": null,
+   "tokenizer_sha256": {},
+   "chat_template_sha256": null,
+   "error": "quantized checkpoint not chosen (quantization.checkpoint is null): choose it, then pin it",
+   "resolved_utc": "2026-10-27T01:09:28+00:00"
+  },
+  {
+   "name": "gemma-4-e4b",
+   "hf_id": "google/gemma-4-e4b-it",
+   "checkpoint": "google/gemma-4-e4b-it",
+   "group": "general_multilingual",
+   "backend": "vllm",
+   "panel": true,
+   "config_hf_id_status": "uncertain",
+   "config_revision": null,
+   "hf_id_status": "checkpoint_unchosen",
+   "revision": null,
+   "hub_gated": null,
+   "license": null,
+   "last_modified": null,
+   "tokenizer_sha256": {},
+   "chat_template_sha256": null,
+   "error": "quantized checkpoint not chosen (quantization.checkpoint is null): choose it, then pin it",
+   "resolved_utc": "2026-10-27T01:09:28+00:00"
+  },
+  {
+   "name": "gemma-4-12b",
+   "hf_id": "google/gemma-4-12b-it",
+   "checkpoint": "google/gemma-4-12b-it",
+   "group": "general_multilingual",
+   "backend": "vllm",
+   "panel": true,
+   "config_hf_id_status": "uncertain",
+   "config_revision": null,
+   "hf_id_status": "checkpoint_unchosen",
+   "revision": null,
+   "hub_gated": null,
+   "license": null,
+   "last_modified": null,
+   "tokenizer_sha256": {},
+   "chat_template_sha256": null,
+   "error": "quantized checkpoint not chosen (quantization.checkpoint is null): choose it, then pin it",
+   "resolved_utc": "2026-10-27T01:09:28+00:00"
+  },
+  {
+   "name": "gemma-sea-lion-v4.5-e2b-it",
+   "hf_id": "aisingapore/Gemma-SEA-LION-v4.5-E2B-IT",
+   "checkpoint": "aisingapore/Gemma-SEA-LION-v4.5-E2B-IT",
+   "group": "sea_specialised",
+   "backend": "vllm",
+   "panel": true,
+   "config_hf_id_status": "uncertain",
+   "config_revision": null,
+   "hf_id_status": "checkpoint_unchosen",
+   "revision": null,
+   "hub_gated": null,
+   "license": null,
+   "last_modified": null,
+   "tokenizer_sha256": {},
+   "chat_template_sha256": null,
+   "error": "quantized checkpoint not chosen (quantization.checkpoint is null): choose it, then pin it",
+   "resolved_utc": "2026-10-27T01:09:28+00:00"
+  },
+  {
+   "name": "sailor2-8b-chat",
+   "hf_id": "sail/Sailor2-8B-Chat",
+   "checkpoint": "sail/Sailor2-8B-Chat",
+   "group": "sea_specialised",
+   "backend": "vllm",
+   "panel": true,
+   "config_hf_id_status": "known",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "577d5b2745863cec11e1b2f1c92586a91cea446e",
+   "hub_gated": false,
+   "license": {
+    "card": "apache-2.0",
+    "license_name": null,
+    "tags": [
+     "license:apache-2.0"
+    ]
+   },
+   "last_modified": "2025-02-20T09:40:00+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.json": "82bf42f9364aa867b8c9b839e53c829979092b99b8fab5e8dc932d83f965e815",
+    "tokenizer_config.json": "9c0e9447c249435c31b6a25b6f83b2f8e24838ef05cc3f99e3db5a37e66ebb3d",
+    "special_tokens_map.json": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+   },
+   "chat_template_sha256": "038f933e058ba87f2eea38edaf880b5f1819ac4cffddcacc5fa87e673fa693af",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:09:28+00:00"
+  },
+  {
+   "name": "phogpt-4b-chat",
+   "hf_id": "vinai/PhoGPT-4B-Chat",
+   "checkpoint": "vinai/PhoGPT-4B-Chat",
+   "group": "vietnamese_specialised",
+   "backend": "hf",
+   "panel": true,
+   "config_hf_id_status": "known",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "3b11fad96d853b78f2fecc76f13aedb381b02d5a",
+   "hub_gated": false,
+   "license": {
+    "card": "bsd-3-clause",
+    "license_name": null,
+    "tags": [
+     "license:bsd-3-clause"
+    ]
+   },
+   "last_modified": "2024-11-12T07:44:43+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.json": "e5d0981153b0fa9014832a2395bd81f4c6036e9df9ce64ee79241e53e2326130",
+    "tokenizer_config.json": "6d2d431914ba11aecf0280c59fdac22f60503870a36a1f3e8c2e1dacd36469ca",
+    "special_tokens_map.json": "9046da57c270c8e74d0f38832b4adce269c9d914ef21d2a0925e7772152dd793"
+   },
+   "chat_template_sha256": "752fb7a96a951de1c9ced4f37033c539daa3ee9a6be56d72caf4674e4e44f46a",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:09:43+00:00"
+  },
+  {
+   "name": "vistral-7b-chat",
+   "hf_id": "Viet-Mistral/Vistral-7B-Chat",
+   "checkpoint": "Viet-Mistral/Vistral-7B-Chat",
+   "group": "vietnamese_specialised",
+   "backend": "vllm",
+   "panel": true,
+   "config_hf_id_status": "known",
+   "config_revision": null,
+   "hf_id_status": "gated",
+   "revision": "d331b64e61b935cc43c2b3010ae9fb4fde599b45",
+   "hub_gated": "manual",
+   "license": {
+    "card": "afl-3.0",
+    "license_name": null,
+    "tags": [
+     "license:afl-3.0"
+    ]
+   },
+   "last_modified": "2024-02-27T19:49:13+00:00",
+   "tokenizer_sha256": {},
+   "chat_template_sha256": null,
+   "error": "GatedRepoError: 403 Client Error. (Request ID: Root=1-6adff9e0-7018ba4f5126033d15753ded;9004fc41-7d7e-46bf-b25f-862d0501a9dd)\n\nCannot access gated repo for url https://huggingface.co/Viet-Mistral/Vistral-7B-Chat/resolve/d331b64e61b935cc43c2b3010ae9fb4fde599b45/tokenizer.model.\nYour request to access model Viet-Mistral/Vistral-7B-Chat is awaiting a review from the repo authors.",
+   "resolved_utc": "2026-10-27T01:09:51+00:00"
+  },
+  {
+   "name": "llama-3.1-8b-instruct",
+   "hf_id": "meta-llama/Llama-3.1-8B-Instruct",
+   "checkpoint": "hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4",
+   "group": "legacy_baseline",
+   "backend": "vllm",
+   "panel": true,
+   "config_hf_id_status": "known",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "db1f81ad4b8c7e39777509fac66c652eb0a52f91",
+   "hub_gated": false,
+   "license": {
+    "card": "llama3.1",
+    "license_name": null,
+    "tags": [
+     "license:llama3.1"
+    ]
+   },
+   "last_modified": "2024-08-07T07:29:21+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.json": "76e48799b099d43365bd24ccd8ecc5aedac831718da780552f03b0a6eb4412aa",
+    "tokenizer_config.json": "177c7b61e616fecb84c17ce0591acb92c6c4d60e9ac5ababfb940ff23bbcd424",
+    "special_tokens_map.json": "8482e6b67fa8244c2c5265ba4e9bc0f1fbfd150b140d6cf86722d5a37ac81e25"
+   },
+   "chat_template_sha256": "e10ca381b1ccc5cf9db52e371f3b6651576caee0a630b452e2816b2d404d4b65",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:09:52+00:00"
+  },
+  {
+   "name": "qwen3.8-27b",
+   "hf_id": "Qwen/Qwen3.8-27B",
+   "checkpoint": "Qwen/Qwen3.8-27B",
+   "group": "large_open_reference",
+   "backend": "vllm",
+   "panel": true,
+   "config_hf_id_status": "uncertain",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+   "hub_gated": false,
+   "license": {
+    "card": "apache-2.0",
+    "license_name": null,
+    "tags": [
+     "license:apache-2.0"
+    ]
+   },
+   "last_modified": "2026-08-14T15:00:01+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.json": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+    "tokenizer_config.json": "b11349aafa7cdc6a320767cf7ceb29ed82f7eda5d65e8e0819e76f0ce947bf27",
+    "chat_template.jinja": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041"
+   },
+   "chat_template_sha256": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:09:59+00:00"
+  },
+  {
+   "name": "qwen-sea-lion-v4.5-27b-it",
+   "hf_id": "aisingapore/Qwen-SEA-LION-v4.5-27B-IT",
+   "checkpoint": "aisingapore/Qwen-SEA-LION-v4.5-27B-IT",
+   "group": "large_open_reference",
+   "backend": "vllm",
+   "panel": true,
+   "config_hf_id_status": "uncertain",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "544e416f68a5700c7577547ad48e351e7d294116",
+   "hub_gated": false,
+   "license": {
+    "card": "mit",
+    "license_name": null,
+    "tags": [
+     "license:mit"
+    ]
+   },
+   "last_modified": "2026-08-24T23:59:54+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+    "tokenizer_config.json": "f4d969585e55cec902abe1300d760cef06866ae807de8c6fb7a98394c37c066b",
+    "chat_template.jinja": "e84f32a23fdda27689f868aa4a1a5621f41133e51a48d7f3efcbea2839574259"
+   },
+   "chat_template_sha256": "e84f32a23fdda27689f868aa4a1a5621f41133e51a48d7f3efcbea2839574259",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:10:39+00:00"
+  },
+  {
+   "name": "gemma-3-1b-it--bf16",
+   "hf_id": "google/gemma-3-1b-it",
+   "checkpoint": "google/gemma-3-1b-it",
+   "group": "bf16_reference",
+   "backend": "vllm",
+   "panel": false,
+   "config_hf_id_status": "known",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "dcc83ea841ab6100d6b47a070329e1ba4cf78752",
+   "hub_gated": "manual",
+   "license": {
+    "card": "gemma",
+    "license_name": null,
+    "tags": [
+     "license:gemma"
+    ]
+   },
+   "last_modified": "2025-04-04T13:12:40+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.model": "1299c11d7cf632ef3b4e11937501358ada021bbdf7c47638d13c0ee982f2e79c",
+    "tokenizer.json": "4667f2089529e8e7657cfb6d1c19910ae71ff5f28aa7ab2ff2763330affad795",
+    "tokenizer_config.json": "bfe25c2735e395407beb78456ea9a6984a1f00d8c16fa04a8b75f2a614cf53e1",
+    "special_tokens_map.json": "2f7b0adf4fb469770bb1490e3e35df87b1dc578246c5e7e6fc76ecf33213a397"
+   },
+   "chat_template_sha256": "7de1c58e208eda46e9c7f86397df37ec49883aeece39fb961e0a6b24088dd3c4",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:07:59+00:00"
+  },
+  {
+   "name": "gemma-3-4b-it--bf16",
+   "hf_id": "google/gemma-3-4b-it",
+   "checkpoint": "google/gemma-3-4b-it",
+   "group": "bf16_reference",
+   "backend": "vllm",
+   "panel": false,
+   "config_hf_id_status": "known",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "093f9f388b31de276ce2de164bdc2081324b9767",
+   "hub_gated": "manual",
+   "license": {
+    "card": "gemma",
+    "license_name": null,
+    "tags": [
+     "license:gemma"
+    ]
+   },
+   "last_modified": "2025-03-21T20:20:53+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.model": "1299c11d7cf632ef3b4e11937501358ada021bbdf7c47638d13c0ee982f2e79c",
+    "tokenizer.json": "4667f2089529e8e7657cfb6d1c19910ae71ff5f28aa7ab2ff2763330affad795",
+    "tokenizer_config.json": "bfe25c2735e395407beb78456ea9a6984a1f00d8c16fa04a8b75f2a614cf53e1",
+    "special_tokens_map.json": "2f7b0adf4fb469770bb1490e3e35df87b1dc578246c5e7e6fc76ecf33213a397"
+   },
+   "chat_template_sha256": "7de1c58e208eda46e9c7f86397df37ec49883aeece39fb961e0a6b24088dd3c4",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:08:42+00:00"
+  },
+  {
+   "name": "qwen3.5-0.8b--bf16",
+   "hf_id": "Qwen/Qwen3.5-0.8B",
+   "checkpoint": "Qwen/Qwen3.5-0.8B",
+   "group": "bf16_reference",
+   "backend": "vllm",
+   "panel": false,
+   "config_hf_id_status": "uncertain",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "2fc06364715b967f1860aea9cf38778875588b17",
+   "hub_gated": false,
+   "license": {
+    "card": "apache-2.0",
+    "license_name": null,
+    "tags": [
+     "license:apache-2.0"
+    ]
+   },
+   "last_modified": "2026-03-02T11:26:58+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+    "tokenizer_config.json": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c",
+    "chat_template.jinja": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80"
+   },
+   "chat_template_sha256": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:08:52+00:00"
+  },
+  {
+   "name": "qwen3.5-2b--bf16",
+   "hf_id": "Qwen/Qwen3.5-2B",
+   "checkpoint": "Qwen/Qwen3.5-2B",
+   "group": "bf16_reference",
+   "backend": "vllm",
+   "panel": false,
+   "config_hf_id_status": "uncertain",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+   "hub_gated": false,
+   "license": {
+    "card": "apache-2.0",
+    "license_name": null,
+    "tags": [
+     "license:apache-2.0"
+    ]
+   },
+   "last_modified": "2026-03-02T11:26:29+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+    "tokenizer_config.json": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c",
+    "chat_template.jinja": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80"
+   },
+   "chat_template_sha256": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:09:03+00:00"
+  },
+  {
+   "name": "qwen3.5-4b--bf16",
+   "hf_id": "Qwen/Qwen3.5-4B",
+   "checkpoint": "Qwen/Qwen3.5-4B",
+   "group": "bf16_reference",
+   "backend": "vllm",
+   "panel": false,
+   "config_hf_id_status": "uncertain",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+   "hub_gated": false,
+   "license": {
+    "card": "apache-2.0",
+    "license_name": null,
+    "tags": [
+     "license:apache-2.0"
+    ]
+   },
+   "last_modified": "2026-03-02T00:52:52+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+    "tokenizer_config.json": "316230d6a809701f4db5ea8f8fc862bc3a6f3229c937c174e674ff3ca0a64ac8",
+    "chat_template.jinja": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715"
+   },
+   "chat_template_sha256": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:09:14+00:00"
+  },
+  {
+   "name": "qwen3.5-9b--bf16",
+   "hf_id": "Qwen/Qwen3.5-9B",
+   "checkpoint": "Qwen/Qwen3.5-9B",
+   "group": "bf16_reference",
+   "backend": "vllm",
+   "panel": false,
+   "config_hf_id_status": "uncertain",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+   "hub_gated": false,
+   "license": {
+    "card": "apache-2.0",
+    "license_name": null,
+    "tags": [
+     "license:apache-2.0"
+    ]
+   },
+   "last_modified": "2026-03-02T00:51:43+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+    "tokenizer_config.json": "316230d6a809701f4db5ea8f8fc862bc3a6f3229c937c174e674ff3ca0a64ac8",
+    "chat_template.jinja": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715"
+   },
+   "chat_template_sha256": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:10:54+00:00"
+  },
+  {
+   "name": "gemma-4-e2b--bf16",
+   "hf_id": "google/gemma-4-e2b-it",
+   "checkpoint": "google/gemma-4-e2b-it",
+   "group": "bf16_reference",
+   "backend": "vllm",
+   "panel": false,
+   "config_hf_id_status": "uncertain",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "3e22461f65e89153144f8adb70e3b8c2cc9845a7",
+   "hub_gated": false,
+   "license": {
+    "card": "apache-2.0",
+    "license_name": null,
+    "tags": [
+     "license:apache-2.0"
+    ]
+   },
+   "last_modified": "2026-07-20T16:41:56+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.json": "cc8d3a0ce36466ccc1278bf987df5f71db1719b9ca6b4118264f45cb627bfe0f",
+    "tokenizer_config.json": "9f4fec4b1dc6ecddf8f4a92e9caea5971c0e67d81309f3f9066a2bee8c362633",
+    "chat_template.jinja": "0a2c8073c878ab1da004bee933a998606537bbb62016310352c7285c3f01c5b5"
+   },
+   "chat_template_sha256": "0a2c8073c878ab1da004bee933a998606537bbb62016310352c7285c3f01c5b5",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:10:59+00:00"
+  },
+  {
+   "name": "gemma-4-e4b--bf16",
+   "hf_id": "google/gemma-4-e4b-it",
+   "checkpoint": "google/gemma-4-e4b-it",
+   "group": "bf16_reference",
+   "backend": "vllm",
+   "panel": false,
+   "config_hf_id_status": "uncertain",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "ee0ef6023621cff504d758262d4e04895a5af4a2",
+   "hub_gated": false,
+   "license": {
+    "card": "apache-2.0",
+    "license_name": null,
+    "tags": [
+     "license:apache-2.0"
+    ]
+   },
+   "last_modified": "2026-07-20T16:42:03+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.json": "cc8d3a0ce36466ccc1278bf987df5f71db1719b9ca6b4118264f45cb627bfe0f",
+    "tokenizer_config.json": "9f4fec4b1dc6ecddf8f4a92e9caea5971c0e67d81309f3f9066a2bee8c362633",
+    "chat_template.jinja": "0a2c8073c878ab1da004bee933a998606537bbb62016310352c7285c3f01c5b5"
+   },
+   "chat_template_sha256": "0a2c8073c878ab1da004bee933a998606537bbb62016310352c7285c3f01c5b5",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:11:40+00:00"
+  },
+  {
+   "name": "gemma-4-12b--bf16",
+   "hf_id": "google/gemma-4-12b-it",
+   "checkpoint": "google/gemma-4-12b-it",
+   "group": "bf16_reference",
+   "backend": "vllm",
+   "panel": false,
+   "config_hf_id_status": "uncertain",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7",
+   "hub_gated": false,
+   "license": {
+    "card": "apache-2.0",
+    "license_name": null,
+    "tags": [
+     "license:apache-2.0"
+    ]
+   },
+   "last_modified": "2026-07-20T16:42:08+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.json": "cc8d3a0ce36466ccc1278bf987df5f71db1719b9ca6b4118264f45cb627bfe0f",
+    "tokenizer_config.json": "a62f4e85a47c0c136edaaa3a4f591fd6783717299a9def47e5ad03a49f6a5eb9",
+    "chat_template.jinja": "ae53464bf3be25802b3a5b37def7fd89667067d7577049b3b2d74c4d8de4c6d4"
+   },
+   "chat_template_sha256": "ae53464bf3be25802b3a5b37def7fd89667067d7577049b3b2d74c4d8de4c6d4",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:11:44+00:00"
+  },
+  {
+   "name": "gemma-sea-lion-v4.5-e2b-it--bf16",
+   "hf_id": "aisingapore/Gemma-SEA-LION-v4.5-E2B-IT",
+   "checkpoint": "aisingapore/Gemma-SEA-LION-v4.5-E2B-IT",
+   "group": "bf16_reference",
+   "backend": "vllm",
+   "panel": false,
+   "config_hf_id_status": "uncertain",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "c028f609f6f84dd0e9b669dad9dc1f9fd61b8bed",
+   "hub_gated": false,
+   "license": {
+    "card": "mit",
+    "license_name": null,
+    "tags": [
+     "license:mit"
+    ]
+   },
+   "last_modified": "2026-08-24T23:59:18+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.json": "cc8d3a0ce36466ccc1278bf987df5f71db1719b9ca6b4118264f45cb627bfe0f",
+    "tokenizer_config.json": "90c3a3ba5bf53818383a58e1a776cbcacd2a038d4812eaa373e1522f2d06f3df",
+    "chat_template.jinja": "2f1b4d75d067bae3fe44e676721c7f077d243bc007156cb9c2f8b5836613d082"
+   },
+   "chat_template_sha256": "2f1b4d75d067bae3fe44e676721c7f077d243bc007156cb9c2f8b5836613d082",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:11:47+00:00"
+  },
+  {
+   "name": "sailor2-8b-chat--bf16",
+   "hf_id": "sail/Sailor2-8B-Chat",
+   "checkpoint": "sail/Sailor2-8B-Chat",
+   "group": "bf16_reference",
+   "backend": "vllm",
+   "panel": false,
+   "config_hf_id_status": "known",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "577d5b2745863cec11e1b2f1c92586a91cea446e",
+   "hub_gated": false,
+   "license": {
+    "card": "apache-2.0",
+    "license_name": null,
+    "tags": [
+     "license:apache-2.0"
+    ]
+   },
+   "last_modified": "2025-02-20T09:40:00+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.json": "82bf42f9364aa867b8c9b839e53c829979092b99b8fab5e8dc932d83f965e815",
+    "tokenizer_config.json": "9c0e9447c249435c31b6a25b6f83b2f8e24838ef05cc3f99e3db5a37e66ebb3d",
+    "special_tokens_map.json": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+   },
+   "chat_template_sha256": "038f933e058ba87f2eea38edaf880b5f1819ac4cffddcacc5fa87e673fa693af",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:09:28+00:00"
+  },
+  {
+   "name": "phogpt-4b-chat--bf16",
+   "hf_id": "vinai/PhoGPT-4B-Chat",
+   "checkpoint": "vinai/PhoGPT-4B-Chat",
+   "group": "bf16_reference",
+   "backend": "hf",
+   "panel": false,
+   "config_hf_id_status": "known",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "3b11fad96d853b78f2fecc76f13aedb381b02d5a",
+   "hub_gated": false,
+   "license": {
+    "card": "bsd-3-clause",
+    "license_name": null,
+    "tags": [
+     "license:bsd-3-clause"
+    ]
+   },
+   "last_modified": "2024-11-12T07:44:43+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.json": "e5d0981153b0fa9014832a2395bd81f4c6036e9df9ce64ee79241e53e2326130",
+    "tokenizer_config.json": "6d2d431914ba11aecf0280c59fdac22f60503870a36a1f3e8c2e1dacd36469ca",
+    "special_tokens_map.json": "9046da57c270c8e74d0f38832b4adce269c9d914ef21d2a0925e7772152dd793"
+   },
+   "chat_template_sha256": "752fb7a96a951de1c9ced4f37033c539daa3ee9a6be56d72caf4674e4e44f46a",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:09:43+00:00"
+  },
+  {
+   "name": "vistral-7b-chat--bf16",
+   "hf_id": "Viet-Mistral/Vistral-7B-Chat",
+   "checkpoint": "Viet-Mistral/Vistral-7B-Chat",
+   "group": "bf16_reference",
+   "backend": "vllm",
+   "panel": false,
+   "config_hf_id_status": "known",
+   "config_revision": null,
+   "hf_id_status": "gated",
+   "revision": "d331b64e61b935cc43c2b3010ae9fb4fde599b45",
+   "hub_gated": "manual",
+   "license": {
+    "card": "afl-3.0",
+    "license_name": null,
+    "tags": [
+     "license:afl-3.0"
+    ]
+   },
+   "last_modified": "2024-02-27T19:49:13+00:00",
+   "tokenizer_sha256": {},
+   "chat_template_sha256": null,
+   "error": "GatedRepoError: 403 Client Error. (Request ID: Root=1-6adff9e0-7018ba4f5126033d15753ded;9004fc41-7d7e-46bf-b25f-862d0501a9dd)\n\nCannot access gated repo for url https://huggingface.co/Viet-Mistral/Vistral-7B-Chat/resolve/d331b64e61b935cc43c2b3010ae9fb4fde599b45/tokenizer.model.\nYour request to access model Viet-Mistral/Vistral-7B-Chat is awaiting a review from the repo authors.",
+   "resolved_utc": "2026-10-27T01:09:51+00:00"
+  },
+  {
+   "name": "llama-3.1-8b-instruct--bf16",
+   "hf_id": "meta-llama/Llama-3.1-8B-Instruct",
+   "checkpoint": "meta-llama/Llama-3.1-8B-Instruct",
+   "group": "bf16_reference",
+   "backend": "vllm",
+   "panel": false,
+   "config_hf_id_status": "known",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "0e9e39f249a16976918f6564b8830bc894c89659",
+   "hub_gated": "manual",
+   "license": {
+    "card": "llama3.1",
+    "license_name": null,
+    "tags": [
+     "license:llama3.1"
+    ]
+   },
+   "last_modified": "2024-09-25T17:00:57+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.json": "79e3e522635f3171300913bb421464a87de6222182a0570b9b2ccba2a964b2b4",
+    "tokenizer_config.json": "177c7b61e616fecb84c17ce0591acb92c6c4d60e9ac5ababfb940ff23bbcd424",
+    "special_tokens_map.json": "6f38c73729248f6c127296386e3cdde96e254636cc58b4169d3fd32328d9a8ec"
+   },
+   "chat_template_sha256": "e10ca381b1ccc5cf9db52e371f3b6651576caee0a630b452e2816b2d404d4b65",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:11:50+00:00"
+  },
+  {
+   "name": "qwen3.5-4b--thinking",
+   "hf_id": "Qwen/Qwen3.5-4B",
+   "checkpoint": "Qwen/Qwen3.5-4B",
+   "group": "reasoning_substudy",
+   "backend": "vllm",
+   "panel": false,
+   "config_hf_id_status": "uncertain",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+   "hub_gated": false,
+   "license": {
+    "card": "apache-2.0",
+    "license_name": null,
+    "tags": [
+     "license:apache-2.0"
+    ]
+   },
+   "last_modified": "2026-03-02T00:52:52+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+    "tokenizer_config.json": "316230d6a809701f4db5ea8f8fc862bc3a6f3229c937c174e674ff3ca0a64ac8",
+    "chat_template.jinja": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715"
+   },
+   "chat_template_sha256": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:09:14+00:00"
+  },
+  {
+   "name": "qwen3.5-9b--thinking",
+   "hf_id": "Qwen/Qwen3.5-9B",
+   "checkpoint": "Qwen/Qwen3.5-9B",
+   "group": "reasoning_substudy",
+   "backend": "vllm",
+   "panel": false,
+   "config_hf_id_status": "uncertain",
+   "config_revision": null,
+   "hf_id_status": "checkpoint_unchosen",
+   "revision": null,
+   "hub_gated": null,
+   "license": null,
+   "last_modified": null,
+   "tokenizer_sha256": {},
+   "chat_template_sha256": null,
+   "error": "quantized checkpoint not chosen (quantization.checkpoint is null): choose it, then pin it",
+   "resolved_utc": "2026-10-27T01:12:01+00:00"
+  },
+  {
+   "name": "qwen3.8-27b--thinking",
+   "hf_id": "Qwen/Qwen3.8-27B",
+   "checkpoint": "Qwen/Qwen3.8-27B",
+   "group": "reasoning_substudy",
+   "backend": "vllm",
+   "panel": false,
+   "config_hf_id_status": "uncertain",
+   "config_revision": null,
+   "hf_id_status": "found",
+   "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+   "hub_gated": false,
+   "license": {
+    "card": "apache-2.0",
+    "license_name": null,
+    "tags": [
+     "license:apache-2.0"
+    ]
+   },
+   "last_modified": "2026-08-14T15:00:01+00:00",
+   "tokenizer_sha256": {
+    "tokenizer.json": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+    "tokenizer_config.json": "b11349aafa7cdc6a320767cf7ceb29ed82f7eda5d65e8e0819e76f0ce947bf27",
+    "chat_template.jinja": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041"
+   },
+   "chat_template_sha256": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+   "error": null,
+   "resolved_utc": "2026-10-27T01:09:59+00:00"
+  }
+ ]
+}

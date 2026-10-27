@@ -73,3 +73,18 @@ def test_check_run_end_to_end_on_the_echo_backend(tmp_path):
     (run / "scores.jsonl").write_text((run / "scores.jsonl").read_text() + "\n")          # tamper: one byte
     v2 = subprocess.run([py, "scripts/check_run.py", "--run", str(run), "--verify"], cwd=ROOT, capture_output=True, text=True, check=False)
     assert v2.returncode == 1 and "scores.jsonl" in v2.stdout
+
+
+def test_check_run_rescoring_on_an_xcopa_pilot_run(tmp_path):
+    """The box run of 2026-10-27: check_run's rescoring loaded an XCOPA item file with the generic loader, which
+    gives XCOPA records no item_id, and raised 'output for unknown item XCOPA-test-0000' on a run that scored."""
+    xcopa = ROOT / "data" / "external" / "xcopa_test_vi.jsonl"
+    py = sys.executable
+    subprocess.run([py, "scripts/run_eval.py", "--items", str(xcopa), "--backend", "echo", "--smoke", "--limit", "8",
+                    "--tasks", "XCOPA", "--paraphrases", "p0", "--shots", "0", "--arms", "nfc", "nfd", "--run-id", "echo_xcopa",
+                    "--out-root", str(tmp_path / "runs"), "--score"], cwd=ROOT, check=True, capture_output=True, text=True)
+    run = tmp_path / "runs" / "echo_xcopa"
+    r = subprocess.run([py, "scripts/check_run.py", "--run", str(run), "--n-boot", "100"], cwd=ROOT, capture_output=True, text=True, check=False)
+    assert r.returncode == 0, r.stdout + r.stderr
+    rep = json.loads(r.stdout.strip().splitlines()[-1])
+    assert rep["checks"]["rescoring_identical"] is True

@@ -1,0 +1,128 @@
+{
+  "by_task": {
+    "T1": {
+      "n": 20,
+      "accuracy": 0.0,
+      "error_classes": {
+        "copy": 2,
+        "component": 3,
+        "unparseable": 15
+      },
+      "copy_rate": 0.1,
+      "unparseable_rate": 0.75,
+      "accuracy_lenient": 0.0,
+      "component_errors": {
+        "onset": 3,
+        "rime": 3,
+        "tone": 2
+      },
+      "component_accuracy": {
+        "onset": 0.6,
+        "rime": 0.0,
+        "tone": 0.6
+      }
+    }
+  },
+  "by_task_variant": {
+    "T1-V1": {
+      "n": 20,
+      "accuracy": 0.0,
+      "error_classes": {
+        "copy": 2,
+        "component": 3,
+        "unparseable": 15
+      },
+      "copy_rate": 0.1,
+      "unparseable_rate": 0.75,
+      "accuracy_lenient": 0.0,
+      "component_errors": {
+        "onset": 3,
+        "rime": 3,
+        "tone": 2
+      },
+      "component_accuracy": {
+        "onset": 0.6,
+        "rime": 0.0,
+        "tone": 0.6
+      }
+    }
+  },
+  "by_task_arm": {
+    "T1-nfc": {
+      "n": 20,
+      "accuracy": 0.0,
+      "error_classes": {
+        "copy": 2,
+        "component": 3,
+        "unparseable": 15
+      },
+      "copy_rate": 0.1,
+      "unparseable_rate": 0.75,
+      "accuracy_lenient": 0.0,
+      "component_errors": {
+        "onset": 3,
+        "rime": 3,
+        "tone": 2
+      },
+      "component_accuracy": {
+        "onset": 0.6,
+        "rime": 0.0,
+        "tone": 0.6
+      }
+    }
+  },
+  "by_task_prompt": {
+    "T1-vi-p0-s3-explained-raw": {
+      "n": 20,
+      "accuracy": 0.0,
+      "error_classes": {
+        "copy": 2,
+        "component": 3,
+        "unparseable": 15
+      },
+      "copy_rate": 0.1,
+      "unparseable_rate": 0.75,
+      "accuracy_lenient": 0.0,
+      "component_errors": {
+        "onset": 3,
+        "rime": 3,
+        "tone": 2
+      },
+      "component_accuracy": {
+        "onset": 0.6,
+        "rime": 0.0,
+        "tone": 0.6
+      }
+    }
+  },
+  "by_task_twin_type": {},
+  "t3_headline": {},
+  "n_rows": 20,
+  "overall": {
+    "n": 20,
+    "accuracy": 0.0,
+    "error_classes": {
+      "copy": 2,
+      "component": 3,
+      "unparseable": 15
+    },
+    "copy_rate": 0.1,
+    "unparseable_rate": 0.75,
+    "accuracy_lenient": 0.0,
+    "component_errors": {
+      "onset": 3,
+      "rime": 3,
+      "tone": 2
+    },
+    "component_accuracy": {
+      "onset": 0.6,
+      "rime": 0.0,
+      "tone": 0.6
+    }
+  },
+  "run_id": "smoke_20__qwen3.5-4b",
+  "model": "qwen3.5-4b",
+  "item_file_sha256": "762d21ff404be7529277c640360bc8a761cb3196dc402d470e6fcb7df22050ef",
+  "items_path": "data/release/v0.4/noilai_dev.jsonl",
+  "n_unchanged": 0
+}

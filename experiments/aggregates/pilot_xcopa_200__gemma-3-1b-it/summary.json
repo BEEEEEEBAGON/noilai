@@ -1,0 +1,107 @@
+{
+  "by_task": {
+    "XCOPA": {
+      "n": 400,
+      "accuracy": 0.455,
+      "error_classes": {
+        "correct": 182,
+        "unparseable": 47,
+        "wrong": 171
+      },
+      "copy_rate": 0.0,
+      "unparseable_rate": 0.1175,
+      "component_errors": {},
+      "component_accuracy": {},
+      "logprob_accuracy": 0.505,
+      "logprob_accuracy_norm": 0.535
+    }
+  },
+  "by_task_variant": {
+    "XCOPA--": {
+      "n": 400,
+      "accuracy": 0.455,
+      "error_classes": {
+        "correct": 182,
+        "unparseable": 47,
+        "wrong": 171
+      },
+      "copy_rate": 0.0,
+      "unparseable_rate": 0.1175,
+      "component_errors": {},
+      "component_accuracy": {},
+      "logprob_accuracy": 0.505,
+      "logprob_accuracy_norm": 0.535
+    }
+  },
+  "by_task_arm": {
+    "XCOPA-nfc": {
+      "n": 200,
+      "accuracy": 0.515,
+      "error_classes": {
+        "correct": 103,
+        "wrong": 97
+      },
+      "copy_rate": 0.0,
+      "unparseable_rate": 0.0,
+      "component_errors": {},
+      "component_accuracy": {},
+      "logprob_accuracy": 0.52,
+      "logprob_accuracy_norm": 0.555
+    },
+    "XCOPA-nfd": {
+      "n": 200,
+      "accuracy": 0.395,
+      "error_classes": {
+        "unparseable": 47,
+        "correct": 79,
+        "wrong": 74
+      },
+      "copy_rate": 0.0,
+      "unparseable_rate": 0.235,
+      "component_errors": {},
+      "component_accuracy": {},
+      "logprob_accuracy": 0.49,
+      "logprob_accuracy_norm": 0.515
+    }
+  },
+  "by_task_prompt": {
+    "XCOPA-xcopa-p0": {
+      "n": 400,
+      "accuracy": 0.455,
+      "error_classes": {
+        "correct": 182,
+        "unparseable": 47,
+        "wrong": 171
+      },
+      "copy_rate": 0.0,
+      "unparseable_rate": 0.1175,
+      "component_errors": {},
+      "component_accuracy": {},
+      "logprob_accuracy": 0.505,
+      "logprob_accuracy_norm": 0.535
+    }
+  },
+  "by_task_twin_type": {},
+  "t3_headline": {},
+  "n_rows": 400,
+  "overall": {
+    "n": 400,
+    "accuracy": 0.455,
+    "error_classes": {
+      "correct": 182,
+      "unparseable": 47,
+      "wrong": 171
+    },
+    "copy_rate": 0.0,
+    "unparseable_rate": 0.1175,
+    "component_errors": {},
+    "component_accuracy": {},
+    "logprob_accuracy": 0.505,
+    "logprob_accuracy_norm": 0.535
+  },
+  "run_id": "pilot_xcopa_200__gemma-3-1b-it",
+  "model": "gemma-3-1b-it",
+  "item_file_sha256": "6a61990e5d87a0456a81916b68301734a037181e13d5ccb64d47d0c4011e7677",
+  "items_path": "data/external/pilot_xcopa_200.jsonl",
+  "n_unchanged": 0
+}

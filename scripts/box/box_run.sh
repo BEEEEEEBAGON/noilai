@@ -11,6 +11,10 @@ START=$(date +%s)
 export HF_HOME="$BOXDIR/hf"
 export HF_ENDPOINT="${HF_ENDPOINT:-https://huggingface.co}"
 export TOKENIZERS_PARALLELISM=false
+# vLLM 0.30's FlashInfer sampler compiles itself with nvcc on first use, which a provider image may not ship
+# (box run of 2026-10-27: "Could not find nvcc"); the built-in sampler is used instead. Every eval line
+# decodes greedily (noilai.eval.backends: temperature 0), so the sampler kernel cannot change an output.
+export VLLM_USE_FLASHINFER_SAMPLER=0
 cd "$BOXDIR/noilai" || { echo "[box] $BOXDIR/noilai is missing: run laptop_start.sh first"; exit 2; }
 echo "[box] $(date -u +%FT%TZ) start; $MINUTES_LEFT min of rental left; hub endpoint $HF_ENDPOINT; token $([ -n "${HF_TOKEN:-}" ] && echo set || echo NOT set)"
 
@@ -63,8 +67,26 @@ ELAPSED=$(( ($(date +%s) - START) / 60 ))
 BUDGET_MIN=$(( MINUTES_LEFT - ELAPSED - 12 ))
 BUDGET_H=$(python -c "print(round(max(0.05, $BUDGET_MIN / 60), 2))")
 echo "[box] setup took $ELAPSED min; launching no new model after $BUDGET_H h"
-python scripts/cuda_box.py --session auto --chunks c05_gpu_t0 c06_gpu_t0 c07_tpu_t0 --platform rented \
+# EXTRA_PILOT_MODELS (space-separated models.yaml names): the Gate 1 pilot lines repeated on larger models before the
+# Gate 1 decision (the author's choice of 2026-10-27, DEVIATIONS row 2026-10-27; dev items, not a paper run). The
+# weights stay in the cache for them (--keep-weights: the remaining tier-0 models fit the 200 GB disk).
+KEEP=""; [ -n "${EXTRA_PILOT_MODELS:-}" ] && KEEP="--keep-weights"
+# shellcheck disable=SC2086
+python scripts/cuda_box.py --session auto --chunks c05_gpu_t0 c06_gpu_t0 c07_tpu_t0 --platform rented $KEEP \
     --max-hours "$BUDGET_H" 2>&1 | tee "$BOXDIR/cuda_box.log"
+if [ -n "${EXTRA_PILOT_MODELS:-}" ]; then
+  ELAPSED=$(( ($(date +%s) - START) / 60 ))
+  BUDGET_H=$(python -c "print(round(max(0.05, ($MINUTES_LEFT - $ELAPSED - 12) / 60), 2))")
+  echo "[box] Gate 1 pilot lines on the larger models: $EXTRA_PILOT_MODELS (launching no new model after $BUDGET_H h)"
+  for LINE in pilot_t1_200 pilot_xcopa_200; do
+    # shellcheck disable=SC2086
+    python scripts/kaggle_run_plan.py --run "$LINE" --models $EXTRA_PILOT_MODELS --platform rented --session-hardware cuda \
+        --max-session-hours "$BUDGET_H" 2>&1 | tee -a "$BOXDIR/cuda_box.log"
+    for M in $EXTRA_PILOT_MODELS; do
+      [ -f "data/runs/${LINE}__${M}/outputs.jsonl" ] && python scripts/check_run.py --run "data/runs/${LINE}__${M}" 2>&1 | tail -1 | cut -c1-300
+    done
+  done
+fi
 
 # pilot models the pin could not resolve: run them once more as a rehearsal (manifests record revision null)
 UNPINNED=$(grep -oE '^\[skip \] [^:]+: skipped: revision not pinned' "$BOXDIR/cuda_box.log" | sed -E 's/^\[skip \] ([^:]+):.*/\1/' | sort -u | tr '\n' ' ')

@@ -1,0 +1,95 @@
+{
+  "tokenizer": "sail__Sailor2-8B-Chat",
+  "summary": {
+    "nfc": {
+      "n": 6595,
+      "tokens_per_syllable_mean": 1.9341925701288856,
+      "single_token_frac": 0.23411675511751326,
+      "boundary_alignment_mean": 0.9372757139246904,
+      "boundary_alignment_among_split_mean": 0.9181020260014519,
+      "n_split": 5051,
+      "onset_rime_split_frac": 0.553297952994693,
+      "tone_isolated_frac": 0,
+      "byte_fallback_frac": 0,
+      "n_tokens_hist": {
+        "1": 1544,
+        "2": 3946,
+        "3": 1100,
+        "4": 5
+      }
+    },
+    "nfd": {
+      "n": 6595,
+      "tokens_per_syllable_mean": 1.9341925701288856,
+      "single_token_frac": 0.23411675511751326,
+      "boundary_alignment_mean": 0.9372757139246904,
+      "boundary_alignment_among_split_mean": 0.9181020260014519,
+      "n_split": 5051,
+      "onset_rime_split_frac": 0.553297952994693,
+      "tone_isolated_frac": 0,
+      "byte_fallback_frac": 0,
+      "n_tokens_hist": {
+        "1": 1544,
+        "2": 3946,
+        "3": 1100,
+        "4": 5
+      }
+    }
+  },
+  "normalization_census": {
+    "n_samples": 1000,
+    "forms": [
+      "nfd",
+      "pc"
+    ],
+    "nfd_same_ids_frac": 1.0,
+    "nfd_longer_frac": 0.0,
+    "nfd_byte_fallback_frac": 0.0,
+    "nfd_roundtrip_ok_frac": 1.0,
+    "nfd_roundtrip_failures": [],
+    "verdict_nfd": "normalizes",
+    "pc_same_ids_frac": 1.0,
+    "pc_longer_frac": 0.0,
+    "pc_byte_fallback_frac": 0.0,
+    "pc_roundtrip_ok_frac": 1.0,
+    "pc_roundtrip_failures": [],
+    "verdict_pc": "normalizes",
+    "normalizes_nfd": true,
+    "verdict": "normalizes",
+    "roundtrip_rule": "NFC(decoded.strip()) == NFC(input.strip()), clean_up_tokenization_spaces=False (design 6.2)",
+    "type": "huggingface",
+    "class": "Qwen2Tokenizer",
+    "vocab_size": 151665,
+    "normalizer": {
+      "type": "NFC"
+    },
+    "pre_tokenizer": {
+      "type": "Sequence",
+      "pretokenizers": [
+        {
+          "type": "Split",
+          "pattern": {
+            "Regex": "(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r\\n\\p{L}\\p{N}]?\\p{L}+|\\p{N}| ?[^\\s\\p{L}\\p{N}]+[\\r\\n]*|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+"
+          },
+          "behavior": "Isolated",
+          "invert": false
+        },
+        {
+          "type": "ByteLevel",
+          "add_prefix_space": false,
+          "trim_offsets": true,
+          "use_regex": false
+        }
+      ]
+    },
+    "model_type": "BPE",
+    "probe_set": {
+      "n": 1000,
+      "n_words": 500,
+      "n_items": 500,
+      "items_file": "data/release/v0.4/noilai_main.jsonl",
+      "seed": 0,
+      "rule": "500 multi-syllable words + 500 NóiLái item inputs, seeded (design 6.2)"
+    }
+  }
+}

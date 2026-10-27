@@ -1,0 +1,20 @@
+{
+ "by_task_arm": {
+  "T1|nfc": {
+   "n": 20,
+   "n_clusters": 20,
+   "accuracy": 0.0,
+   "ci": [
+    0.0,
+    0.16112515805281938
+   ],
+   "ci_method": "wilson_deff",
+   "gain_over_copy_baseline": 0.0,
+   "gain_ci_lower_bound_above_0": false
+  }
+ },
+ "paired_vs_nfc": {},
+ "t1_forced_choice": {},
+ "smoke_or_standin": true,
+ "model": "qwen3.5-0.8b"
+}

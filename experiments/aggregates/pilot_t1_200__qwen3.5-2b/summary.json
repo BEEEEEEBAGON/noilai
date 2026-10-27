@@ -1,0 +1,231 @@
+{
+  "by_task": {
+    "T1": {
+      "n": 400,
+      "accuracy": 0.0,
+      "error_classes": {
+        "component": 90,
+        "copy": 274,
+        "unparseable": 12,
+        "reversal": 24
+      },
+      "copy_rate": 0.685,
+      "unparseable_rate": 0.03,
+      "accuracy_lenient": 0.0,
+      "component_errors": {
+        "onset": 38,
+        "rime": 84,
+        "spelling": 6,
+        "tone": 78
+      },
+      "component_accuracy": {
+        "onset": 0.788659793814433,
+        "rime": 0.29381443298969073,
+        "tone": 0.41494845360824745
+      }
+    }
+  },
+  "by_task_variant": {
+    "T1-V1": {
+      "n": 100,
+      "accuracy": 0.0,
+      "error_classes": {
+        "component": 16,
+        "copy": 78,
+        "unparseable": 4,
+        "reversal": 2
+      },
+      "copy_rate": 0.78,
+      "unparseable_rate": 0.04,
+      "accuracy_lenient": 0.0,
+      "component_errors": {
+        "onset": 8,
+        "rime": 16,
+        "spelling": 2,
+        "tone": 12
+      },
+      "component_accuracy": {
+        "onset": 0.9583333333333334,
+        "rime": 0.020833333333333332,
+        "tone": 0.9166666666666666
+      }
+    },
+    "T1-V2": {
+      "n": 100,
+      "accuracy": 0.0,
+      "error_classes": {
+        "copy": 50,
+        "reversal": 20,
+        "component": 28,
+        "unparseable": 2
+      },
+      "copy_rate": 0.5,
+      "unparseable_rate": 0.02,
+      "accuracy_lenient": 0.0,
+      "component_errors": {
+        "onset": 28,
+        "rime": 28,
+        "tone": 20
+      },
+      "component_accuracy": {
+        "onset": 0.21428571428571427,
+        "rime": 0.23469387755102042,
+        "tone": 0.673469387755102
+      }
+    },
+    "T1-V3": {
+      "n": 100,
+      "accuracy": 0.0,
+      "error_classes": {
+        "copy": 78,
+        "unparseable": 4,
+        "component": 16,
+        "reversal": 2
+      },
+      "copy_rate": 0.78,
+      "unparseable_rate": 0.04,
+      "accuracy_lenient": 0.0,
+      "component_errors": {
+        "tone": 16,
+        "spelling": 2,
+        "onset": 2,
+        "rime": 10
+      },
+      "component_accuracy": {
+        "onset": 0.9895833333333334,
+        "rime": 0.9270833333333334,
+        "tone": 0.052083333333333336
+      }
+    },
+    "T1-V4": {
+      "n": 100,
+      "accuracy": 0.0,
+      "error_classes": {
+        "component": 30,
+        "copy": 68,
+        "unparseable": 2
+      },
+      "copy_rate": 0.68,
+      "unparseable_rate": 0.02,
+      "accuracy_lenient": 0.0,
+      "component_errors": {
+        "rime": 30,
+        "tone": 30,
+        "spelling": 2
+      },
+      "component_accuracy": {
+        "onset": 1.0,
+        "rime": 0.0,
+        "tone": 0.02040816326530612
+      }
+    }
+  },
+  "by_task_arm": {
+    "T1-nfc": {
+      "n": 200,
+      "accuracy": 0.0,
+      "error_classes": {
+        "component": 45,
+        "copy": 137,
+        "unparseable": 6,
+        "reversal": 12
+      },
+      "copy_rate": 0.685,
+      "unparseable_rate": 0.03,
+      "accuracy_lenient": 0.0,
+      "component_errors": {
+        "onset": 19,
+        "rime": 42,
+        "spelling": 3,
+        "tone": 39
+      },
+      "component_accuracy": {
+        "onset": 0.788659793814433,
+        "rime": 0.29381443298969073,
+        "tone": 0.41494845360824745
+      }
+    },
+    "T1-nfd": {
+      "n": 200,
+      "accuracy": 0.0,
+      "error_classes": {
+        "component": 45,
+        "copy": 137,
+        "unparseable": 6,
+        "reversal": 12
+      },
+      "copy_rate": 0.685,
+      "unparseable_rate": 0.03,
+      "accuracy_lenient": 0.0,
+      "component_errors": {
+        "onset": 19,
+        "rime": 42,
+        "spelling": 3,
+        "tone": 39
+      },
+      "component_accuracy": {
+        "onset": 0.788659793814433,
+        "rime": 0.29381443298969073,
+        "tone": 0.41494845360824745
+      }
+    }
+  },
+  "by_task_prompt": {
+    "T1-vi-p0-s3-explained-raw": {
+      "n": 400,
+      "accuracy": 0.0,
+      "error_classes": {
+        "component": 90,
+        "copy": 274,
+        "unparseable": 12,
+        "reversal": 24
+      },
+      "copy_rate": 0.685,
+      "unparseable_rate": 0.03,
+      "accuracy_lenient": 0.0,
+      "component_errors": {
+        "onset": 38,
+        "rime": 84,
+        "spelling": 6,
+        "tone": 78
+      },
+      "component_accuracy": {
+        "onset": 0.788659793814433,
+        "rime": 0.29381443298969073,
+        "tone": 0.41494845360824745
+      }
+    }
+  },
+  "by_task_twin_type": {},
+  "t3_headline": {},
+  "n_rows": 400,
+  "overall": {
+    "n": 400,
+    "accuracy": 0.0,
+    "error_classes": {
+      "component": 90,
+      "copy": 274,
+      "unparseable": 12,
+      "reversal": 24
+    },
+    "copy_rate": 0.685,
+    "unparseable_rate": 0.03,
+    "accuracy_lenient": 0.0,
+    "component_errors": {
+      "onset": 38,
+      "rime": 84,
+      "spelling": 6,
+      "tone": 78
+    },
+    "component_accuracy": {
+      "onset": 0.788659793814433,
+      "rime": 0.29381443298969073,
+      "tone": 0.41494845360824745
+    }
+  },
+  "run_id": "pilot_t1_200__qwen3.5-2b",
+  "model": "qwen3.5-2b",
+  "item_file_sha256": "63667119857e569c85bb7beedae12721f189160a4f7c6436d55d551cc9a8b04e",
+  "items_path": "data/release/v0.4/pilot_t1_200.jsonl",
+  "n_unchanged": 0
+}

@@ -1,0 +1,56 @@
+date,platform,gpu_type,n_gpus,hours,run_id,purpose
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,pilot_t1_200__gemma-3-1b-it,pilot_t1_200 started 01:12Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0994,pilot_t1_200__gemma-3-1b-it,pilot_t1_200
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,pilot_t1_200__qwen3.5-2b,pilot_t1_200 started 01:17Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.4419,pilot_t1_200__qwen3.5-2b,pilot_t1_200
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,pilot_t1_200__phogpt-4b-chat,pilot_t1_200 started 01:44Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0085,pilot_t1_200__phogpt-4b-chat,pilot_t1_200
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,pilot_xcopa_200__gemma-3-1b-it,pilot_xcopa_200 started 01:45Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0116,pilot_xcopa_200__gemma-3-1b-it,pilot_xcopa_200
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,pilot_xcopa_200__qwen3.5-2b,pilot_xcopa_200 started 01:45Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0629,pilot_xcopa_200__qwen3.5-2b,pilot_xcopa_200
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,pilot_xcopa_200__phogpt-4b-chat,pilot_xcopa_200 started 01:49Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0032,pilot_xcopa_200__phogpt-4b-chat,pilot_xcopa_200
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,smoke_20__gemma-3-1b-it,smoke_20 started 01:49Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0114,smoke_20__gemma-3-1b-it,smoke_20
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,smoke_20__qwen3.5-0.8b,smoke_20 started 01:50Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.3885,smoke_20__qwen3.5-0.8b,smoke_20
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,smoke_20__qwen3.5-2b,smoke_20 started 02:13Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0263,smoke_20__qwen3.5-2b,smoke_20
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,smoke_20__qwen3.5-4b,smoke_20 started 02:15Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,pilot_t1_200__gemma-3-1b-it,pilot_t1_200 started 02:24Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0453,pilot_t1_200__gemma-3-1b-it,pilot_t1_200
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,pilot_t1_200__qwen3.5-2b,pilot_t1_200 started 02:27Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0770,pilot_t1_200__qwen3.5-2b,pilot_t1_200
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,pilot_t1_200__phogpt-4b-chat,pilot_t1_200 started 02:31Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0017,pilot_t1_200__phogpt-4b-chat,pilot_t1_200
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,pilot_xcopa_200__gemma-3-1b-it,pilot_xcopa_200 started 02:32Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0217,pilot_xcopa_200__gemma-3-1b-it,pilot_xcopa_200
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,pilot_xcopa_200__qwen3.5-2b,pilot_xcopa_200 started 02:33Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0847,pilot_xcopa_200__qwen3.5-2b,pilot_xcopa_200
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,pilot_xcopa_200__phogpt-4b-chat,pilot_xcopa_200 started 02:38Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0018,pilot_xcopa_200__phogpt-4b-chat,pilot_xcopa_200
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,smoke_20__gemma-3-1b-it,smoke_20 started 02:38Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0140,smoke_20__gemma-3-1b-it,smoke_20
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,smoke_20__qwen3.5-0.8b,smoke_20 started 02:39Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0967,smoke_20__qwen3.5-0.8b,smoke_20
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,smoke_20__qwen3.5-2b,smoke_20 started 02:45Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0664,smoke_20__qwen3.5-2b,smoke_20
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,smoke_20__qwen3.5-4b,smoke_20 started 02:49Z
+2026-10-27,rented,a100-sxm4-80gb,1,2.4157,smoke_20__qwen3.5-4b,smoke_20
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,smoke_20__qwen3.5-9b,smoke_20 started 05:14Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0253,smoke_20__qwen3.5-9b,smoke_20
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,smoke_20__gemma-4-e2b,smoke_20 started 05:15Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0116,smoke_20__gemma-4-e2b,smoke_20
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,smoke_20__gemma-4-e4b,smoke_20 started 05:16Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0061,smoke_20__gemma-4-e4b,smoke_20
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,smoke_20__gemma-sea-lion-v4.5-e2b-it,smoke_20 started 05:16Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0064,smoke_20__gemma-sea-lion-v4.5-e2b-it,smoke_20
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,smoke_20__sailor2-8b-chat,smoke_20 started 05:17Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0064,smoke_20__sailor2-8b-chat,smoke_20
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,smoke_20__phogpt-4b-chat,smoke_20 started 05:17Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0015,smoke_20__phogpt-4b-chat,smoke_20
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,smoke_20__vistral-7b-chat,smoke_20 started 05:17Z
+2026-10-27,rented,a100-sxm4-80gb,1,0.0036,smoke_20__vistral-7b-chat,smoke_20
+2026-10-27,rented,a100-sxm4-80gb,1,0.0000,smoke_20__llama-3.1-8b-instruct,smoke_20 started 05:17Z
+2026-10-27,rented,a100-sxm4-80gb,1,4.0000,box-rental-2026-10-27b,rental lost: provider instance (js3:10216) unreachable from about 17:20Z after a 28-min setup; no model ran

@@ -19,7 +19,9 @@ git fetch origin main
 git checkout -B "box-run-$DATE" origin/main
 rsync -az --rsh="ssh -p $PORT" "$BOX:$BOXDIR/noilai/configs/models.yaml" configs/models.yaml
 rsync -az --rsh="ssh -p $PORT" "$BOX:$BOXDIR/noilai/experiments/" experiments/
-rsync -az --rsh="ssh -p $PORT" --include='*.json' --include='*_rows.csv' --exclude='*' "$BOX:$BOXDIR/noilai/data/audit/" data/audit/
+# the per-model audits come home; the normalization census of record (gemma2.json, gemma3.json: RESULTS_LOG
+# RL-2026-09-30-06, quoted in docs/ and the paper) stays as committed until the paper workstream adopts a re-census
+rsync -az --rsh="ssh -p $PORT" --exclude='gemma2.json' --exclude='gemma3.json' --include='*.json' --include='*_rows.csv' --exclude='*' "$BOX:$BOXDIR/noilai/data/audit/" data/audit/
 rsync -az --rsh="ssh -p $PORT" "$BOX:$BOXDIR/noilai/STATUS.md" STATUS.md
 cp "$OUT/compute_log.csv" data/compute_log.csv
 mkdir -p data/box_logs && cp "$OUT"/box_run.log "$OUT"/cuda_box.log "$OUT"/audits.log data/box_logs/ 2>/dev/null || true
