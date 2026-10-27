@@ -53,3 +53,4 @@ date,platform,gpu_type,n_gpus,hours,run_id,purpose
 2026-10-27,rented,a100-sxm4-80gb,1,0.0000,smoke_20__vistral-7b-chat,smoke_20 started 05:17Z
 2026-10-27,rented,a100-sxm4-80gb,1,0.0036,smoke_20__vistral-7b-chat,smoke_20
 2026-10-27,rented,a100-sxm4-80gb,1,0.0000,smoke_20__llama-3.1-8b-instruct,smoke_20 started 05:17Z
+2026-10-27,rented,a100-sxm4-80gb,1,4.0000,box-rental-2026-10-27b,rental lost: provider instance (js3:10216) unreachable from about 17:20Z after a 28-min setup; no model ran

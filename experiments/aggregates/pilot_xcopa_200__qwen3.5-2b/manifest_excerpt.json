@@ -1,0 +1,239 @@
+{
+ "identity": {
+  "run_id": "pilot_xcopa_200__qwen3.5-2b",
+  "model_key": "qwen3.5-2b",
+  "model_id": "Qwen/Qwen3.5-2B",
+  "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+  "revision_kind": "commit_hash",
+  "tokenizer_sha256": "63c71e09abe4f3dd8136e921bae930667e07bb9aa16b81560a76a0d1be369ec1",
+  "tokenizer_sha256_source": "vocab",
+  "chat_template_sha256": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80",
+  "template_kwargs": {
+   "enable_thinking": false
+  },
+  "thinking_knob_detected": true,
+  "thinking_knobs": [
+   "enable_thinking"
+  ]
+ },
+ "data": {
+  "item_file": "data/external/pilot_xcopa_200.jsonl",
+  "item_file_sha256": "6a61990e5d87a0456a81916b68301734a037181e13d5ccb64d47d0c4011e7677",
+  "item_content_sha256": "1e3fffa6d44cda79a43327f22572f655f65a594ecac553eea9ed4bff5a2a6c91",
+  "attested_list_sha256": "0e62d4c5c1f77103f0c72d8ea0cc9d030d2906d59eda55b736b2f148776ec2a4",
+  "prompt_file_sha256": {
+   "demos.yaml": "5fe710f9964597a7ca69476419e5ab2c4b839727910169f08c9bd8a2139a6d61",
+   "noilai.yaml": "39826d523a09c0927cec80e4e5ad246ee6f4b429a3628a71a6379026c38f6a92",
+   "xcopa.yaml": "de275fa2df4b9bcb9599f9262f588a66a7e130ac7cc6f708bf3e398e847132b6",
+   "_all": "b38631cf711d31dde677b7c6d2be943ff55672e3258760013fdd39a1881b9084"
+  },
+  "demo_hashes": null,
+  "arms": [
+   "nfc",
+   "nfd"
+  ],
+  "arm_scope": "whole_prompt",
+  "prompt_ids": [
+   "xcopa-p0"
+  ],
+  "n_items": 200,
+  "canary_check": {
+   "item_file_has_canary": false,
+   "canary_in_outputs": false,
+   "canary_in_prompts": false
+  },
+  "resource_hashes": {
+   "Viet74K.txt": "b83d49308336f12ca46d06287d8db6e2cdc7a725d9a9dac56930051775fafb90",
+   "gemma2_tokenizer.model": "61a7b147390c64585d6c3543dd6fc636906c9af3865a5548f27f31aee1d4c8e2",
+   "gemma3_tokenizer.model": "1299c11d7cf632ef3b4e11937501358ada021bbdf7c47638d13c0ee982f2e79c",
+   "vi-DauCu.dic": "50b23ff20ea83ad886e2ff166220d53b307784c9870fb447341e0f298f0e5588",
+   "vi-DauMoi.dic": "a075773a27729713a1f5853404c7aafbb78e9056a12ccd729c19622953723143",
+   "xcopa_test_vi.jsonl": "24cb28827066abb00a2f4004d86c447c4a30a9edb17938b26b61fb2385f94170",
+   "xcopa_val_vi.jsonl": "6f804ec3c25b12a3d51f58e338b631bc1b45e7223b15481f8593923e0bdb26fa"
+  },
+  "normalization_census": {
+   "status": "not_censused",
+   "source": null,
+   "classification": null,
+   "legacy_census": false,
+   "note": "no data/audit/<family>.json for this model; run scripts/audit_tokenizers.py before GPU time (6.2)"
+  },
+  "placement_baseline": "mixed",
+  "source": "measured",
+  "n_inputs_changed_by_old": 1,
+  "n_inputs_changed_by_new": 8,
+  "n_changed_prompts": {
+   "nfd": 200
+  },
+  "n_unchanged_prompts": {
+   "nfd": 0
+  },
+  "prefix_property_violations": 0,
+  "prefix_property_violations_by_continuation": {},
+  "sample": null,
+  "demo_overlap_item_ids": []
+ },
+ "options": {
+  "tasks": [
+   "XCOPA"
+  ],
+  "variants": [
+   "V1",
+   "V2",
+   "V3",
+   "V4"
+  ],
+  "paraphrases": [
+   "p0"
+  ],
+  "shots": [
+   0
+  ],
+  "arms": [
+   "nfc",
+   "nfd"
+  ],
+  "arm_scope": "whole_prompt",
+  "limit": 0,
+  "sample_n": 0,
+  "sample_seed": 20261205,
+  "sample_exclude_vulgar": true,
+  "in_core_only": false,
+  "resume": true,
+  "allow_noncore_api": false,
+  "core_to_training_provider_opt_out": false,
+  "allow_thinking": false,
+  "allow_demo_overlap": false,
+  "demo_overlap_policy": "flag",
+  "attested_policy": "exact2",
+  "validator_flags": null,
+  "max_new_tokens": 64,
+  "batch_size": 8,
+  "logprobs": true,
+  "input_format": "raw",
+  "instruction": "explained",
+  "language": "vi",
+  "seed": 20261203,
+  "run_id": "pilot_xcopa_200__qwen3.5-2b",
+  "out_root": "data/runs",
+  "system_prompt": null,
+  "n_accelerators": null,
+  "xcopa_logprob_mode": "choice",
+  "t1_forced_choice": false,
+  "account_holder": null,
+  "require_census": false,
+  "notes": {
+   "smoke": false
+  }
+ },
+ "outcome": {
+  "n_done": 400,
+  "n_unparseable": 0,
+  "n_truncated": 0,
+  "n_thinking_chars_total": 0,
+  "thinking_allowed": false,
+  "smoke": false,
+  "n_hedged": 0,
+  "nan_inf_events": 0,
+  "api_model_echo": [],
+  "rate_limit_events": null,
+  "account_holder": null,
+  "api_account_holder": null,
+  "api_account_holder_missing": false,
+  "api_privacy_settings": null,
+  "prefill_tok_s": null,
+  "decode_tok_s": null,
+  "thinking_present_in_main_run": false,
+  "n_prompt_truncated": 0,
+  "n_prefix_property_violations": 0,
+  "n_truncated_prompts_backend": null
+ },
+ "status": "finished",
+ "gpu_hours": 0.008855333488889098,
+ "tpu_hours": 0.0,
+ "wall_s": 31.879200560000754,
+ "git_commit": "unknown",
+ "git_dirty": null,
+ "code_sha256": "4b2b0cff8f984b2d41efd13f94e1104186a15f6b628416c9a3caa1c695b0f3b2",
+ "engine": {
+  "engine": "vllm",
+  "engine_version": "0.30.0",
+  "torch_version": "2.13.0+cu130",
+  "cuda_version": "13.0",
+  "driver_version": "580.95.05",
+  "python_version": "3.12.16",
+  "pip_freeze_sha256": "c1d1d3b3ecf454c9dda788425741ed5a1d085be056e013310d0b63a44bd9fd06",
+  "pip_freeze_file": "pip_freeze.txt",
+  "engine_args": {
+   "dtype": "half",
+   "max_model_len": 2048,
+   "gpu_memory_utilization": 0.85,
+   "enforce_eager": false,
+   "tensor_parallel_size": 1,
+   "quantization": null,
+   "seed": 20261203,
+   "trust_remote_code": false,
+   "attention_backend": "TRITON_ATTN",
+   "limit_mm_per_prompt": {
+    "image": 0,
+    "audio": 0
+   },
+   "enable_prefix_caching": true,
+   "max_num_seqs": 64,
+   "chat_template_kwargs": {
+    "enable_thinking": false
+   },
+   "supports_enable_thinking": true
+  },
+  "dtype_requested": "float16",
+  "dtype_resolved": "half",
+  "quantization": null,
+  "attention_backend": "TRITON_ATTN",
+  "tensor_parallel_size": 1
+ },
+ "backend": {
+  "backend": "vllm",
+  "engine": "vllm",
+  "backend_version": "0.30.0",
+  "torch_version": "2.13.0+cu130",
+  "model_id": "Qwen/Qwen3.5-2B",
+  "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+  "dtype": "half",
+  "quantization": null,
+  "engine_flags": {
+   "dtype": "half",
+   "max_model_len": 2048,
+   "gpu_memory_utilization": 0.85,
+   "enforce_eager": false,
+   "tensor_parallel_size": 1,
+   "quantization": null,
+   "seed": 20261203,
+   "trust_remote_code": false,
+   "attention_backend": "TRITON_ATTN",
+   "limit_mm_per_prompt": {
+    "image": 0,
+    "audio": 0
+   },
+   "enable_prefix_caching": true,
+   "max_num_seqs": 64,
+   "chat_template_kwargs": {
+    "enable_thinking": false
+   },
+   "supports_enable_thinking": true
+  },
+  "seed": 20261203,
+  "tokenizer_sha256": "63c71e09abe4f3dd8136e921bae930667e07bb9aa16b81560a76a0d1be369ec1",
+  "tokenizer_sha256_source": "vocab",
+  "chat_template_sha256": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80",
+  "thinking_knob_detected": true,
+  "thinking_knobs": [
+   "enable_thinking"
+  ],
+  "n_prefix_property_violations": 0
+ },
+ "canary_check": {
+  "item_file_has_canary": false,
+  "canary_in_outputs": false,
+  "canary_in_prompts": false
+ }
+}
