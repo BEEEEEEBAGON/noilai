@@ -68,6 +68,7 @@ from pathlib import Path
 from statistics import NormalDist
 
 from ..gen import variants as V
+from ..vi import mergers as MG
 from ..vi import reencode as R
 from ..vi import unicode as U
 from ..vi.reencode import canonical_text
@@ -83,11 +84,12 @@ COMPONENTS = ("onset", "rime", "tone")
 STRATA_KEYS = ("input_lexical", "output_lexical", "output_syllables_attested", "has_glide", "has_zero_onset",
                "has_stop_coda", "spelling_triggers", "tone_pair", "same_tone", "same_onset", "same_rime",
                "variant_labels", "c2_affected", "input_freq", "output_freq", "n_readings")
-# DESIGN_DECISIONS 5.4 item 8: regional homophone spellings, canonical onsets (<= 12 entries).
-# NATIVE-CHECK: the list and its regional attribution (d/gi and r/d/gi: Northern; ch/tr, s/x: Northern;
-# quốc/cuốc: the /k/ + glide spelling).
-HOMOPHONE_ONSET_PAIRS = frozenset({frozenset({"d", "gi"}), frozenset({"ch", "tr"}), frozenset({"s", "x"}),
-                                   frozenset({"r", "d"}), frozenset({"r", "gi"})})
+# DESIGN_DECISIONS 5.4 item 8: regional homophone spellings, canonical onsets (<= 12 entries), DERIVED from the
+# 2.1 O3 merger table (noilai.vi.mergers: the mergers flagged `homophone_bin` -- d/gi everywhere, d/gi/r, ch/tr and
+# s/x in the North -- give the five onset pairs d/gi, d/r, gi/r, ch/tr, s/x); quốc/cuốc is the /k/ + glide spelling
+# class (2.1 O5), not a merger, and stays here. A change to the bin is a scoring change (docs/DEVIATIONS.md).
+# NATIVE-CHECK: the list and its regional attribution live in noilai/vi/mergers.py.
+HOMOPHONE_ONSET_PAIRS = MG.homophone_onset_pairs()
 HOMOPHONE_STRING_PAIRS = frozenset({frozenset({"quốc", "cuốc"})})
 # DESIGN_DECISIONS 5.4 item 9: ay/ây lexical doublets (<= 10 entries; high, NV). Scored wrong, binned.
 # NATIVE-CHECK: completeness of the list.

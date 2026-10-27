@@ -376,3 +376,189 @@ def test_api_models_report_p0_only_as_their_metric_and_h4_pairs_the_c2_affected_
     assert h4.extra["c2_affected_only"] is True and h4.extra["expected_direction"] == (-1 if constants.BASELINE_PLACEMENT == "old" else 1)
     assert row["effect"] == pytest.approx((4 - 14) / 20)            # affected pairs 0,3,...,57: 14 right under nfc, 4 under placement_new
     assert h4.extra["k_of_n_models"]["n"] == 1 and h4.extra["pooled"]["computable"] and not h4.extra["pooled"]["pooled"]
+
+
+# ------------------------------------------------------------------ H1 / H3b / H6 on synthetic runs with an item audit and item files
+def _syllables_by_tone() -> dict[int, list[str]]:
+    """Real, strictly parseable Hunspell syllables by tone (the H6 covariates need real syllables and the Viet74K frequencies)."""
+    if not (ROOT / "data" / "external" / "vi-DauMoi.dic").exists() or not (ROOT / "data" / "external" / "Viet74K.txt").exists():
+        pytest.skip("third-party resources not fetched (python scripts/fetch_resources.py)")
+    from noilai.vi import lexicon as L
+    from noilai.vi.syllable import try_parse
+    by: dict[int, list[str]] = {t: [] for t in range(6)}
+    for w in L.load_hunspell_syllables():
+        p = try_parse(w, strict=True)
+        if p is not None and p.syllable.onset not in ("", "p", "c") and not p.syllable.glide and 2 <= len(w) <= 5:
+            by[p.syllable.tone].append(w)
+    return by
+
+
+def _manifest(run_id: str, model: str, item_path: Path, census: dict | None = None) -> dict:
+    return {"run_id": run_id, "status": "finished", "n_thinking_chars_total": 0,
+            "identity": {"run_id": run_id, "model_key": model, "model_id": None, "revision": None},
+            "model": {"name": model, "provider": None, "hardware_entry": "t4", "config_entry": {"name": model, "backend": "vllm"}},
+            "options": {"notes": {"smoke": False}, "arms": ["nfc", "nfd"]},
+            "item_file": {"path": str(item_path), "sha256": "0" * 64, "kind": "noilai"},
+            "data": {"item_file": str(item_path), "item_file_sha256": "0" * 64,
+                     "normalization_census": census or {"status": "not_censused", "classification": None}}}
+
+
+def _write(root: Path, run_id: str, model: str, rows: list[dict], item_path: Path, census: dict | None = None) -> None:
+    d = root / run_id
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "manifest.json").write_text(json.dumps(_manifest(run_id, model, item_path, census)), encoding="utf-8")
+    (d / "scores.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+
+
+def _row(item: dict, arm: str, correct: bool, **extra) -> dict:
+    r = {k: v for k, v in item.items() if k not in ("gold", "input", "input_syllables")}
+    r.update({"gold": item["gold"], "arm": arm, "arm_scope": "whole_prompt", "prompt_id": "vi-p0-s3-explained-raw", "correct": bool(correct),
+              "correct_lenient": bool(correct), "error_class": "correct" if correct else "wrong", "answer": "x"})
+    r.update(extra)
+    return r
+
+
+@pytest.fixture(scope="module")
+def matching_runs(tmp_path_factory) -> dict:
+    """One abstract model `alpha`: E1_main T1 rows (4 variants x 300 base pairs) whose correctness follows the planted E2
+    structure (fewer tokens per syllable and aligned boundaries help), E3_noilai V3 / V1 rows under nfc and nfd where NFD helps the
+    tone-isolated V3 items by +0.35 and nothing else, E1_attested rows on 60 exact attested items at 85 % against a 50 % pool,
+    the item files (input / gold text, parsed input syllables) and the item audit of `alpha`'s tokenizer."""
+    from noilai.gen.generate import syl_dict
+    from noilai.vi import lexicon as L
+    from noilai.vi import unicode as U
+    from noilai.vi.syllable import try_parse
+    rng = np.random.default_rng(5)
+    by = _syllables_by_tone()
+    freqs = L.syllable_frequencies()
+    root = tmp_path_factory.mktemp("mruns")
+    items_dir, audit_dir = root / "items", root / "audit"
+    items_dir.mkdir()
+    audit_dir.mkdir()
+    tone_pairs = [(0, 1), (1, 2), (2, 0), (0, 0)]
+    n_pairs = 300
+    main_items, main_rows, e3_rows, audit_rows = [], [], [], []
+    for bp in range(n_pairs):
+        ta, tb = tone_pairs[bp % 4]
+        a, b = str(rng.choice(by[ta])), str(rng.choice(by[tb]))
+        inp, out = f"{a} {b}", f"{b} {a}"
+        in_freq = [int(freqs.get(a, 0)), int(freqs.get(b, 0))]
+        tone_pair = f"{U.TONE_NAMES[ta]}-{U.TONE_NAMES[tb]}"
+        iso = bp % 2 == 0                                                   # the NFD tokenization isolates a tone mark
+        tps_nfc = float(rng.choice([1.0, 1.5, 2.0, 2.5]))
+        align = float(rng.random()) if tps_nfc > 1 else None
+        for v in ("V1", "V2", "V3", "V4"):
+            iid = f"T1-{v}-{bp:06d}"
+            item = {"item_id": iid, "task": "T1", "variant": v, "input": inp, "gold": [out], "base_pair_id": f"bp-{bp:05d}",
+                    "source": "lexicon" if bp % 3 else "pseudo", "in_core": False, "split": "test", "input_lexical": True,
+                    "output_lexical": True, "attested_overlap": False, "spelling_triggers": [], "tone_pair": tone_pair,
+                    "input_freq": in_freq, "output_freq": list(reversed(in_freq))}
+            main_items.append(item)
+            logit = 0.8 - 1.2 * (tps_nfc - 1.75) + 1.0 * (align or 0.0)      # the planted E2 structure (H1)
+            main_rows.append(_row(item, "nfc", rng.random() < 1 / (1 + np.exp(-logit))))
+            for enc, total in (("nfc", int(tps_nfc * 2)), ("nfd", int(tps_nfc * 2) + 2)):
+                audit_rows.append({"item_id": iid, "tokenizer": "alpha", "encoding": enc, "delta_tokens_vs_nfc": 2 if enc == "nfd" else 0,
+                                   "input": {"tokens_mean": total / 2, "tokens_total": total, "align_among_split": align if total > 2 else None,
+                                             "n_split": 2 if total > 2 else 0, "n_misaligned_split": 1 if (total > 2 and (align or 0) < 1) else 0,
+                                             "tone_isolated": iso and enc == "nfd", "byte_fallback": False, "any_single_token": total == 2,
+                                             "all_single_token": total == 2}})
+            if v in ("V3", "V1"):
+                base = rng.random() < 0.4
+                gain = 0.35 if (v == "V3" and iso) else 0.0
+                e3_rows.append(_row(item, "nfc", base))
+                e3_rows.append(_row(item, "nfd", rng.random() < 0.4 + gain, delta_prompt_tokens=40))
+    (items_dir / "noilai_main.jsonl").write_text("".join(json.dumps(it, ensure_ascii=False) + "\n" for it in main_items), encoding="utf-8")
+    (audit_dir / "items_alpha__noilai_main.jsonl").write_text("".join(json.dumps(r) + "\n" for r in audit_rows), encoding="utf-8")
+    att_items, att_rows = [], []
+    for i in range(60):
+        ta, tb = tone_pairs[i % 4]
+        a, b = str(rng.choice(by[ta])), str(rng.choice(by[tb]))
+        inp, out = f"{a} {b}", f"{b} {a}"
+        parsed = [try_parse(w, strict=False) for w in (a, b)]
+        item = {"item_id": f"ATT-{i + 1:04d}", "task": "attested", "variant": "V1", "input": inp, "gold": [out], "rule_output": out,
+                "input_syllables": [syl_dict(p.syllable, w) for p, w in zip(parsed, (a, b))], "exact": True, "eligible_h6": True, "n_syllables": 2,
+                "verified_by": "A" if i < 40 else None, "source": "collection one" if i % 2 else "collection two", "vulgar": False,
+                "base_pair_id": f"att-{a}_{b}", "split": "test", "in_core": False}
+        att_items.append(item)
+        att_rows.append(_row(item, "nfc", rng.random() < 0.85))
+    (items_dir / "attested.jsonl").write_text("".join(json.dumps(it, ensure_ascii=False) + "\n" for it in att_items), encoding="utf-8")
+    census = {"status": "censused", "source": "synthetic", "classification": "passes_through", "legacy_census": False,
+              "verdict_nfd": "passes_through", "verdict_pc": "passes_through", "engine": "vllm"}
+    _write(root, "E1_main__alpha", "alpha", main_rows, items_dir / "noilai_main.jsonl", census)
+    _write(root, "E3_noilai__alpha", "alpha", e3_rows, items_dir / "noilai_main.jsonl", census)
+    _write(root, "E1_attested__alpha", "alpha", att_rows, items_dir / "attested.jsonl", census)
+    cfg = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
+    cfg["lines"]["h3b"]["models"] = ["alpha"]
+    # the pre-registered H6 parameters (3-5 controls, 0.2-SD caliper) stay in configs/analysis.yaml; the synthetic pool has 75
+    # candidates per exact stratum, so the mechanics are exercised with a looser caliper and one control at least
+    assert cfg["lines"]["attested"]["k_min"] == 3 and cfg["lines"]["attested"]["k_max"] == 5 and cfg["lines"]["attested"]["caliper_sd"] == 0.2
+    cfg["lines"]["attested"].update(k_min=1, k_max=5, caliper_sd=0.6)
+    cfg_path = root / "analysis.yaml"
+    cfg_path.write_text(yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    return {"root": root, "audit": audit_dir, "config": cfg_path}
+
+
+def test_h1_join_h3b_did_and_h6_matching_run_end_to_end_on_synthetic_runs(matching_runs, tmp_path):
+    out = tmp_path / "out"
+    r = subprocess.run([PY, "-m", "noilai.stats.analyze", "--config", str(matching_runs["config"]), "--runs", str(matching_runs["root"]), "--out", str(out),
+                        "--date", DATE, "--n-boot", "100", "--audit-dir", str(matching_runs["audit"]), "--quiet"], cwd=ROOT, text=True, capture_output=True, check=False)
+    assert r.returncode == 0, r.stderr
+    # H1: the join, the floor and the nested test ran; the planted alignment effect is found; the family map does not know `alpha`,
+    # so the identifiability floor (>= 4 families) and the minimum viable panel are not met and H1 stays descriptive
+    h1 = json.loads((out / "table_h1_e2.json").read_text(encoding="utf-8"))
+    assert h1["computable"], h1["reason"]
+    [row] = h1["rows"]
+    assert row["model"] == "alpha" and row["in_fit"] and row["clears_floor"] and row["n_misaligned_split"] >= 300 and row["n_joined"] == 1200
+    assert row["slope_tps"] < 0 and row["slope_align"] > 0 and row["audit"].endswith("items_alpha__noilai_main.jsonl")
+    assert h1["nested"]["h1_supported"] and h1["nested"]["p"] < 0.05 and h1["nested"]["delta_aic"] >= 2 and h1["n_fit_rows"] == 1200
+    assert h1["bootstrap"]["n_ok"] >= 80 and h1["bootstrap"]["ci_mean_slope_tps"][1] < 0 and "primary" in h1["bootstrap"]["label"]
+    assert h1["decision"]["h1_supported_by_test"] and not h1["decision"]["identified"] and h1["decision"]["h1"].startswith("descriptive")
+    assert "items_alpha__noilai_main.jsonl" in h1["audit_files"]
+    # H3b: the four contrasts' Holm family holds the configured model's V3 and V1; V3 recovers the planted +0.35, V1 includes 0
+    h3b = json.loads((out / "table_h3b.json").read_text(encoding="utf-8"))
+    assert h3b["computable"], h3b["reason"]
+    by_v = {x["variant"]: x for x in h3b["rows"] if x.get("computable")}
+    v3, v1 = by_v["V3"], by_v["V1"]
+    assert 0.15 < v3["estimate"] < 0.6 and v3["lo"] > 0 and v3["p_holm"] < 0.05 and v3["significant"] and v3["holm_family_size"] == 2
+    assert v1["lo"] <= 0 <= v1["hi"] and v1["n_items"] == 300 and v1["underpowered"] and v3["configured"]
+    assert v3["matching"]["k_max"] == 1 and v3["matching"]["n_matched"] >= 60 and v3["matching"]["exact"] == ["source"]
+    assert h3b["decisions"]["alpha"]["supported"] and h3b["decisions"]["alpha"]["underpowered"]
+    tex = (out / "table_h3b.tex").read_text(encoding="utf-8")
+    assert "alpha & V3 & +" in tex and "underpowered" in tex
+    # H6: exact attested items matched 3-5 : 1 to generated items with lexical output; the floor is not met (40 verified rows, no
+    # expansion unit) so the matched contrast is descriptive (no p, no pool) and still recovers the planted +0.35
+    h6 = json.loads((out / "table_h6.json").read_text(encoding="utf-8"))
+    assert h6["computable"], h6["reason"]
+    [row] = h6["rows"]
+    m = row["matching"]
+    assert m["n_treated"] == 60 and m["n_matched"] >= 40 and 1 <= m["mean_k"] <= 5 and m["exact"] == list(AN.MT.H6_EXACT)
+    assert m["k_min"] == 1 and m["k_max"] == 5 and m["caliper_sd"] == 0.6 and m["nearest"] == list(AN.MT.H6_NEAREST)
+    assert m["max_abs_smd_after"] is not None and m["smd_after"]["log_freq_in_1"] == m["smd_after"]["log_freq_in_1"]
+    assert 0.15 < row["effect"] < 0.55 and row["ci_lo"] < row["effect"] < row["ci_hi"] and "p_holm" not in row
+    assert not h6["floor_met"] and h6["floor_counts"] == {"n_exact": 60, "n_eligible_h6": 60, "n_verified_exact": 40, "n_collections": 2}
+    assert h6["test"] == "not run" and h6["pooled"] is None and row["status"].startswith("descriptive")
+    assert h6["descriptive_accuracy"][0]["estimate"] > 0.7
+    tex = (out / "table_h6.tex").read_text(encoding="utf-8")
+    assert "alpha & ? & +" in tex and "descriptive" in tex
+    summ = json.loads((out / "analysis_summary.json").read_text(encoding="utf-8"))
+    for name in ("H1 nested LR test (E2), PREREG 8.4", "H3b tone-isolation DiD", "H6 attested vs matched (needs the 100-row floor)"):
+        assert summ["analyses"][name]["computable"] is True, name
+    kinds = {i["kind"] for i in summ["inputs"]}
+    assert {"items_audit", "items"} <= kinds
+    # --check sees the outputs as current
+    r = subprocess.run([PY, "-m", "noilai.stats.analyze", "--config", str(matching_runs["config"]), "--runs", str(matching_runs["root"]), "--out", str(out),
+                        "--date", DATE, "--n-boot", "100", "--audit-dir", str(matching_runs["audit"]), "--check"], cwd=ROOT, text=True, capture_output=True, check=False)
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_without_an_item_audit_or_item_files_the_three_analyses_say_why(echo_runs, tmp_path):
+    out = tmp_path / "out"
+    r = _cli("--runs", echo_runs, "--out", out, "--date", DATE, "--n-boot", N_BOOT, "--include-smoke", "--quiet", "--audit-dir", tmp_path / "no_audit")
+    assert r.returncode == 0, r.stderr
+    h1 = json.loads((out / "table_h1_e2.json").read_text(encoding="utf-8"))
+    assert not h1["computable"] and "no item audit for echo" in h1["reason"] and h1["rows"][0]["in_fit"] is False
+    h3b = json.loads((out / "table_h3b.json").read_text(encoding="utf-8"))
+    status = [str(x.get("status")) for x in h3b["rows"]]
+    assert not h3b["computable"] and any("not informative" in x or "no item audit" in x for x in status), status
+    h6 = json.loads((out / "table_h6.json").read_text(encoding="utf-8"))
+    assert not h6["computable"] and "no completed E1_attested rows" in h6["reason"]

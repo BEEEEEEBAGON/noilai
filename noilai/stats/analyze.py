@@ -26,9 +26,11 @@ empty tables, exit 0. --out under paper/ is refused (exit 2). --check recomputes
 (the stamp lines ignored), exit 1 when stale. Nothing is item-level in the outputs.
 
 The code implements docs/PREREGISTRATION.md section 8 and docs/DESIGN_DECISIONS.md sections 1, 8 and 9; where
-the two differ the difference is recorded in the handoff, never edited into either. Analyses whose inputs or
-helpers are not available (H1 / E2 join, H3b matching, H6 matching, probes) are written as `not computable`
-artefacts with the reason, never silently omitted. scripts/ is never imported: the run-directory conventions of
+the two differ the difference is recorded in the handoff, never edited into either. The H1 item-audit join, the
+H3b tone-isolation DiD and the H6 matched contrast live in noilai.stats.matching (PREREG 8.4, 8.7, 8.8) and run here
+when their inputs (the item audits under paths.audit_dir / --audit-dir, the item files) are on the machine; an analysis
+whose inputs are absent (those, the probes) is written as a `not computable` artefact with the reason, never silently
+omitted. scripts/ is never imported: the run-directory conventions of
 scripts/interim_analysis.py are re-implemented here.
 """
 from __future__ import annotations
@@ -53,10 +55,12 @@ from statsmodels.stats.multitest import multipletests
 
 from .. import constants
 from ..eval.prompts import ARM_ALIASES
-from ..eval.run import CENSUS_ARM_VERDICTS, STATUS_FINISHED, STATUS_THINKING, read_manifest
+from ..eval.run import CENSUS_ARM_VERDICTS, STATUS_FINISHED, STATUS_THINKING, load_item_file, read_manifest
 from ..eval.score import _spelling_pair_ids, balanced_stats, read_jsonl
 from . import aggregate as AGG  # the aggregation helper (DD 8.1): the Table 2 cross-check
 from . import bootstrap, dose_response, tables
+from . import e2 as E2  # the E2 regression and the H1 nested test (PREREG 8.4)
+from . import matching as MT  # the item-audit join, the H3b DiD and the H6 matching (PREREG 8.4, 8.7, 8.8)
 from . import pooling as PL  # the hierarchical pool, k of N and TOST (DD 1, PREREG 8.1)
 from . import tests as T
 
@@ -83,7 +87,7 @@ ROW_FIELDS = ("item_id", "task", "variant", "arm", "arm_scope", "prompt_id", "co
               "base_pair_id", "source", "in_core", "c2_affected", "pair_item_id", "twin_type", "forced_choice_correct",
               "paired_correct", "paired_correct_norm", "logprob_correct", "logprob_correct_norm", "delta_prompt_tokens",
               "delta_n_tokens", "input_lexical", "output_lexical", "attested_overlap", "spelling_triggers", "tone_pair",
-              "degenerate", "exact", "eligible_h6", "n_thinking_chars", "pred", "gold")
+              "degenerate", "exact", "eligible_h6", "n_thinking_chars", "pred", "gold", "input_freq", "output_freq")
 T3_LOGPROB_KEYS = ("forced_choice_correct", "paired_correct", "paired_correct_norm")
 
 
@@ -351,7 +355,7 @@ def models_index(models_cfg: Mapping | None) -> dict[str, dict]:
     out = {}
     for e in models_cfg.get("models") or []:
         out[str(e.get("name"))] = {"group": e.get("group"), "family": e.get("family"), "hardware": e.get("hardware"),
-                                  "provider": e.get("provider"), "reference_of": e.get("reference_of"),
+                                  "provider": e.get("provider"), "reference_of": e.get("reference_of"), "hf_id": e.get("hf_id"),
                                   "panel": e.get("group") in panel_groups}
     return out
 
@@ -515,6 +519,7 @@ class Context:
     inputs: list[dict] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     n_cells: int = 0                 # the Table 2 cells, set once the artefacts are computed
+    cache: dict = field(default_factory=dict)   # item audits and item files read once (keyed by path)
 
     @property
     def n(self) -> dict:
@@ -715,6 +720,58 @@ def pooled(ctx: Context, records: list[dict], *, direction: int | None, min_fami
     out = res.as_dict()
     out["computable"] = True
     return out
+
+
+def _audit_key_of(ctx: Context, model: str, line: str) -> str | None:
+    """The run plan's item-file key of the file a model's line ran on (`noilai_main` for .../noilai_main.jsonl): the
+    `__<key>` suffix of scripts/kaggle_cpu_jobs.py's item audits."""
+    for r in ctx.runs:
+        if r.model == model and r.line == line and r.excerpt.get("item_file"):
+            return Path(str(r.excerpt["item_file"])).stem
+    return None
+
+
+def items_audit_for(ctx: Context, model: str, key: str | None) -> tuple[pd.DataFrame | None, str]:
+    """The model's item audit (scripts/audit_items.py rows for its tokenizer and item file; data/audit/items_<tokenizer>__<key>.jsonl,
+    named by hf_id, then models.yaml family, then the model name) as a frame, or (None, why)."""
+    entry = ctx.midx.get(model) or {}
+    cands = MT.items_audit_candidates(ctx.paths["audit_dir"], hf_id=entry.get("hf_id"), family=entry.get("family"), key=key)
+    cands += [p for p in MT.items_audit_candidates(ctx.paths["audit_dir"], hf_id=None, family=model, key=key) if p not in cands]
+    path = next((p for p in cands if p.exists()), None)
+    if path is None:
+        return None, f"no item audit for {model} under {ctx.paths['audit_dir']} (tried {', '.join(p.name for p in cands)})"
+    cache = ctx.cache.setdefault("items_audit", {})
+    if path not in cache:
+        cache[path] = MT.read_items_audit(path)
+        ctx.inputs.append(_sha_record(path, "items_audit"))
+    return cache[path], str(path)
+
+
+def _item_file_of(ctx: Context, model: str, line: str) -> Path | None:
+    """The item file a model's line ran on, when it is on this machine (aggregate.resolve_item_path's rules)."""
+    for r in ctx.runs:
+        if r.model == model and r.line == line and r.excerpt.get("item_file"):
+            p = AGG.resolve_item_path({"item_file": {"path": r.excerpt["item_file"]}}) if AGG is not None else None
+            if p is not None:
+                return p
+    return None
+
+
+def _items_by_id(ctx: Context, path: Path) -> dict[str, dict]:
+    cache = ctx.cache.setdefault("items", {})
+    if path not in cache:
+        items, _ = load_item_file(path)
+        cache[path] = {it["item_id"]: it for it in items}
+        ctx.inputs.append(_sha_record(path, "items"))
+    return cache[path]
+
+
+def _f(x):
+    try:
+        v = float(x)
+    except (TypeError, ValueError):
+        return None
+    return v if np.isfinite(v) else None
 
 
 def min_families(ctx: Context, key: str, default: int) -> int:
@@ -1510,46 +1567,197 @@ def fig_deltatok(ctx: Context) -> Artefact:
                     caption="Associational decomposition of each arm's effect along delta prompt tokens (no share mediated is estimated).")
 
 
-def table_h6(ctx: Context) -> Artefact:
-    """H6 (PREREG 8.8): attested vs matched generated items. The matching helper (3-5 controls per attested item,
-    SMD < 0.1) is not part of this module: the attested cells are reported DESCRIPTIVELY per model and paraphrase,
-    and the test is `not run` until the helper exists and the attested__expansion unit is done (floor 100)."""
-    title = "H6: attested items per model (descriptive until the matching helper and the 100-row floor exist)"
-    headers = ["Model", "paraphrase", "accuracy % [95% CI]", "items", "base pairs", "status"]
-    spec = (ctx.cfg.get("lines") or {}).get("attested") or {}
-    d = ctx.rows(str(spec.get("line", "E1_attested")))
-    floor_done = False
-    if ctx.ledger_rows is not None:
-        floor_done = any(r.get("unit_id") == spec.get("floor_unit", "attested__expansion") and r.get("status") == "done" for r in ctx.ledger_rows)
-    status = ("descriptive: the matching helper (PREREG 8.8) is not implemented; " +
-              ("floor met" if floor_done else f"floor NOT met (unit {spec.get('floor_unit', 'attested__expansion')} not done)"))
-    if len(d) == 0:
-        return not_computable("table_h6", title, f"no completed {spec.get('line', 'E1_attested')} rows; {status}", headers, analysis=ANALYSES[7],
-                              extra={"floor_done": floor_done})
-    rows, tex_rows = [], []
-    for keys, g in _groups(d, ("model", "unit", "paraphrase")):
-        if "exact" in g and g["exact"].notna().any():
-            g = g[g["exact"].fillna(False).astype(bool)]
-        if len(g) == 0:
+def _attested_covariates(items: Mapping[str, dict], freqs: Mapping[str, int]) -> tuple[dict[str, dict], dict]:
+    """The PREREG 8.8 covariates of every exact, H6-eligible two-syllable attested item (from the attested release file:
+    the parsed input syllables, the rule output, the Viet74K syllable frequencies), plus the floor counts."""
+    from ..gen.generate import spelling_triggers, syl_from_dict
+    from ..vi.syllable import spell, try_parse
+    cov: dict[str, dict] = {}
+    n_exact = n_elig = n_verified = 0
+    collections: set[str] = set()
+    for iid, it in items.items():
+        if not it.get("exact"):
             continue
-        c = acc_cell(g, ctx)
-        rows.append({**keys, **c, "status": status})
-        tex_rows.append([_tex(_model_label(keys)), str(keys["paraphrase"]), ci_pct(c["estimate"], c["lo"], c["hi"]), str(c["n_items"]), str(c["n_base_pairs"]), "descriptive"])
-    return Artefact("table_h6", title, headers, tex_rows, rows, caption=f"Attested-item accuracy per model ({status}).",
-                    extra={"floor_done": floor_done, "floor": constants.ATTESTED_EXACT_FLOOR_FOR_H6, "test": "not run"}, analysis=ANALYSES[7])
+        n_exact += 1
+        if not it.get("eligible_h6") or it.get("n_syllables") != 2 or not it.get("input_syllables"):
+            continue
+        n_elig += 1
+        if it.get("verified_by"):
+            n_verified += 1
+            collections.add(str(it.get("source") or "?"))
+        inp = [syl_from_dict(d) for d in it["input_syllables"]]
+        out_text = it.get("rule_output") or (it["gold"][0] if isinstance(it.get("gold"), list) else it.get("gold"))
+        parsed = [try_parse(w, strict=False) for w in str(out_text or "").split()]
+        if len(parsed) != 2 or any(p is None for p in parsed):
+            continue
+        outs = [p.syllable for p in parsed]
+        try:
+            cov[iid] = MT.h6_covariates(it["input"], out_text, variant=str(it.get("variant")), output_lexical=True,
+                                        spelling_triggers=spelling_triggers((inp[0], inp[1]), (outs[0], outs[1])),
+                                        tone_pair=MT.tone_pair_of(it["input_syllables"]),
+                                        input_freq=[freqs.get(spell(x), 0) for x in inp], output_freq=[freqs.get(spell(x), 0) for x in outs])
+        except ValueError:
+            continue
+    return cov, {"n_exact": n_exact, "n_eligible_h6": n_elig, "n_verified_exact": n_verified, "n_collections": len(collections)}
+
+
+def _generated_covariates(rows: pd.DataFrame, items: Mapping[str, dict]) -> pd.DataFrame:
+    """The matching covariates of the generated control pool: the row's strata (frequencies, tone pair, spelling triggers,
+    lexicality) and the syllable lengths from the item text."""
+    recs = []
+    for r in rows.drop_duplicates("item_id").itertuples(index=False):
+        it = items.get(r.item_id)
+        if it is None:
+            continue
+        gold = it["gold"][0] if isinstance(it.get("gold"), list) else it.get("gold")
+        try:
+            c = MT.h6_covariates(it["input"], str(gold), variant=str(r.variant), output_lexical=bool(r.output_lexical),
+                                 spelling_triggers=r.spelling_triggers if isinstance(r.spelling_triggers, (list, tuple)) else None,
+                                 tone_pair=r.tone_pair, input_freq=r.input_freq if isinstance(r.input_freq, (list, tuple)) else None,
+                                 output_freq=r.output_freq if isinstance(r.output_freq, (list, tuple)) else None)
+        except ValueError:
+            continue
+        recs.append({"item_id": r.item_id, **c})
+    return pd.DataFrame(recs)
+
+
+def table_h6(ctx: Context) -> Artefact:
+    """H6 (PREREG 8.8 / DD 8.7, :29): every exact attested item matched to 3-5 generated items with lexical output from base pairs
+    outside the attested set (noilai.stats.matching: exact on variant, task class, output lexicality, spelling-trigger presence and
+    tone pair; nearest on the log syllable frequencies and syllable lengths, 0.2-SD caliper; SMDs after matching reported), the
+    estimate = mean over attested items of (acc_attested - mean acc of its controls) with the base-pair bootstrap, Holm across the
+    panel and the pooled estimate. The floor (>= 100 verified exact two-syllable rows from >= 3 collections and the
+    attested__expansion unit done) decides whether the test runs; below it the matched estimate is DESCRIPTIVE (no p, no pool)."""
+    title = "H6: exact attested items vs matched generated items (matched contrast; descriptive below the 100-row floor)"
+    headers = ["Model", "Family", "attested - matched, pts [95% CI]", "p", "p (Holm)", "attested matched/total", "controls", "balance (max |SMD|)", "status"]
+    spec = (ctx.cfg.get("lines") or {}).get("attested") or {}
+    line, control_line = str(spec.get("line", "E1_attested")), str(spec.get("control_line", "E1_main"))
+    base_arm = str(ctx.cfg.get("baseline_arm") or "nfc")
+    floor = int(spec.get("floor", constants.ATTESTED_EXACT_FLOOR_FOR_H6))
+    k_min, k_max, caliper = int(spec.get("k_min", MT.H6_K_MIN)), int(spec.get("k_max", MT.H6_K_MAX)), spec.get("caliper_sd", MT.CALIPER_SD)
+    floor_unit_done = False
+    if ctx.ledger_rows is not None:
+        floor_unit_done = any(r.get("unit_id") == spec.get("floor_unit", "attested__expansion") and r.get("status") == "done" for r in ctx.ledger_rows)
+    d = ctx.rows(line, arm=base_arm, paraphrase="p0")
+    extra: dict = {"floor": floor, "floor_unit_done": floor_unit_done, "k_min": k_min, "k_max": k_max, "caliper_sd": caliper,
+                   "exact_on": list(MT.H6_EXACT), "nearest_on": list(MT.H6_NEAREST), "smd_balance": MT.SMD_BALANCE}
+    if len(d) == 0:
+        return not_computable("table_h6", title, f"no completed {line} rows under {base_arm} (p0); floor unit done: {floor_unit_done}", headers,
+                              analysis=ANALYSES[7], extra=extra)
+    try:
+        from ..vi import lexicon as L
+        freqs = L.syllable_frequencies()
+    except (OSError, FileNotFoundError) as e:
+        return not_computable("table_h6", title, f"the Viet74K word list is not fetched (syllable frequencies for the matching): {e}", headers,
+                              analysis=ANALYSES[7], extra=extra)
+    fam_map = ctx.family_map() or {}
+    rows, tex_rows, records, tests_ = [], [], [], []
+    descriptive_rows = []
+    counts_any: dict = {}
+    for model in sorted(d["model"].unique()):
+        dm = d[d["model"] == model]
+        rec: dict = {"model": model, "family": fam_map.get(model), "n_attested_rows": len(dm), "n_attested_items": int(dm["item_id"].nunique())}
+        c = acc_cell(dm[dm["exact"].fillna(False).astype(bool)] if "exact" in dm and dm["exact"].notna().any() else dm, ctx)
+        descriptive_rows.append({"model": model, **c})
+        att_path = _item_file_of(ctx, model, line)
+        if att_path is None:
+            rec["note"] = f"the attested item file of {line} is not on this machine (the matching covariates need it)"
+            rows.append(rec)
+            continue
+        att_items = _items_by_id(ctx, att_path)
+        cov_att, counts = _attested_covariates(att_items, freqs)
+        counts_any = counts
+        pool_rows = ctx.rows(control_line, arm=base_arm, paraphrase="p0", task="T1")
+        pool_rows = pool_rows[pool_rows["model"] == model]
+        if "output_lexical" in pool_rows:
+            pool_rows = pool_rows[pool_rows["output_lexical"].fillna(False).astype(bool)]
+        if "attested_overlap" in pool_rows:
+            pool_rows = pool_rows[~pool_rows["attested_overlap"].fillna(False).astype(bool)]
+        main_path = _item_file_of(ctx, model, control_line)
+        if len(pool_rows) == 0 or main_path is None:
+            rec["note"] = (f"no {control_line} T1 rows with lexical output for {model}" if len(pool_rows) == 0
+                           else f"the {control_line} item file is not on this machine (syllable lengths for the matching need it)")
+            rows.append(rec)
+            continue
+        treated = pd.DataFrame([{"item_id": iid, **cov_att[iid]} for iid in dm["item_id"].unique() if iid in cov_att])
+        rec["n_exact_eligible_with_rows"] = len(treated)
+        if len(treated) == 0:
+            rec["note"] = "no exact, H6-eligible attested item among the scored rows"
+            rows.append(rec)
+            continue
+        pool = _generated_covariates(pool_rows, _items_by_id(ctx, main_path))
+        if len(pool) == 0:
+            rec["note"] = "no control pool item could be read from the item file"
+            rows.append(rec)
+            continue
+        match = MT.nearest_neighbour_match(treated, pool, exact=MT.H6_EXACT, nearest=MT.H6_NEAREST, k_min=k_min, k_max=k_max, caliper_sd=caliper)
+        rec["matching"] = match.as_dict()
+        if match.n_matched == 0:
+            rec["note"] = "no attested item found k_min controls within the caliper"
+            rows.append(rec)
+            continue
+        y_t = dict(zip(dm.drop_duplicates("item_id")["item_id"], dm.drop_duplicates("item_id")["correct"].fillna(False).astype(float)))
+        pr = pool_rows.drop_duplicates("item_id")
+        y_c = dict(zip(pr["item_id"], pr["correct"].fillna(False).astype(float)))
+        clusters = dict(zip(dm["item_id"], dm[CLUSTER_KEY]))
+        try:
+            mc = MT.matched_contrast(y_t, y_c, match, clusters, n_boot=ctx.paired_boot, seed=ctx.seed, level=ctx.level)
+        except ValueError as e:
+            rec["note"] = f"matched contrast not computable: {e}"
+            rows.append(rec)
+            continue
+        rec.update(contrast=mc.as_dict(), effect=mc.estimate, ci_lo=mc.lo, ci_hi=mc.hi, p_bootstrap=mc.p_bootstrap)
+        records.append({"model": model, "values": list(mc.per_treated["contribution"]), "clusters": list(mc.per_treated["cluster"])})
+        tests_.append(rec)
+        rows.append(rec)
+    floor_met = bool(counts_any) and counts_any.get("n_verified_exact", 0) >= floor and counts_any.get("n_collections", 0) >= constants.ATTESTED_MIN_COLLECTIONS \
+        and floor_unit_done
+    status = "test run" if floor_met else "descriptive: floor not met (PREREG :29); no p-values, no pooled estimate"
+    if tests_ and floor_met:
+        reject, adj = holm_adjust([r["p_bootstrap"] for r in tests_])
+        for r, rj, pa in zip(tests_, reject, adj):
+            r.update(p_holm=float(pa), significant=bool(rj), holm_family_size=len(tests_))
+    for r in rows:
+        r["status"] = status if "effect" in r else (r.get("note") or "not matched")
+        if "effect" in r:
+            m = r["matching"]
+            bal = f"{'yes' if m['balanced'] else 'no'} ({m['max_abs_smd_after']:.2f})" if m.get("max_abs_smd_after") is not None else "?"
+            tex_rows.append([_tex(r["model"]), _tex(r["family"] or "?"), ci_pts(r["effect"], r["ci_lo"], r["ci_hi"]),
+                             pval(r["p_bootstrap"]) if floor_met else "--", pval(r.get("p_holm")) if floor_met else "--",
+                             f"{m['n_matched']}/{m['n_treated']}", str(m["n_controls_distinct"]), bal, "test" if floor_met else "descriptive"])
+        else:
+            tex_rows.append([_tex(r["model"]), _tex(r.get("family") or "?"), "--", "--", "--", str(r.get("n_attested_items", "")), "--", "--", _tex(r["status"])])
+    pooled_h6 = None
+    if tests_ and floor_met:
+        pooled_h6 = pooled(ctx, records, direction=+1, min_families=min_families(ctx, "H6", 3), label="H6 attested - matched")
+    decision = {"rule": "pooled acc(attested) - acc(matched) > 0 with the CI excluding 0, per-model tests Holm across the panel; H6 is tested only above the floor "
+                        f"({floor} verified exact two-syllable rows from >= {constants.ATTESTED_MIN_COLLECTIONS} collections and the expansion unit done), else descriptive",
+                "floor_met": floor_met, "floor_counts": counts_any, "on_predicted_side": (pooled_h6 or {}).get("on_predicted_side") if pooled_h6 else None}
+    extra.update(floor_met=floor_met, floor_counts=counts_any, status=status, descriptive_accuracy=descriptive_rows, pooled=pooled_h6, decision=decision,
+                 test="run" if floor_met else "not run")
+    cap = (f"Matched contrast per model (mean over attested items of acc_attested - mean acc of 3-5 matched generated items; base-pair bootstrap); "
+           f"{status}.")
+    return Artefact("table_h6", title, headers, tex_rows, rows, computable=bool(tests_), reason=None if tests_ else "no model yielded a matched contrast; see the status column",
+                    caption=cap, extra=extra, analysis=ANALYSES[7])
 
 
 def table_h1_e2(ctx: Context) -> Artefact:
-    """H1 / E2 (PREREG 8.4): the nested LR test needs the E1_main T1 rows joined to data/audit/items_<tokenizer>.jsonl
-    per panel tokenizer (e2.prepare_covariates, nested_h1_test, identifiability_floor). The join is not part of this
-    module: the artefact records what is available (models, families, audit files, the minimum-viable-panel rule)
-    and is `not run`."""
-    title = "H1 / E2: nested LR test of alignment and fragmentation (not run here; inputs listed)"
-    headers = ["quantity", "value"]
+    """H1 / E2 (PREREG 8.4): the E1_main T1 rows under the baseline arm joined per model to the item audit of its tokenizer
+    (data/audit/items_<tokenizer>__<key>.jsonl; noilai.stats.matching.e2_frame), the identifiability floor per tokenizer
+    (e2.identifiability_floor: a model with fewer than 300 misaligned split syllables contributes descriptively only), then
+    e2.nested_h1_test (LR / ΔAIC of M0 + tps_w vs + split + align_w) and the base-pair cluster bootstrap of the mean per-model
+    slopes. H1 is supported when the test passes, >= 4 families clear the floor and the minimum viable panel holds."""
+    title = "H1 / E2: nested LR test of alignment and fragmentation (PREREG 8.4) with the identifiability floor"
+    headers = ["Model", "Family", "rows", "items", "misaligned split syll.", "clears floor", "slope tps_w", "slope align_w", "in fit"]
     if not ctx.runs:
         return not_computable("table_h1_e2", title, "no completed run (the E1_main T1 rows and the item audits are the inputs)", headers,
                               analysis=ANALYSES[2])
-    d = ctx.rows("E1_main", arm=str(ctx.cfg.get("baseline_arm") or "nfc"), task="T1")
+    e2cfg = ctx.cfg.get("e2") or {}
+    floor = int(e2cfg.get("misaligned_split_floor", E2.H1_MISALIGNED_SPLIT_FLOOR))
+    min_fam = int(e2cfg.get("min_families", E2.H1_MIN_FAMILIES))
+    base_arm = str(ctx.cfg.get("baseline_arm") or "nfc")
+    main = str((((ctx.cfg.get("lines") or {}).get("table2") or {}).get("lines") or ["E1_main"])[0])
+    d = ctx.rows(main, arm=base_arm, task="T1")
     fam = ctx.family_map() or {}
     models = sorted(d["model"].unique()) if len(d) else []
     fams = {fam.get(m) for m in models} - {None}
@@ -1559,15 +1767,147 @@ def table_h1_e2(ctx: Context) -> Artefact:
     ok = len(models) >= int(mvp.get("models", constants.MIN_VIABLE_PANEL_MODELS)) and len(fams) >= int(mvp.get("families", constants.MIN_VIABLE_PANEL_FAMILIES)) \
         and (non_gemma or not mvp.get("needs_non_gemma_pass_through", True))
     audits = sorted(p.name for p in ctx.paths["audit_dir"].glob("items_*.jsonl")) if ctx.paths["audit_dir"].exists() else []
-    rows = [{"quantity": "models with E1_main T1 rows", "value": len(models)}, {"quantity": "tokenizer families among them", "value": len(fams)},
-            {"quantity": "minimum viable panel (>= 8 models, >= 4 families, a non-Gemma pass-through family)", "value": ok},
-            {"quantity": "items audit files (data/audit/items_*.jsonl)", "value": audits},
-            {"quantity": "status", "value": "not run: the item-audit join and the floor gating are outside this module (handoff section 9, item 21)"}]
-    reason = "not run here: needs the E1_main T1 rows joined to data/audit/items_<tokenizer>.jsonl (e2.nested_h1_test); " + \
-             ("MVP rule met" if ok else "MVP rule not met (H1 would be descriptive)")
-    art = Artefact("table_h1_e2", title, headers, [[_tex(r["quantity"]), _tex(str(r["value"]))] for r in rows], rows, computable=False,
-                   reason=reason, analysis=ANALYSES[2], extra={"models": models, "families": sorted(fams), "mvp": ok, "audit_files": audits})
-    return art
+    extra: dict = {"models": models, "families": sorted(fams), "mvp": ok, "audit_files": audits, "floor": floor, "min_families": min_fam,
+                   "baseline_arm": base_arm, "line": main}
+    if len(d) == 0:
+        return not_computable("table_h1_e2", title, f"no completed {main} T1 rows under {base_arm}", headers, analysis=ANALYSES[2], extra=extra)
+    rows, parts, floor_counts, notes = [], [], {}, []
+    for model in models:
+        dm = d[d["model"] == model]
+        rec = {"model": model, "family": fam.get(model), "n_rows": len(dm), "n_items": int(dm["item_id"].nunique()), "n_misaligned_split": None,
+               "clears_floor": None, "slope_tps": None, "slope_align": None, "in_fit": False, "note": None}
+        audit, where = items_audit_for(ctx, model, _audit_key_of(ctx, model, main))
+        if audit is None:
+            rec["note"] = where
+            notes.append(where)
+            rows.append(rec)
+            continue
+        a = audit[(audit["encoding"] == "nfc") & audit["item_id"].isin(set(dm["item_id"]))]
+        n_mis = int(pd.to_numeric(a["n_misaligned_split"], errors="coerce").fillna(0).sum())
+        floor_counts[model] = n_mis
+        joined = MT.e2_frame(dm, audit, encoding="nfc")
+        rec.update(n_misaligned_split=n_mis, clears_floor=n_mis >= floor, audit=where, n_audited_items=int(a["item_id"].nunique()), n_joined=len(joined))
+        if len(joined) and rec["clears_floor"]:
+            parts.append(joined)
+            rec["in_fit"] = True
+        elif len(joined) == 0:
+            rec["note"] = "no score row joins an audit row (item ids differ?)"
+        else:
+            rec["note"] = f"below the floor ({n_mis} < {floor}): descriptive only"
+        rows.append(rec)
+    fams_clear = sorted({fam.get(m) for m, n in floor_counts.items() if n >= floor and fam.get(m)})
+    identified = len(fams_clear) >= min_fam
+    extra.update(families_clearing=fams_clear, h1_identified=identified, floor_counts=floor_counts, notes=notes)
+
+    def _tex_rows():
+        out = []
+        for r in rows:
+            out.append([_tex(r["model"]), _tex(r["family"] or "?"), str(r["n_rows"]), str(r["n_items"]),
+                        "--" if r["n_misaligned_split"] is None else str(r["n_misaligned_split"]),
+                        "--" if r["clears_floor"] is None else ("yes" if r["clears_floor"] else "no"),
+                        "--" if r["slope_tps"] is None else f"{r['slope_tps']:+.2f}", "--" if r["slope_align"] is None else f"{r['slope_align']:+.2f}",
+                        "yes" if r["in_fit"] else "no"])
+        return out
+
+    if not parts:
+        reason = "no model with E1_main T1 rows both has an item audit and clears the identifiability floor" + (f"; {notes[0]}" if notes else "")
+        return Artefact("table_h1_e2", title, headers, _tex_rows(), rows, computable=False, reason=reason, analysis=ANALYSES[2], extra=extra)
+    frame = E2.prepare_covariates(pd.concat(parts, ignore_index=True))
+    try:
+        h1 = E2.nested_h1_test(frame)
+        fe = E2.fit_fixed_effects_clustered(frame, sandwich=False)
+        boot = E2.bootstrap_mean_slopes(frame, n_boot=min(int(e2cfg.get("n_boot", 200)), ctx.n_boot), seed=ctx.seed, level=ctx.level)
+    except Exception as e:
+        extra["fit_error"] = f"{type(e).__name__}: {e}"
+        return Artefact("table_h1_e2", title, headers, _tex_rows(), rows, computable=False,
+                        reason=f"E2 fit failed on {len(frame)} rows: {type(e).__name__}: {str(e)[:160]}", analysis=ANALYSES[2], extra=extra)
+    for r in rows:
+        if r["in_fit"]:
+            r["slope_tps"], r["slope_align"] = _f(fe.slopes_tps.get(r["model"])), _f(fe.slopes_align.get(r["model"]))
+    supported = bool(h1["h1_supported"]) and identified and ok
+    verdict = "supported" if supported else ("descriptive (floor or minimum viable panel not met)" if not (identified and ok) else "falsified")
+    decision = {"h1_supported_by_test": bool(h1["h1_supported"]), "identified": identified, "mvp": ok, "h1": verdict,
+                "rule": "LR p < alpha and ΔAIC >= 2 and beta(align_w) > 0 and beta(tps_w) < 0 (PREREG 8.4), with >= 4 families clearing the "
+                        f"{floor}-misaligned-split floor and the minimum viable panel (>= 8 models, >= 4 families, a non-Gemma pass-through family)"}
+    extra.update(nested=h1, bootstrap=boot, n_fit_rows=len(frame), n_fit_models=int(frame["model"].nunique()), decision=decision,
+                 primary_formula=E2.PRIMARY_FORMULA)
+    cap = (f"Per model: rows and items joined to the item audit, misaligned split syllables under NFC against the floor of {floor}, the per-model "
+           f"slopes of tps_w and align_w from the primary fit; the nested LR test (p = {pval(h1['p'])}, ΔAIC = {h1['delta_aic']:.1f}) and the "
+           f"bootstrap CIs of the mean slopes are in the .json sibling. H1: {verdict}.")
+    return Artefact("table_h1_e2", title, headers, _tex_rows(), rows, caption=cap, extra=extra, analysis=ANALYSES[2])
+
+
+def table_h3b(ctx: Context) -> Artefact:
+    """H3b (PREREG 8.7 / DD 1, :26): the tone-isolation difference-in-differences on the E3_noilai T1 rows (p0) of every pass-through
+    model with an item audit: ISO items (the audit's NFD `tone_isolated`) matched to NON-ISO items nearest on syllable frequency, NFC
+    and NFD token count within the lexical / pseudo strata (noilai.stats.matching.h3b_did); Δ = (y(NFD) - y(NFC))_ISO minus the
+    matched NON-ISO items' effect, on V3 (expected > 0) and on V1 (expected ≈ 0); Holm over the four configured contrasts."""
+    cfg = (ctx.cfg.get("lines") or {}).get("h3b") or {}
+    t3 = (ctx.cfg.get("lines") or {}).get("table3") or {}
+    line = str(cfg.get("line", t3.get("main", "E3_noilai")))
+    conf_models = [str(m) for m in (cfg.get("models") or ["gemma-3-4b-it", "gemma-3-1b-it"])]
+    variants = [str(v) for v in (cfg.get("variants") or ["V3", "V1"])]
+    base_arm, arm = str(t3.get("baseline_arm", ctx.cfg.get("baseline_arm") or "nfc")), str(cfg.get("arm", "nfd"))
+    min_items = int(cfg.get("min_items", MT.H3B_MIN_ITEMS))
+    k_min, k_max, caliper = int(cfg.get("k_min", MT.H3B_K_MIN)), int(cfg.get("k_max", MT.H3B_K_MAX)), cfg.get("caliper_sd", MT.CALIPER_SD)
+    title = "H3b: tone-isolation DiD on T1 (ISO items matched to NON-ISO items), V3 expected > 0 and V1 expected ≈ 0"
+    headers = ["Model", "variant", "Δ pts [95% CI]", "p", "p (Holm)", "sig.", "ISO matched/total", "items in cell", "balance (max |SMD|)", "status"]
+    d = ctx.rows(line, paraphrase="p0", task="T1")
+    d = d[d["arm"].isin([base_arm, arm])] if len(d) else d
+    extra: dict = {"line": line, "configured_models": conf_models, "variants": variants, "baseline_arm": base_arm, "arm": arm, "min_items": min_items,
+                   "k_min": k_min, "k_max": k_max, "caliper_sd": caliper, "exact_on": list(MT.H3B_EXACT), "nearest_on": list(MT.H3B_NEAREST)}
+    if len(d) == 0:
+        return not_computable("table_h3b", title, f"no completed {line} T1 rows under {base_arm} / {arm} (p0)", headers, analysis=ANALYSES[4], extra=extra)
+    fam_map = ctx.family_map() or {}
+    rows, results = [], []
+    for model in sorted(d["model"].unique()):
+        ok, why = pass_through(ctx, model)
+        if not ok:
+            rows.append({"model": model, "family": fam_map.get(model), "variant": None, "status": f"not informative: {why} (NFD = NFC by construction)"})
+            continue
+        audit, where = items_audit_for(ctx, model, _audit_key_of(ctx, model, line))
+        if audit is None:
+            rows.append({"model": model, "family": fam_map.get(model), "variant": None, "status": where})
+            continue
+        dm = d[d["model"] == model]
+        for v in variants:
+            r = MT.h3b_did(dm, audit, variant=v, baseline_arm=base_arm, arm=arm, k_min=k_min, k_max=k_max, caliper_sd=caliper, min_items=min_items,
+                           n_boot=ctx.paired_boot, seed=ctx.seed, level=ctx.level)
+            r.update(model=model, family=fam_map.get(model), configured=model in conf_models, audit=where)
+            results.append(r)
+            rows.append(r)
+    conf = [r for r in results if r.get("computable") and r["configured"]]
+    if conf:
+        reject, adj = holm_adjust([r["p_bootstrap"] for r in conf])
+        for r, rj, pa in zip(conf, reject, adj):
+            r.update(p_holm=float(pa), significant=bool(rj), holm_family_size=len(conf))
+    decisions = {}
+    for model in {r["model"] for r in results}:
+        by_v = {r["variant"]: r for r in results if r["model"] == model and r.get("computable")}
+        v3, v1 = by_v.get(variants[0]), by_v.get(variants[1]) if len(variants) > 1 else None
+        pos = bool(v3 and v3["lo"] > 0)
+        null_ok = v1 is None or bool(v1["lo"] <= 0 <= v1["hi"])
+        decisions[model] = {"v3_positive_ci_excludes_0": pos if v3 else None, "v1_ci_includes_0": (v1["lo"] <= 0 <= v1["hi"]) if v1 else None,
+                            "supported": bool(v3 and pos and v1 is not None and null_ok), "underpowered": any(r.get("underpowered") for r in by_v.values())}
+    tex_rows = []
+    for r in rows:
+        if r.get("computable"):
+            m = r["matching"]
+            bal = f"{'yes' if m['balanced'] else 'no'} ({m['max_abs_smd_after']:.2f})" if m.get("max_abs_smd_after") is not None else "?"
+            status = ("Holm family" if r["configured"] else "exploratory model") + (f"; underpowered (< {min_items} items)" if r["underpowered"] else "")
+            tex_rows.append([_tex(r["model"]), r["variant"], ci_pts(r["estimate"], r["lo"], r["hi"]), pval(r["p_bootstrap"]), pval(r.get("p_holm")),
+                             "yes" if r.get("significant") else ("no" if r.get("significant") is False else "--"), f"{m['n_matched']}/{r['n_iso']}",
+                             str(r["n_items"]), bal, status])
+        else:
+            tex_rows.append([_tex(r["model"]), r.get("variant") or "--", "--", "--", "--", "--", "--", str(r.get("n_items", "--")), "--",
+                             _tex(r.get("status") or r.get("reason") or "not computable")])
+    extra.update(decisions=decisions, rule="Δ(V3) CI > 0 (excluding 0) and Δ(V1) CI including 0 per model (PREREG :26); Holm over the four configured contrasts; "
+                                           "fewer than 500 items in a cell is reported as underpowered (PREREG 8.7)")
+    computable = any(r.get("computable") for r in results)
+    reason = None if computable else ("; ".join(str(r.get("status") or r.get("reason")) for r in rows[:3]) or "no contrast computable")
+    cap = ("Tone-isolation DiD per model and variant: ISO items (NFD isolates the tone mark) against NON-ISO items matched within lexical / pseudo "
+           "strata on syllable frequency and NFC / NFD token counts; base-pair bootstrap over the ISO items; Holm over the configured contrasts.")
+    return Artefact("table_h3b", title, headers, tex_rows, rows, computable=computable, reason=reason, caption=cap, extra=extra, analysis=ANALYSES[4])
 
 
 def fig_probes(ctx: Context) -> Artefact:
@@ -1676,7 +2016,7 @@ def all_artefacts(ctx: Context) -> list[Artefact]:
     t2 = table2(ctx)
     ctx.n_cells = len(t2.rows)
     t3, t3mc = table3(ctx)
-    arts = [t2, table2_range(ctx, t2), t3, t3mc, table_h3(ctx), table_h4(ctx), table_h1_e2(ctx), table_explicit_input(ctx),
+    arts = [t2, table2_range(ctx, t2), t3, t3mc, table_h3(ctx), table_h3b(ctx), table_h4(ctx), table_h1_e2(ctx), table_explicit_input(ctx),
             table_human(ctx), table_census(ctx), table_runs(ctx), table_h6(ctx), table_ablations(ctx), table_errors(ctx)]
     errors = arts[-1]
     fig_err = Artefact("fig_errors", "Fig. 3 data: error-class shares", errors.headers, errors.tex_rows, errors.rows, errors.computable,
@@ -1765,8 +2105,7 @@ def analyses_status(ctx: Context, arts: Sequence[Artefact]) -> dict:
     for name in ANALYSES:
         a = by_name.get(name)
         if a is None:
-            reason = "no artefact of this module decides it" if name != ANALYSES[4] else "H3b DiD: the matching helper is not written (handoff section 9, item 4 / 21)"
-            out[name] = {"computable": False, "reason": reason}
+            out[name] = {"computable": False, "reason": "no artefact of this module decides it"}
         else:
             out[name] = {"computable": bool(a.computable and not a.empty()), "reason": a.reason if not a.computable else (None if a.rows else "no rows"),
                          "artefact": a.name}
@@ -1909,8 +2248,10 @@ def write_outputs(ctx: Context, arts: Sequence[Artefact], out_dir: Path, *, date
 
 # ============================================================================ the driver
 def build_context(cfg: dict, *, runs: Sequence[Path], ledger: Path | None, n_boot: int, paired_boot: int, seed: int,
-                  include_smoke: bool = False, label: str = LABEL_INTERIM) -> Context:
+                  include_smoke: bool = False, label: str = LABEL_INTERIM, audit_dir: Path | None = None) -> Context:
     paths = {k: resolve_path(cfg, k) for k in ("runs_root", "ledger", "models", "audit_dir", "human_report", "human_items", "gates", "freeze_check")}
+    if audit_dir is not None:
+        paths["audit_dir"] = Path(audit_dir)
     if runs:
         paths["runs_root"] = Path(runs[0]) if len(runs) == 1 and Path(runs[0]).is_dir() and not (Path(runs[0]) / "manifest.json").exists() else paths["runs_root"]
     if ledger is not None:
@@ -1954,6 +2295,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--n-boot", type=int, default=None, help="bootstrap replicates (default: the config's B; also sets the paired B)")
     ap.add_argument("--seed", type=int, default=None, help="bootstrap seed (default: the config's)")
     ap.add_argument("--include-smoke", action="store_true", help="analyse smoke manifests too (exercise only; FINAL stays refused)")
+    ap.add_argument("--audit-dir", type=Path, default=None, help="where the census and item audits live (default: the config's paths.audit_dir)")
     ap.add_argument("--check", action="store_true", help="recompute and compare every .tex body in --out (stamp lines ignored); exit 1 when stale")
     ap.add_argument("--quiet", action="store_true", help="do not print the Markdown report")
     args = ap.parse_args(argv)
@@ -1985,7 +2327,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"ledger {ledger} does not exist: scanning the runs for finished runs", file=sys.stderr)
         ledger = None
     ctx = build_context(cfg, runs=args.runs or [], ledger=ledger, n_boot=n_boot, paired_boot=paired, seed=seed,
-                        include_smoke=args.include_smoke, label=args.label)
+                        include_smoke=args.include_smoke, label=args.label, audit_dir=args.audit_dir)
     if args.label == LABEL_FINAL:
         blockers = final_blockers(ctx)
         if blockers:

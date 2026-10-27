@@ -222,3 +222,14 @@ prompt's cache 0.14–0.16 s; generating 24 tokens after a 520-token prompt 5.6 
 after a 950-token prompt 8.0 s (51.3 s for 8). Batching gains little on 4 cores. Kaggle CPU sessions have different
 cores [UNCERTAIN: verify]; `docs/COMPUTE_PLAN.md` derives its CPU pilot estimates from these numbers with that caveat.
 
+
+## 2026-10-27 — Reconciliations of the section-0 discrepancies, re-read by the counts script (no model outputs) [RL-2026-10-27-01]
+
+Source: `data/audit/counts.json` `reconciliations` (`scripts/reconcile_counts.py`), read from `data/audit/gemma3.json`, `data/audit/gemma2.json`, `data/audit/placement_xcopa_test.json` and a live recount of `data/external/xcopa_test_vi.jsonl` with the current parser.
+
+- **Gemma 3 NFD tokens per syllable (2.83 vs 2.90).** 2.83 is Gemma 3 (2.8308) and 2.90 is Gemma 2 (2.8986): the 2.90 once printed in the Gemma 3 row was Gemma 2's value copied by hand (RL-2026-09-30-01, corrected the same day); every document quotes the gemma3 value of this file. (`consistent`: True.)
+- **XCOPA-vi syllable tokens (9,628 vs 10,137).** The two figures are two definitions over the 500-item test file: 10,137 regex word tokens, of which 9,594 parse as Vietnamese syllables with the current parser (committed count 9,594; the 9,628 of the design document predates the 30 September parser corrections and is superseded). The C2-affected count is unchanged: 53 tokens in 43 items. The paper quotes word tokens with the definition. (`consistent` with the committed count: True.)
+- `release_strata` carried over from the previous counts.json (computed over data/release/v0.3 on the author's machine): the release item files are not on this machine.
+
+Inventory used: `vi-DauMoi.dic` 6,642 entries, 6,611 lower-case, 6,595 parsable, 162 orthographic rimes (base inventory for the counts; the extended Hunspell-plus-Viet74K inventory has 6,830 structures).
+

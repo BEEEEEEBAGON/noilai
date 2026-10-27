@@ -2,6 +2,7 @@
 import csv
 import json
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -538,3 +539,75 @@ def test_sheet_scorers_write_nothing_without_returns_and_make_ingest_sheets_runs
         r = subprocess.run(["make", "-n", "ingest-sheets"], cwd=ROOT, text=True, capture_output=True, check=False)
         assert r.returncode == 0 and "make_validation_forms.py score --dir data/validation" in r.stdout
         assert "make_validation_forms.py score-baseline" in r.stdout and "ingest_sheets.py" not in r.stdout
+
+
+# ------------------------------------------------------------------ scripts/encrypt_release.py (DD 4.6 / 11.1 / 12 item 23)
+def _enc_module():
+    import importlib.util
+    pytest.importorskip("cryptography")
+    spec = importlib.util.spec_from_file_location("encrypt_release", ROOT / "scripts" / "encrypt_release.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_encrypt_release_round_trip_default_files_record_and_refusals(release, tmp_path):
+    """The gated files (those opening with the header record) are encrypted under one key per release; the key is written only
+    to the key file; the record carries hashes and the key's SHA-256, never the key; decryption needs the right key AND the
+    original file name; `verify` recomputes every hash; the public dev file is left alone."""
+    enc = _enc_module()
+    rel = tmp_path / "rel"
+    shutil.copytree(release, rel)
+    for extra in rel.glob("*.jsonl"):                      # the module-scoped fixture may carry sampled files from earlier tests
+        if extra.name not in ("noilai_dev.jsonl", "noilai_test.jsonl", "noilai_core.jsonl"):
+            extra.unlink()
+    r = run("scripts/encrypt_release.py", "encrypt", "--release", str(rel))
+    out = json.loads(r.stdout)
+    assert out["encrypted"] == ["noilai_core.jsonl", "noilai_test.jsonl"], out       # dev carries no header record
+    key_path = rel / "release_key.txt"
+    key_hex = key_path.read_text().strip()
+    assert len(key_hex) == 64 and bytes.fromhex(key_hex)
+    rec = json.loads((rel / "encrypted" / "encryption.json").read_text(encoding="utf-8"))
+    assert rec["algorithm"] == "AES-256-GCM" and rec["key_sha256"] == out["key_sha256"] and key_hex not in json.dumps(rec)
+    assert {f["name"] for f in rec["files"]} == {"noilai_core.jsonl", "noilai_test.jsonl"} and all(f["header_record"] for f in rec["files"])
+    blob = (rel / "encrypted" / "noilai_test.jsonl.enc").read_bytes()
+    assert blob.startswith(enc.MAGIC) and b"NOILAI-CANARY" not in blob and len(blob) == (rel / "noilai_test.jsonl").stat().st_size + 16 + 12 + 16
+    # round trip through the CLI and the module; a wrong key, a renamed file and a flipped byte are refused
+    r = run("scripts/encrypt_release.py", "decrypt", "--key-file", str(key_path), str(rel / "encrypted" / "noilai_test.jsonl.enc"),
+            "--out", str(tmp_path / "back.jsonl"))
+    assert (tmp_path / "back.jsonl").read_bytes() == (rel / "noilai_test.jsonl").read_bytes()
+    key = bytes.fromhex(key_hex)
+    assert enc.decrypt_bytes(blob, key, "noilai_test.jsonl") == (rel / "noilai_test.jsonl").read_bytes()
+    with pytest.raises(ValueError):
+        enc.decrypt_bytes(blob, bytes(32), "noilai_test.jsonl")
+    with pytest.raises(ValueError):
+        enc.decrypt_bytes(blob, key, "noilai_core.jsonl")                              # the file name is the associated data
+    bad = bytearray(blob)
+    bad[-1] ^= 1
+    with pytest.raises(ValueError):
+        enc.decrypt_bytes(bytes(bad), key, "noilai_test.jsonl")
+    with pytest.raises(ValueError):
+        enc.decrypt_bytes(b"not an encrypted file", key, "noilai_test.jsonl")
+    with pytest.raises(ValueError):
+        enc.read_key("00")
+    r = subprocess.run([PY, "scripts/encrypt_release.py", "decrypt", "--key", "00" * 32, str(rel / "encrypted" / "noilai_test.jsonl.enc"),
+                        "--out", str(tmp_path / "never.jsonl")], cwd=ROOT, text=True, capture_output=True, check=False)
+    assert r.returncode == 2 and "wrong key" in r.stderr and not (tmp_path / "never.jsonl").exists()
+    # verify: every hash recomputed from the key file; a tampered ciphertext fails it
+    r = run("scripts/encrypt_release.py", "verify", "--release", str(rel))
+    v = json.loads(r.stdout)
+    assert v["ok"] and v["key_sha256_matches_record"] and all(f["plain_matches_release"] for f in v["files"])
+    (rel / "encrypted" / "noilai_core.jsonl.enc").write_bytes(bytes(bad))
+    r = subprocess.run([PY, "scripts/encrypt_release.py", "verify", "--release", str(rel)], cwd=ROOT, text=True, capture_output=True, check=False)
+    assert r.returncode == 1 and not json.loads(r.stdout)["ok"]
+    # a second encrypt reuses the key file (one key per release, the one the gated README publishes) and can add attested.jsonl
+    (rel / "attested.jsonl").write_text('{"item_id": "ATT-0001", "vulgar": true}\n', encoding="utf-8")
+    r = run("scripts/encrypt_release.py", "encrypt", "--release", str(rel), "--files", "noilai_test.jsonl", "attested.jsonl")
+    out2 = json.loads(r.stdout)
+    assert out2["key_sha256"] == out["key_sha256"] and out2["encrypted"] == ["noilai_test.jsonl", "attested.jsonl"]
+    assert key_path.read_text().strip() == key_hex
+    # the git-ignore covers the key file and the ciphertexts; the dependency is declared
+    gi = (ROOT / ".gitignore").read_text(encoding="utf-8")
+    assert "data/release/*/release_key.txt" in gi and "data/release/*/encrypted/" in gi
+    assert "cryptography" in (ROOT / "requirements.txt").read_text(encoding="utf-8")
+    assert "cryptography" in (ROOT / "pyproject.toml").read_text(encoding="utf-8")

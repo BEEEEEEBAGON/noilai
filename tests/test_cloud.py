@@ -538,7 +538,7 @@ def test_no_run_line_samples_at_run_time_and_ablations_are_run_lines(plan, model
             seeds.append(d["seed"])
             if "per_cell" in d:
                 pc = d["per_cell"]
-                cells = {"T1": 4, "T2": 4, "T3": 4} if not d.get("tasks") else {t: 4 for t in d["tasks"]}
+                cells = {"T1": 4, "T2": 4, "T3": 4} if not d.get("tasks") else dict.fromkeys(d["tasks"], 4)
                 n = sum((pc[t] if isinstance(pc, dict) else pc) * k for t, k in cells.items())
                 assert n == spec["expected_counts"]["n_items"], key
     assert len(seeds) == len(set(seeds))
@@ -1747,3 +1747,33 @@ def test_cpu_chunk_estimates_derive_from_the_benchmark(chunk_spec):
     cpu = [c for c in chunk_spec["chunks"] if c["queue"] == "cpu"]
     assert [c["jobs"][0]["models"] for c in cpu] == [["gemma-3-1b-it"], ["gemma-3-1b-it"], ["qwen3.5-2b"], ["phogpt-4b-chat"]]
     assert all(c["quota_hours"]["x1"] == [0, 0] for c in cpu)
+
+
+def test_budget_watchdog_escalates_when_the_child_ignores_sigint(tmp_path):
+    """A driver started with `nohup ... &` from a non-interactive shell inherits SIGINT = ignored and its children too: the
+    watchdog's SIGINT is dropped, so it escalates to SIGTERM (then SIGKILL) after the grace period and still parks the run."""
+    stub = tmp_path / "ignores_sigint.py"
+    stub.write_text("import json, pathlib, signal, sys, time\n"
+                    "signal.signal(signal.SIGINT, signal.SIG_IGN)\n"
+                    "out = pathlib.Path(sys.argv[1]); out.mkdir(parents=True, exist_ok=True)\n"
+                    "with open(out / 'outputs.jsonl', 'a') as f:\n"
+                    "    for i in range(400):\n"
+                    "        f.write(json.dumps({'item_id': i, 'n_prompt_tokens': 400, 'n_output_tokens': 100}) + '\\n'); f.flush(); time.sleep(0.02)\n")
+    out_dir = tmp_path / "run"
+    budget = {"requests_per_day": 1000, "tokens_per_day": 2000}
+    dog = KRP.BudgetWatchdog(out_dir, budget, 0, 0, 0, poll_s=0.02, grace_s=0.3)
+    t0 = time.time()
+    rc = dog.run([sys.executable, str(stub), str(out_dir)], cwd=tmp_path)
+    assert time.time() - t0 < 5 and rc != 0
+    assert dog.stopped and dog.reason.startswith("tokens") and dog.signal_sent == "SIGTERM"
+    rows = KRP.outputs_usage(out_dir, 0, 500)["rows"]
+    assert 4 <= rows < 400
+    # the default grace follows the poll interval, between 2 and 30 seconds; a well-behaved child stops at the SIGINT itself
+    # (the child installs Python's default handler itself: when pytest runs under `nohup ... &` it would inherit SIG_IGN)
+    assert KRP.BudgetWatchdog(out_dir, budget, 0, 0, 0, poll_s=0.02).grace_s == 2.0
+    assert KRP.BudgetWatchdog(out_dir, budget, 0, 0, 0, poll_s=5.0).grace_s == 30.0
+    polite = tmp_path / "polite.py"
+    polite.write_text(stub.read_text().replace("signal.signal(signal.SIGINT, signal.SIG_IGN)\n", "signal.signal(signal.SIGINT, signal.default_int_handler)\n"))
+    dog2 = KRP.BudgetWatchdog(tmp_path / "run2", budget, 0, 0, 0, poll_s=0.02, grace_s=2.0)
+    rc2 = dog2.run([sys.executable, str(polite), str(tmp_path / "run2")], cwd=tmp_path)
+    assert rc2 != 0 and dog2.stopped and dog2.signal_sent == "SIGINT"

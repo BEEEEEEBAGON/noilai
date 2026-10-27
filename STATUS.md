@@ -1,11 +1,46 @@
 # STATUS — experiments and validation workstreams
 
-Hand-maintained sections first (dated **2026-10-16**); the meter block at the end is written by `scripts/progress.py`
+Hand-maintained sections first (dated **2026-10-27**); the meter block at the end is written by `scripts/progress.py`
 and is never edited by hand. Blockers, in deadline order, are in `BLOCKED.md`; the author's rulings are in
 `docs/gate1/DD13_DECISION_MEMO.md` (reply with the row numbers you accept).
 
 ## Session log (newest first)
 
+- **2026-10-27 (non-GPU development session, pensive-cannon; no Kaggle or Hugging Face access).** Nothing ingested,
+  nothing launched: `www.kaggle.com` and `huggingface.co` are unreachable here, no token exists, the frozen item files
+  are absent (`data/release/v0.4/` holds `manifest.json` only); the meter was not re-run (nothing to ingest). The
+  environment was rebuilt (`/home/user/venv-noilai`, Python 3.11, `requirements.txt` + ruff 0.17.3, `fetch_resources.py`);
+  the CI lint was clean and the suite ran 698 passed / 1 failed / 22 skipped before this session's work (the failure is
+  the budget-watchdog item below). A local NON-frozen smoke build and its scored echo run now live under the
+  git-ignored `data/smoke_build/` (`v0.3-smoke`, `runs_echo/smoke_echo_20__echo`), so the smoke-build and echo-run
+  tests run here instead of skipping. At the end of the session: `python -m ruff check noilai scripts tests` clean and
+  `python -m pytest -q -p no:cacheprovider -o addopts=""` 714 passed / 0 failed / 19 skipped (the skips are the absent
+  private release files and the optional API client). Built, each through its tests (DEVIATIONS rows of 2026-10-27;
+  `BLOCKED.md` 34):
+  - `noilai/vi/mergers.py` (DD 2.1 O3): the merger table stated once by region; the scorer's `homophone` bin and the
+    attested `approx(merger: …)` names derive from it (`build_attested.py` records `merger_derived` beside the declared
+    tag, `--strict` fails on a disagreement); the bin itself is unchanged.
+  - `noilai/stats/matching.py` + `noilai.stats.analyze`: the H1 item-audit join with the 300-misaligned-split floor and
+    the nested LR test (`table_h1_e2`), the H3b tone-isolation DiD (`table_h3b`: 1:1 nearest neighbour within lexical /
+    pseudo strata, Holm over the four configured contrasts) and the H6 matched contrast (`table_h6`: 3–5 generated
+    controls per exact attested item, descriptive below the 100-row floor, Holm + REML/HK pool above it); every one
+    computes when the item audits (`BLOCKED.md` 19; `--audit-dir`) and the item files are on the machine and says why
+    when they are not. Exercised end to end on synthetic runs with planted effects (`tests/test_analyze.py`).
+  - `noilai/validation.py` `stratified_precision`: `ci` is now the design-based interval of the weighted estimate
+    (`agreement.weighted_precision_from_rows`), the unweighted Wilson beside it.
+  - `scripts/encrypt_release.py` (DD 12 item 23): AES-256-GCM over the canary-bearing files, one key per release in the
+    git-ignored `release_key.txt` (the gated README publishes it), `encryption.json` with the hashes, `verify`, `decrypt`;
+    `cryptography` added to `requirements.txt`.
+  - `scripts/reconcile_counts.py`: the `reconciliations` block of DD §0 (2.83 is Gemma 3, 2.90 Gemma 2; 10,137 word
+    tokens vs 9,594 syllable tokens on the XCOPA test file — both consistent), the carry-over of the author's
+    `release_strata` when the item files are absent, the RESULTS_LOG entry (RL-2026-10-27-01 appended).
+  - `scripts/kaggle_run_plan.py` `BudgetWatchdog`: SIGINT → SIGTERM → SIGKILL escalation. Root cause of the failing CI
+    test here: a process started with `nohup … &` from a non-interactive shell inherits SIGINT = ignored, as does
+    `run_eval.py` under it, so the watchdog's interrupt was dropped and the run never parked; on the rented box the same
+    launch would have spent the daily API cap.
+  - Not done: no model run; nothing for the author's items in `BLOCKED.md`; the E4 notebook resume (entry 36) waits
+    for the stage-2 protocol; the author confirms the two readings recorded in DEVIATIONS (the caliper on the RMS
+    standardized distance; 1:1 matching for H3b against 3–5 for H6).
 - **2026-10-17 (Vistral: proceed without it).** Hugging Face access as of 17 Oct: Gemma accepted, Llama 3.1 pending
   with Meta (the plan loads the ungated AWQ checkpoint, so nothing waits on it), `Viet-Mistral/Vistral-7B-Chat` pending
   with the owner (manual, no date). The author decided to proceed without Vistral (DEVIATIONS 2026-10-17; the
