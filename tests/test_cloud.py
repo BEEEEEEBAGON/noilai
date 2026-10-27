@@ -84,6 +84,18 @@ PINNED_REVISION = "0123456789abcdef0123456789abcdef01234567"
 
 
 @pytest.fixture(scope="module")
+def unpinned_cfg(models_cfg):
+    """models.yaml with every self-hosted `revision` cleared, as the file was before the whole-panel pin of
+    2026-10-27: the revision skip is tested on it whatever the committed file carries."""
+    cfg = copy.deepcopy({k: v for k, v in models_cfg.items() if k != "by_name"})
+    for m in cfg["models"]:
+        if not KRP.is_api(m):
+            m["revision"] = None
+    cfg["by_name"] = {m["name"]: m for m in cfg["models"]}
+    return cfg
+
+
+@pytest.fixture(scope="module")
 def pinned_cfg(models_cfg):
     """models.yaml with every self-hosted `revision` pinned to a full commit hash (DD 7.1), so that the
     execute tests exercise the runs rather than the revision skip (tested on its own below)."""
@@ -1365,18 +1377,19 @@ def test_build_command_refuses_a_canary_file_for_a_provider_that_trains_on_input
     assert KRP.main(["--run", "E1_api_core", "--models", "gpt-oss-20b", "--dry-run", "--platform", "api"]) == 0
 
 
-def test_execute_skips_an_unpinned_revision_on_a_non_smoke_line(tmp_path, plan, models_cfg, pinned_cfg):
-    """DD 7.1: no paper run on an unpinned revision. The real models.yaml is unpinned today, so every
-    non-smoke self-hosted model is skipped (dry runs still print); smoke lines and API entries pass."""
+def test_execute_skips_an_unpinned_revision_on_a_non_smoke_line(tmp_path, plan, models_cfg, unpinned_cfg, pinned_cfg):
+    """DD 7.1: no paper run on an unpinned revision. On an unpinned models.yaml (the committed file before the
+    whole-panel pin of 2026-10-27) every non-smoke self-hosted model is skipped (dry runs still print); smoke
+    lines and API entries pass."""
     proj = _stub_project(tmp_path, plan, with_items=False)
     log = proj / "log.csv"
-    res = KRP.execute("E1_main", models=["gemma-3-1b-it"], plan=plan, models_cfg=models_cfg, project_root=proj, log_path=log, verify=False)
+    res = KRP.execute("E1_main", models=["gemma-3-1b-it"], plan=plan, models_cfg=unpinned_cfg, project_root=proj, log_path=log, verify=False)
     assert res[0]["status"].startswith("skipped: revision not pinned (None)") and not log.exists()
-    assert KRP.execute("E1_main", models=["gemma-3-1b-it"], plan=plan, models_cfg=models_cfg, project_root=proj, log_path=log,
+    assert KRP.execute("E1_main", models=["gemma-3-1b-it"], plan=plan, models_cfg=unpinned_cfg, project_root=proj, log_path=log,
                        verify=False, dry_run=True)[0]["status"] == "dry-run"
-    assert KRP.execute("smoke_20", models=["gemma-3-1b-it"], plan=plan, models_cfg=models_cfg, project_root=proj, log_path=log,
+    assert KRP.execute("smoke_20", models=["gemma-3-1b-it"], plan=plan, models_cfg=unpinned_cfg, project_root=proj, log_path=log,
                        verify=False)[0]["status"] == "ok", "a smoke line runs unpinned (as run_eval --smoke does)"
-    assert KRP.execute("E1_main", models=["gemma-3-1b-it"], plan=plan, models_cfg=models_cfg, project_root=proj, log_path=log,
+    assert KRP.execute("E1_main", models=["gemma-3-1b-it"], plan=plan, models_cfg=unpinned_cfg, project_root=proj, log_path=log,
                        verify=False, allow_unpinned_revision=True)[0]["status"] == "ok"
     assert KRP.execute("E1_main", models=["gemma-3-1b-it"], plan=plan, models_cfg=pinned_cfg, project_root=proj, log_path=log,
                        verify=False)[0]["status"] == "ok"

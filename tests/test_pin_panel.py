@@ -9,7 +9,6 @@ import hashlib
 import importlib
 import json
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -127,27 +126,38 @@ def _chosen_text(text: str) -> str:
     return "".join(out)
 
 
+def _unpinned_text(text: str) -> str:
+    """configs/models.yaml as it was before the whole-panel pin of 2026-10-27: every pinned `revision: "<hash>"`
+    line back to `revision: null` (the per-line comment survives), so that the pin tests exercise a pin
+    from scratch whatever the committed file carries."""
+    return re.sub(r'revision: "[0-9a-f]{40}"', "revision: null", text)
+
+
+def _models_text() -> str:
+    return _unpinned_text(MODELS_YAML.read_text(encoding="utf-8"))
+
+
 @pytest.fixture(scope="module")
 def cfg():
-    return PP.load_models(MODELS_YAML)
+    return yaml.safe_load(_models_text())
 
 
 @pytest.fixture(scope="module")
 def cfg_chosen():
-    return yaml.safe_load(_chosen_text(MODELS_YAML.read_text(encoding="utf-8")))
+    return yaml.safe_load(_chosen_text(_models_text()))
 
 
 @pytest.fixture
 def models_copy(tmp_path):
     p = tmp_path / "models.yaml"
-    shutil.copy(MODELS_YAML, p)
+    p.write_text(_models_text(), encoding="utf-8")
     return p
 
 
 @pytest.fixture
 def models_copy_chosen(tmp_path):
     p = tmp_path / "models_chosen.yaml"
-    p.write_text(_chosen_text(MODELS_YAML.read_text(encoding="utf-8")), encoding="utf-8")
+    p.write_text(_chosen_text(_models_text()), encoding="utf-8")
     return p
 
 
