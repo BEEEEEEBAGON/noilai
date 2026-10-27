@@ -234,3 +234,55 @@ def test_every_variant_is_an_involution_on_random_pairs():
         for v in V.VARIANTS:
             x, y = V.apply(v, a, b)
             assert V.apply(v, x, y) == (a, b)
+
+
+# ------------------------------------------------------------------ mergers (DESIGN_DECISIONS 2.1 O3)
+def _phrase(text):
+    return [try_parse(w, strict=False).syllable for w in text.split()]
+
+
+def test_merger_table_is_the_o3_table_and_the_scorer_homophone_bin_derives_from_it():
+    from noilai.eval import score as SC
+    from noilai.vi import mergers as MG
+    rows = {(m.region, m.component, m.name) for m in MG.MERGERS}
+    assert rows == {("everywhere", "onset", "d/gi"), ("north", "onset", "d/gi/r"), ("north", "onset", "ch/tr"),
+                    ("north", "onset", "s/x"), ("south_centre", "onset", "v/d/gi"), ("south_centre", "coda", "n/ng"),
+                    ("south_centre", "coda", "t/c"), ("south_centre", "tone", "hỏi/ngã")}
+    assert MG.BY_NAME["hỏi/ngã"].values == frozenset({3, 4}) and MG.BY_NAME["hỏi/ngã"].labels == ("hỏi", "ngã")
+    assert MG.BY_NAME["d/gi/r"].labels == ("d", "gi", "r") and MG.BY_NAME["d/gi/r"].covers("r", "gi") and not MG.BY_NAME["s/x"].covers("s", "s")
+    # DD 5.4 item 8: d<->gi, ch<->tr, s<->x, r<->d/gi -- derived from the table, equal to the list the design document types
+    assert MG.homophone_onset_pairs() == frozenset({frozenset({"d", "gi"}), frozenset({"ch", "tr"}), frozenset({"s", "x"}),
+                                                    frozenset({"r", "d"}), frozenset({"r", "gi"})})
+    assert SC.HOMOPHONE_ONSET_PAIRS == MG.homophone_onset_pairs()
+    assert not any(m.homophone_bin for m in MG.MERGERS if m.component != "onset")
+    assert not MG.BY_NAME["v/d/gi"].homophone_bin                 # the Southern v -> d/gi is not in the 5.4 spelling list
+    assert [m.name for m in MG.for_region("north")] == ["d/gi", "d/gi/r", "ch/tr", "s/x"]
+    assert [m.name for m in MG.for_region("S")] == [m.name for m in MG.for_region("C")] == ["d/gi", "v/d/gi", "n/ng", "t/c", "hỏi/ngã"]
+    assert MG.regions_of("d/gi") == ("north", "south_centre") and MG.regions_of(MG.BY_NAME["n/ng"]) == ("south_centre",)
+    with pytest.raises(ValueError):
+        MG.for_region("west")
+    assert [r["name"] for r in MG.table()] == [m.name for m in MG.MERGERS] and MG.table()[-1]["values"] == ["hỏi", "ngã"]
+    assert MG.SPELLING_CLASSES[0] == ("c", ("c", "k", "qu"))
+
+
+def test_merger_names_resolve_and_the_approximation_tag_derives_from_the_difference():
+    from noilai.vi import mergers as MG
+    m, vals = MG.resolve("hỏi/ngã")
+    assert m.name == "hỏi/ngã" and vals == {3, 4}
+    assert MG.resolve("-n/-ng")[0].name == "n/ng" and MG.resolve("gi→d")[0].name == "d/gi" and MG.resolve("tr=ch")[0].name == "ch/tr"
+    assert MG.resolve("r/d")[0].name == "d/gi/r" and MG.resolve("v/d")[0].name == "v/d/gi" and MG.resolve("hoi/nga")[0].name == "hỏi/ngã"
+    assert MG.resolve("d") is None and MG.resolve("d/th") is None and MG.resolve("hỏi/d") is None
+    assert [x.name for x, _ in MG.parse_tag("approx(merger: n/ng + hỏi/ngã)")] == ["n/ng", "hỏi/ngã"]
+    assert MG.parse_tag("approx(substitution: o→ô)") is None and MG.parse_tag("approx(merger: n/th)") is None
+    # the DESIGN_DECISIONS 3.7 examples: the tag is written from the rule output and the attested form
+    assert MG.approximation_name(_phrase("đan giởn"), _phrase("đang giỡn")) == "approx(merger: n/ng + hỏi/ngã)"
+    assert MG.approximation_name(_phrase("vẫn như củ"), _phrase("vẫn như cũ")) == "approx(merger: hỏi/ngã)"
+    assert MG.approximation_name(_phrase("giái tró"), _phrase("dái chó")) == "approx(merger: d/gi + ch/tr)"
+    assert MG.approximation_name(_phrase("đọc hại"), _phrase("độc hại")) is None       # a substitution (o -> ô), not a merger
+    assert MG.approximation_name(_phrase("đan giởn"), _phrase("đan giởn")) is None     # exact
+    assert MG.approximation_name(_phrase("đan giởn"), _phrase("đan")) is None
+    assert MG.mergers_between(S("mắt"), S("mắc"))[0].name == "t/c" and MG.mergers_between(S("mắt"), S("mặt")) is None
+    found = MG.mergers_between_phrases(_phrase("đan giởn"), _phrase("đang giỡn"))
+    assert [x.name for x in found] == ["n/ng", "hỏi/ngã"]
+    assert MG.same_mergers("approx(merger: hỏi/ngã + -n/-ng)", found) and not MG.same_mergers("approx(merger: hỏi/ngã)", found)
+    assert not MG.same_mergers("approx(substitution: o→ô)", found)

@@ -1275,6 +1275,78 @@
     "c2_affected": 36,
     "c2_affected_test": 24
    }
+  },
+  "carried_over": true,
+  "carried_over_from": "the previous counts.json (computed over data/release/v0.3 on the author's machine)"
+ },
+ "reconciliations": {
+  "gemma3_nfd_tokens_per_syllable": {
+   "quoted": {
+    "2.83": [
+     "README.md",
+     "configs/models.yaml (gemma3 note)",
+     "docs/RESULTS_LOG.md RL-2026-09-30-01 (corrected Gemma 3 NFD row)",
+     "docs/DESIGN_DECISIONS.md 1 (H3 row)"
+    ],
+    "2.90": [
+     "docs/RESULTS_LOG.md RL-2026-09-30-01 (Gemma 2 NFD row; also the first draft of the Gemma 3 row)"
+    ]
+   },
+   "source": {
+    "gemma3_nfd_tokens_per_syllable_mean": 2.830780894617134,
+    "gemma2_nfd_tokens_per_syllable_mean": 2.898559514783927,
+    "files": [
+     "data/audit/gemma3.json",
+     "data/audit/gemma2.json"
+    ],
+    "field": "summary.nfd.tokens_per_syllable_mean"
+   },
+   "gemma3_rounded": 2.83,
+   "gemma2_rounded": 2.9,
+   "consistent": true,
+   "resolution": "2.83 is Gemma 3 (2.8308) and 2.90 is Gemma 2 (2.8986): the 2.90 once printed in the Gemma 3 row was Gemma 2's value copied by hand (RL-2026-09-30-01, corrected the same day); every document quotes the gemma3 value of this file."
+  },
+  "xcopa_syllable_tokens": {
+   "quoted": {
+    "9,628": [
+     "docs/DESIGN_DECISIONS.md 0 ('XCOPA-vi syllable tokens 9,628 vs 10,137')"
+    ],
+    "10,137": [
+     "docs/DESIGN_DECISIONS.md 0",
+     "data/audit/placement_xcopa_test.json n_word_tokens"
+    ]
+   },
+   "definitions": {
+    "n_word_tokens": "regex word tokens over the NFC text (scripts/count_placement.py WORD)",
+    "n_syllable_tokens": "word tokens that parse as a Vietnamese syllable with the current parser (non-strict)"
+   },
+   "committed": {
+    "n_items": 500,
+    "n_texts": 2000,
+    "n_word_tokens": 10137,
+    "n_syllable_tokens": 9594,
+    "affected_tokens": 53,
+    "affected_items": 43
+   },
+   "committed_both_files": {
+    "n_items": 600,
+    "n_word_tokens": 12333,
+    "n_syllable_tokens": 11677,
+    "affected_tokens": 62,
+    "affected_items": 50
+   },
+   "live_recount": {
+    "n_items": 500,
+    "n_word_tokens": 10137,
+    "n_syllable_tokens": 9594
+   },
+   "source_files": [
+    "data/audit/placement_xcopa_test.json",
+    "data/external/xcopa_test_vi.jsonl"
+   ],
+   "consistent": true,
+   "resolution": "The two figures are two definitions over the 500-item test file: 10,137 regex word tokens, of which 9,594 parse as Vietnamese syllables with the current parser (committed count 9,594; the 9,628 of the design document predates the 30 September parser corrections and is superseded). The C2-affected count is unchanged: 53 tokens in 43 items. The paper quotes word tokens with the definition.",
+   "superseded_figure_reproduced": false
   }
  },
  "resource_sha256": {
@@ -1285,5 +1357,9 @@
   "vi-DauMoi.dic": "a075773a27729713a1f5853404c7aafbb78e9056a12ccd729c19622953723143",
   "xcopa_test_vi.jsonl": "24cb28827066abb00a2f4004d86c447c4a30a9edb17938b26b61fb2385f94170",
   "xcopa_val_vi.jsonl": "6f804ec3c25b12a3d51f58e338b631bc1b45e7223b15481f8593923e0bdb26fa"
+ },
+ "generated": {
+  "script": "scripts/reconcile_counts.py",
+  "date_utc": "2026-10-27"
  }
 }

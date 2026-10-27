@@ -13,7 +13,7 @@ syllables scored 1.0 and is kept for readers only), the per-syllable alignment a
 count of misaligned split syllables (the H1 identifiability floor, design section 1),
 `tone_isolated` under NFD and `byte_fallback`, whether any input syllable is a single
 token, the token count of the gold answer (T1) and of the candidate (T3), and the change in
-input token count between NFC and NFD (Δtok for the dose–response / zero-dose contrast of
+input token count between NFC and NFD (Δtok for the dose-response / zero-dose contrast of
 design 8.6, `noilai.stats.dose_response`). The output has one row per (item_id, encoding)
 and is joined to scores by item_id at analysis time (`flatten_for_e2` gives the analysis
 row `noilai.stats.e2.prepare_covariates` consumes); nothing here depends on any model output.
@@ -65,14 +65,10 @@ def flatten_for_e2(row: dict, field: str = "input") -> dict:
     """The analysis row for one (item, encoding) audit row, in the shape
     `noilai.stats.e2.prepare_covariates` consumes: `tokens_per_syllable` = the item's mean
     tokens per syllable, `align_among_split` (None when no syllable is split), the
-    identifiability count and the arm-level covariates."""
-    st = row[field]
-    return {"item_id": row["item_id"], "tokenizer": row["tokenizer"], "encoding": row["encoding"],
-            "tokens_per_syllable": st["tokens_mean"], "align_among_split": st["align_among_split"],
-            "n_split": st["n_split"], "n_misaligned_split": st["n_misaligned_split"],
-            "tone_isolated": st["tone_isolated"], "byte_fallback": st["byte_fallback"],
-            "any_single_token": st["any_single_token"], "all_single_token": st["all_single_token"],
-            "delta_tokens_vs_nfc": row.get("delta_tokens_vs_nfc")}
+    identifiability count and the arm-level covariates. One definition: the analysis side's
+    `noilai.stats.matching.flatten_audit_row` (the join `python -m noilai.stats.analyze` runs)."""
+    from noilai.stats.matching import flatten_audit_row
+    return flatten_audit_row(row, field)
 
 
 def main(argv=None) -> int:

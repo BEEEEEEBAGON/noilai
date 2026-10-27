@@ -23,6 +23,10 @@ data/cache/
 data/release/*/*.jsonl
 # the private release manifest carries the build seed and the canary GUID (DESIGN_DECISIONS 4.6): never tracked
 data/release/*/manifest_private.json
+# the release key and the encrypted gated files (scripts/encrypt_release.py; DESIGN_DECISIONS 11.1, 12 item 23): the key is
+# published only in the gated README, the ciphertexts go to the gated dataset repository
+data/release/*/release_key.txt
+data/release/*/encrypted/
 data/audit/items_*.jsonl
 dist/
 # a local NON-frozen smoke build and its echo run for exercising code (never under data/release/); tests read it

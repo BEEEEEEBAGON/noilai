@@ -956,10 +956,14 @@ def trim_partial_last_line(path: Path) -> bool:
 
 class BudgetWatchdog:
     """Polls a run's outputs.jsonl while run_eval.py runs and interrupts the process (SIGINT) as
-    soon as the day's request or token cap is reached; the rows already flushed are kept."""
+    soon as the day's request or token cap is reached; the rows already flushed are kept. A child
+    that does not stop within `grace_s` of the SIGINT (a driver started with `nohup ... &` from a
+    non-interactive shell inherits SIGINT = ignored and passes it on, so the interrupt is silently
+    dropped) is sent SIGTERM, then SIGKILL after another grace period; `signal_sent` records which
+    one stopped it. Default grace: 10 polls, between 2 and 30 seconds."""
 
     def __init__(self, out_dir: Path, budget: dict, requests_before: int, tokens_before: int, skip_rows: int,
-                 assumed_tokens_per_call: int = 500, poll_s: float = 5.0):
+                 assumed_tokens_per_call: int = 500, poll_s: float = 5.0, grace_s: float | None = None):
         self.out_dir = Path(out_dir)
         self.budget = budget
         self.requests_before = requests_before
@@ -967,8 +971,10 @@ class BudgetWatchdog:
         self.skip_rows = skip_rows
         self.assumed = assumed_tokens_per_call
         self.poll_s = poll_s
+        self.grace_s = min(30.0, max(2.0, 10 * poll_s)) if grace_s is None else grace_s
         self.stopped = False
         self.reason = ""
+        self.signal_sent = ""
         self._stop = threading.Event()
 
     def check(self) -> str | None:
@@ -980,6 +986,20 @@ class BudgetWatchdog:
             return f"tokens {self.tokens_before + u['tokens']}/{tpd}"
         return None
 
+    def _signal(self, proc: subprocess.Popen, sig: signal.Signals) -> None:
+        self.signal_sent = sig.name
+        try:
+            proc.send_signal(sig)
+        except (ProcessLookupError, OSError):
+            pass
+
+    def _wait_exit(self, proc: subprocess.Popen, timeout: float) -> bool:
+        try:
+            proc.wait(timeout=timeout)
+            return True
+        except subprocess.TimeoutExpired:
+            return False
+
     def watch(self, proc: subprocess.Popen) -> None:
         while not self._stop.wait(self.poll_s):
             if proc.poll() is not None:
@@ -987,10 +1007,13 @@ class BudgetWatchdog:
             reason = self.check()
             if reason:
                 self.stopped, self.reason = True, reason
-                try:
-                    proc.send_signal(signal.SIGINT)
-                except (ProcessLookupError, OSError):
-                    pass
+                self._signal(proc, signal.SIGINT)
+                if self._wait_exit(proc, self.grace_s):
+                    return
+                self._signal(proc, signal.SIGTERM)          # SIGINT ignored (inherited SIG_IGN): escalate
+                if self._wait_exit(proc, self.grace_s):
+                    return
+                self._signal(proc, signal.SIGKILL)
                 return
 
     def run(self, cmd: Sequence[str], cwd: Path) -> int:
@@ -1126,6 +1149,8 @@ def execute(run_id: str, models: Sequence[str] | None = None, platform: str = "k
             dog = BudgetWatchdog(out_dir, status, status["requests_used"], status["tokens_used"], before, assumed, poll_s)
             rc = dog.run(cmd, cwd=Path(project_root))
             stopped_by_budget = dog.reason if dog.stopped else ""
+            if dog.stopped:
+                res["stopped_by"] = dog.signal_sent
         else:
             rc = subprocess.run(cmd, cwd=str(project_root), check=False).returncode
         hours = CL.hours_since(t0)

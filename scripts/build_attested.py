@@ -2,7 +2,7 @@
 """Turn data/attested_seed.tsv into the release file attested.jsonl (design 4.7).
 
 Seed columns: input, output, variant (V1-V6), positions ("0-1", "1-2", "0-2", optionally
-"reversed"), exactness (exact | approx(merger: <O3 name>) | approx(substitution: X→Y)),
+"reversed"), exactness (exact | approx(merger: <O3 name, noilai/vi/mergers.py>) | approx(substitution: X→Y)),
 region_tag (N/C/S or empty), gloss_input, gloss_output, note, confidence, vulgar, source,
 verified_by.
 
@@ -42,24 +42,17 @@ sys.path.insert(0, str(ROOT))
 from noilai.gen import variants as V
 from noilai.gen.generate import STYLE, syl_dict
 from noilai.vi import lexicon as L
+from noilai.vi import mergers as MG
 from noilai.vi import unicode as U
 from noilai.vi.reencode import canonical_text, convert_placement
 from noilai.vi.syllable import Syllable, replace, spell, try_parse
 
 POSITION_PAIRS_3 = ((0, 2), (1, 2), (0, 1))
 
-# Design 2.1 O3 merger table: (component, the values a merger identifies). A merger name in an
-# `approx(merger: ...)` tag lists two or more of the values separated by '/', '=' or '→'
-# (e.g. 'hỏi/ngã', 'n/ng', 'd/gi', 'tr/ch'); several mergers are joined with '+'.
-MERGERS: tuple[tuple[str, frozenset], ...] = (
-    ("onset", frozenset({"d", "gi", "r"})),        # everywhere d = gi; North d/gi = r
-    ("onset", frozenset({"ch", "tr"})),            # North
-    ("onset", frozenset({"s", "x"})),              # North
-    ("onset", frozenset({"v", "d", "gi"})),        # South/Centre v -> d/gi
-    ("coda", frozenset({"n", "ng"})),              # South/Centre
-    ("coda", frozenset({"t", "c"})),               # South/Centre
-    ("tone", frozenset({3, 4})),                   # South/Centre hỏi = ngã
-)
+# Design 2.1 O3 merger table, stated once in noilai/vi/mergers.py: (component, the values a merger identifies).
+# A merger name in an `approx(merger: ...)` tag lists two or more of the values separated by '/', '=' or '→'
+# (e.g. 'hỏi/ngã', 'n/ng', 'd/gi', 'tr/ch'); several mergers are joined with '+' (design 3.7).
+MERGERS: tuple[tuple[str, frozenset], ...] = tuple((m.component, m.values) for m in MG.MERGERS)
 _TONE_BY_NAME = {n: i for i, n in enumerate(U.TONE_NAMES_VI)} | {n: i for i, n in enumerate(U.TONE_NAMES)}
 _EXACTNESS_RE = re.compile(r"^approx\((merger|substitution):\s*(.+)\)$")
 
@@ -91,17 +84,9 @@ def parse_positions(spec: str, n: int) -> tuple[int, int, bool]:
 
 
 def _resolve_merger(name: str) -> tuple[str, frozenset] | None:
-    parts = [p.strip() for p in re.split(r"\s*[/=→]\s*", name.strip()) if p.strip()]
-    if len(parts) < 2:
-        return None
-    if all(p in _TONE_BY_NAME for p in parts):
-        vals: set = {_TONE_BY_NAME[p] for p in parts}
-    else:
-        vals = set(parts)
-    for comp, allowed in MERGERS:
-        if vals <= allowed:
-            return comp, frozenset(vals)
-    return None
+    """A tag name -> (component, the values it names), through the O3 table (noilai.vi.mergers.resolve)."""
+    r = MG.resolve(name)
+    return None if r is None else (r[0].component, r[1])
 
 
 def _component(s: Syllable, comp: str):
@@ -201,12 +186,20 @@ def main(argv=None) -> int:
             else:
                 exactness = "approx(unspecified)"
             approx_reachable = None
+            merger_derived = None                     # design 3.7: the merger tag the O3 table derives from the difference
+            merger_agrees = None
             if parse_ok and not rule_matches and rule_sylls is not None:
-                approx_reachable = reachable_by_named_change(rule_sylls, [p.syllable for p in out], exactness)
+                att_sylls = [p.syllable for p in out]
+                approx_reachable = reachable_by_named_change(rule_sylls, att_sylls, exactness)
+                merger_derived = MG.approximation_name(rule_sylls, att_sylls)
+                if exactness.startswith("approx(merger"):
+                    merger_agrees = merger_derived is not None and MG.same_mergers(exactness, MG.mergers_between_phrases(rule_sylls, att_sylls) or [])
             if declared == "exact" and parse_ok and not rule_matches:        # one problem per row
                 problems.append(f"row {i+1} {r['input']!r} -> {r['output']!r} declared exact but the rule gives {rule_out!r}")
             elif approx_reachable is False:
                 problems.append(f"row {i+1} {r['input']!r} -> {r['output']!r} tagged {exactness} is not reachable from {rule_out!r} by that change")
+            elif merger_agrees is False:
+                problems.append(f"row {i+1} {r['input']!r} -> {r['output']!r} tagged {exactness} but the O3 table derives {merger_derived!r}")
             in_stored, out_stored = stored(r["input"]), stored(r["output"])
             gold: dict[str, str] = {canonical_text(out_stored): out_stored}
             if rule_out:
@@ -223,6 +216,7 @@ def main(argv=None) -> int:
                 "reproducing_labels": matches,
                 "exactness": exactness, "declared_exactness": declared or None, "exact": exact,
                 "approx_reachable": approx_reachable,
+                "merger_derived": merger_derived, "declared_merger_agrees": merger_agrees,
                 "eligible_h6": exact and len(inp) == 2,
                 "gold": sorted(gold.values()),
                 "input_syllables": [syl_dict(p.syllable, w) for p, w in zip(inp, in_stored.split())] if all(inp) else None,

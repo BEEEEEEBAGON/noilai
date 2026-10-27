@@ -20,3 +20,4 @@ nbformat>=5.9          # notebook generator/validator (scripts/kaggle_build_note
 openpyxl>=3.1           # the validation workbooks (scripts/make_validation_forms.py; CSV copies are written without it)
 krippendorff>=0.6       # cross-check of noilai.stats.agreement in tests/test_validation.py (skipped when absent)
 httpx            # tests/test_pin_panel.py builds hub error responses with it; huggingface-hub >= 2.2 no longer depends on httpx
+cryptography>=42      # scripts/encrypt_release.py: AES-256-GCM for the gated release files (DESIGN_DECISIONS 12 item 23)

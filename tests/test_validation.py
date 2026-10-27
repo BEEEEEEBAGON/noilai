@@ -63,6 +63,18 @@ def test_stratified_precision_weights_by_population():
     p = VA.stratified_precision(final, key)
     assert p["T1-V1"]["weighted_precision"] == pytest.approx(0.95) and p["T1-V1"]["n"] == 20 and p["T1-V1"]["n_yes"] == 15
     assert p["pooled"]["weighted_precision"] == pytest.approx(0.95)
+    # DD 10.1 / PREREG 8.12: the cited interval is the design-based one of the WEIGHTED estimate (agreement.weighted_precision);
+    # the unweighted Wilson of 15/20 stays beside it and does not even contain the weighted 0.95
+    for cell in ("T1-V1", "pooled"):
+        rec = p[cell]
+        assert rec["ci"] == rec["weighted_ci"] and rec["ci_method"] == rec["weighted_ci_method"] == "stratified_wilson_neff(fpc)"
+        assert rec["ci"][0] <= 0.95 <= rec["ci"][1] and rec["ci"][1] - rec["ci"][0] < 0.2
+        assert rec["wilson_unweighted"][1] < 0.95 and rec["n_eff"] > 20 and rec["n_strata"] == 2 and rec["se"] > 0
+    from noilai.stats.agreement import weighted_precision_from_rows
+    assert p["T1-V1"]["ci"] == [weighted_precision_from_rows(final, key)["T1-V1"][k] for k in ("lo", "hi")]
+    # a single resolved stratum per cell still gets the weighted interval; no resolved row -> no interval, Wilson stays
+    one = VA.stratified_precision({"B-0": "yes", "B-1": "no"}, {k: key[k] for k in ("B-0", "B-1")})
+    assert one["T1-V1"]["ci_method"] == "stratified_wilson_neff(fpc)" and one["T1-V1"]["n_strata"] == 1
 
 
 def test_masi_and_jaccard():

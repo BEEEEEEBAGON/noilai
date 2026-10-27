@@ -74,6 +74,8 @@ scripts/
   progress.py             the meter block of STATUS.md from the ledger: per chunk, next chunk per queue, frontier, Kaggle hours
   interim_analysis.py     INTERIM analysis on completed units only (cluster-bootstrap CIs per cell) -> experiments/interim/
   freeze_scoring_rule.py  hash over the scoring code; --record writes it into experiments/gates.yaml (the author's command), --check
+  encrypt_release.py      encrypt the gated release files (AES-256-GCM, one key per release in the git-ignored release_key.txt that only
+                          the gated README publishes; encryption.json with the hashes; verify / decrypt)
 configs/
   models.yaml   the 21-model panel + bf16-reference and thinking variants: ids, revision, hardware, dtype, quantization, limits, risks
   run_plan.yaml the run matrix (pilot, smoke, E1 + explicit-input main result + ablations, E3, reasoning, bf16 drift, E4) with the
@@ -110,7 +112,7 @@ paper/          ACL 2027 LaTeX sources
 tests/          pytest (test_vi, test_gen, test_audit, test_stats, test_constants, test_probe, test_eval, test_scripts,
                 test_release, test_e2, test_paper, test_cloud, test_validation, test_forced_choice, test_exploratory_plan,
                 test_ledger, test_pin_panel, test_gates, test_interim_analysis, test_pooling, test_aggregate,
-                test_analyze, test_cuda_box)
+                test_analyze, test_cuda_box, test_matching)
 RUNBOOK.md, STATUS.md, BLOCKED.md, CLAUDE.md   the experiments workstream: click steps per chunk, the meter and the session
                 log, the deadline-ordered blocker list, the session protocol
 ```
@@ -333,12 +335,17 @@ to the outputs (`data/runs/env/`, checklist C4).
   by hand), `pooling` (the hierarchical model-in-tokenizer-family pool of PREREG 8.1: REML with the
   Hartung–Knapp adjustment, the family-level bootstrap beside it, k of N families; k-of-N models and
   TOST for H4), `aggregate` (run discovery over `data/runs/`, paraphrase means, cell tables with
-  cluster-bootstrap CIs, τ_m(a) per model and arm, the explicit-input gap, the T3 headline) and
+  cluster-bootstrap CIs, τ_m(a) per model and arm, the explicit-input gap, the T3 headline), `matching`
+  (PREREG 8.4 / 8.7 / 8.8: the item-audit join for E2, Mahalanobis nearest-neighbour matching within exact strata
+  with a 0.2-SD caliper and SMD balance diagnostics, the matched contrast with the base-pair bootstrap, the H3b
+  tone-isolation DiD and the H6 attested-vs-matched covariates) and
   `analyze` (the pre-registered analysis entry point, `python -m noilai.stats.analyze --config
   configs/analysis.yaml --runs data/runs [--ledger experiments/ledger.csv] [--out experiments/analysis]`:
   every table and figure as .tex + .json with its provenance, labelled INTERIM with n; `--label FINAL`
   is refused until the registration and the scoring-rule freeze are recorded and every live Table 2 /
-  Table 3 unit is done and hash-verified; `--check` refuses stale outputs). `scripts/score_run.py`
+  Table 3 unit is done and hash-verified; `--check` refuses stale outputs; `table_h1_e2`, `table_h3b` and
+  `table_h6` run once the item audits of `scripts/kaggle_cpu_jobs.py audit-items` (`--audit-dir`) and the item
+  files are on the machine, and say why when they are not). `scripts/score_run.py`
   produces the `scores.jsonl` these read.
 * `noilai.probe` (present): `extract` (residual stream at the syllable's last sub-token / the token
   after it, NFC and NFD), `probes` (layer-wise logistic probes, syllable-disjoint split, control
@@ -443,6 +450,20 @@ per the ARR policy on generative assistance.
   `experiments/panel_pins.json` with `scripts/kaggle_cpu_jobs.py`, `RUNBOOK.md`, `STATUS.md`, `BLOCKED.md`,
   `CLAUDE.md`), the dev-only `configs/run_plan_exploratory.yaml` and `PLAN_PATH` in every notebook, and the
   reviewed paper draft (`paper/claims.md`). Still no model run.
+* **2026-10-27 (the non-GPU remainder of the analysis and release kit)** — `noilai/vi/mergers.py` states the
+  DD 2.1 O3 merger table once (the scorer's `homophone` bin and the attested `approx(merger: …)` names derive
+  from it; `build_attested.py` records the derived name beside the declared tag); `noilai/stats/matching.py`
+  and `analyze` compute the H1 item-audit join with the identifiability floor and the nested test, the H3b
+  tone-isolation DiD (1:1 nearest neighbour within lexical / pseudo strata, Holm over the four contrasts) and
+  the H6 matched contrast (3–5 generated controls per exact attested item, descriptive below the 100-row floor)
+  once the item audits and item files are present (`--audit-dir`); `validation.stratified_precision` cites the
+  design-based interval of the weighted estimate; `scripts/encrypt_release.py` encrypts the gated files
+  (AES-256-GCM, one key per release, published only in the gated README); `scripts/reconcile_counts.py` emits
+  the two section-0 reconciliations (both consistent: 2.83 is Gemma 3, 2.90 Gemma 2; 10,137 word tokens vs
+  9,594 syllable tokens on the XCOPA test file), carries the author's `release_strata` over when the item files
+  are absent and appends its RESULTS_LOG entry (RL-2026-10-27-01); the API budget watchdog escalates from SIGINT
+  to SIGTERM and SIGKILL (a driver started with `nohup … &` inherits SIGINT = ignored and never parked). Still
+  no model run.
 
 ## Running from a private repository
 

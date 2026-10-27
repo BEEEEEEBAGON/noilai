@@ -689,7 +689,8 @@ def resolve(labels: dict[str, str | None], author: str | None = None) -> tuple[s
 def stratified_precision(final: dict[str, str | None], key: dict) -> dict:
     """Generator precision per cell and pooled from the weighted probability sample (controls excluded,
     unresolved rows excluded and counted): p = sum_h W_h p_h with W_h the stratum's population share among
-    the resolved strata of the cell; unweighted Wilson intervals beside the weighted estimate."""
+    the resolved strata of the cell; `ci` = the design-based interval of the weighted estimate
+    (noilai.stats.agreement.weighted_precision, DD 10.1), the unweighted Wilson interval beside it."""
     per_stratum: dict = defaultdict(lambda: [0, 0])
     unresolved = Counter()
     pop = {}
@@ -724,16 +725,30 @@ def stratified_precision(final: dict[str, str | None], key: dict) -> dict:
     lo, hi = wilson(tot_yes, tot_n)
     out["pooled"] = {"weighted_precision": (tot_wsum / tot_pop) if tot_pop else float("nan"), "n": tot_n, "n_yes": tot_yes,
                      "wilson_unweighted": [lo, hi], "n_unresolved": sum(unresolved.values())}
-    # the design-based interval of the weighted estimate (noilai.stats.agreement.weighted_precision; DD 10.1 :505)
+    # the design-based interval of the weighted estimate (noilai.stats.agreement.weighted_precision; DD 10.1 :505,
+    # PREREG 8.12): `ci` is the interval the report cites (Wilson on the effective n of the stratified variance with the
+    # finite-population correction); the unweighted Wilson stays beside it as `wilson_unweighted` (it is an interval for
+    # the UNWEIGHTED proportion and need not even contain the weighted estimate); `ci_method` names which one `ci` is.
     from noilai.stats.agreement import weighted_precision_from_rows
+    note = None
     try:
         weighted = weighted_precision_from_rows(final, key)
-    except (ValueError, KeyError, ZeroDivisionError):
-        weighted = {}
+    except (ValueError, KeyError, ZeroDivisionError) as e:
+        weighted, note = {}, f"weighted interval not computed: {e}"
     for cell, rec in out.items():
         w = weighted.get(cell)
-        rec["weighted_ci"] = [w["lo"], w["hi"]] if w and w.get("lo") == w.get("lo") else None
-        rec["weighted_ci_method"] = w.get("method") if w else None
+        ok = bool(w) and w.get("lo") == w.get("lo")                 # NaN-safe: an empty cell has no interval
+        rec["weighted_ci"] = [w["lo"], w["hi"]] if ok else None
+        rec["weighted_ci_method"] = w.get("method") if ok else None
+        rec["ci"] = rec["weighted_ci"] if ok else rec["wilson_unweighted"]
+        rec["ci_method"] = rec["weighted_ci_method"] if ok else "wilson_unweighted"
+        if ok:
+            rec["se"] = w.get("se")
+            rec["n_eff"] = w.get("n_eff")
+            rec["n_strata"] = w.get("n_strata")
+            rec["singleton_strata"] = w.get("singleton_strata")
+        if note:
+            rec["ci_note"] = note
     return out
 
 

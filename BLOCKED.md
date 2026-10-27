@@ -282,12 +282,12 @@ latest (25 Oct recommended, memo N13), results freeze 22 Nov, E4 23 Nov–6 Dec.
     `noilai/stats/analyze.py` + `configs/analysis.yaml` (`python -m noilai.stats.analyze`: 21 labelled artefacts to
     `experiments/analysis/`, FINAL refused until the gates are recorded) and `noilai.stats.agreement.weighted_precision`;
     the weighted sampling itself has been in `make_validation_forms.py packet` since 1 Oct
-    (`validation.probability_sample` records `n_population`, `n_sampled`, `weight` per stratum). Still to write: release
-    encryption (DD 12 item 23: no release script encrypts), `noilai/vi/mergers.py` (DD 2.1 O3), the weighted interval in
-    `noilai/validation.py` `stratified_precision` (reports `wilson_unweighted`; it should call
-    `agreement.weighted_precision_from_rows`), the H3b and H6 matching helpers and the H1 item-audit join (`analyze`
-    writes them as `not computable` with the reason), and in `scripts/reconcile_counts.py` (exists:
-    `data/audit/counts.json`) the RESULTS_LOG entry and the two reconciliations DD §0 still lists. Before any pooled
+    (`validation.probability_sample` records `n_population`, `n_sampled`, `weight` per stratum). Written 27 October 2026 (`STATUS.md` log): release encryption (`scripts/encrypt_release.py`), `noilai/vi/mergers.py`, the
+    weighted interval (`stratified_precision` now cites `ci` = the design-based interval), the H3b and H6 matching helpers and
+    the H1 item-audit join (`noilai/stats/matching.py`; `analyze` computes `table_h1_e2`, `table_h3b` and `table_h6` as soon as
+    the item audits of entry 19 and the item files are on the ingesting machine, and says why when they are not), and in
+    `scripts/reconcile_counts.py` the RESULTS_LOG entry and the two reconciliations (RL-2026-10-27-01). Nothing of this entry is
+    still to write; the E4 retention table stays with entry 36. Before any pooled
     number the author confirms the seven tokenizer-family labels for the 21 panel entries in `configs/analysis.yaml` (one
     entry's placement is a guess, marked in the file), REML+HK as the primary pool (standard HKSJ, no truncation), three
     informative families as the H4/H6 floor (five for H3), and the API models' C2 cell / the never-realizable
